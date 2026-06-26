@@ -113,7 +113,8 @@ export const contentService = {
    * POST /lessons (multipart) or PATCH /lessons/{id}
    */
   async create(
-    payload: CreateContentPayload & { lessonTitle: string }
+    payload: CreateContentPayload & { lessonTitle: string },
+    onUploadProgress?: (progressEvent: any) => void
   ): Promise<ContentItem> {
     const fd = new FormData();
 
@@ -128,7 +129,7 @@ export const contentService = {
     const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(
       `/lessons/${payload.lessonId}`,
       fd,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      { onUploadProgress }
     );
     const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
     const items = extractContentItems(lesson);
@@ -168,9 +169,7 @@ export const contentService = {
     // PDF deletion not supported by backend
 
     if (fd.has('videoUrl') || fd.has('content')) {
-      await api.patch(`/lessons/${lessonId}`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      await api.patch(`/lessons/${lessonId}`, fd);
     }
   },
 

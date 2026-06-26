@@ -14,7 +14,7 @@ import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestCo
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API_BASE_URL = import.meta.env.VITE_API_URL as string | undefined
-  ?? 'http://localhost:3000/api/v1';
+  ?? 'https://algonaid-api.onrender.com/api/v1';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
@@ -65,17 +65,27 @@ api.interceptors.response.use(
 
 export function normalizeAxiosError(error: AxiosError): Error {
   if (error.response) {
-    const data = error.response.data as { message?: string | string[] };
+    const data = error.response.data as { message?: string | string[]; error?: string };
     const rawMessage = data?.message;
     const message = Array.isArray(rawMessage)
       ? rawMessage[0]
-      : (rawMessage ?? `HTTP ${error.response.status}`);
+      : (rawMessage ?? data?.error ?? `HTTP ${error.response.status}`);
     const err = new Error(message);
-    (err as Error & { status: number }).status = error.response.status;
+    (err as Error & { status: number; code?: string }).status = error.response.status;
+    (err as Error & { status?: number; code?: string }).code = error.code;
+    return err;
+  }
+  if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
+    const err = new Error('انتهت مهلة الطلب. يرجى المحاولة مرة أخرى.');
+    (err as Error & { isNetworkError: boolean; code?: string }).isNetworkError = true;
+    (err as Error & { isNetworkError?: boolean; code?: string }).code = error.code;
     return err;
   }
   if (error.request) {
-    return new Error('لا يمكن الوصول إلى الخادم. تحقق من اتصالك بالإنترنت.');
+    const err = new Error('لا يمكن الوصول إلى الخادم. تحقق من اتصالك بالإنترنت.');
+    (err as Error & { isNetworkError: boolean; code?: string }).isNetworkError = true;
+    (err as Error & { isNetworkError?: boolean; code?: string }).code = error.code;
+    return err;
   }
   return new Error(error.message ?? 'حدث خطأ غير متوقع');
 }

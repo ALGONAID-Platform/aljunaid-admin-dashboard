@@ -14,7 +14,7 @@ import type { Lesson } from '../../types';
 export const publishService = {
   async publishLesson(lessonId: string): Promise<Lesson> {
     const fd = new FormData();
-    fd.append('isPublished', 'true');
+    fd.append('status', 'PUBLISHED');
     await api.patch(`/lessons/${lessonId}`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -23,7 +23,7 @@ export const publishService = {
 
   async unpublishLesson(lessonId: string): Promise<Lesson> {
     const fd = new FormData();
-    fd.append('isPublished', 'false');
+    fd.append('status', 'DRAFT');
     await api.patch(`/lessons/${lessonId}`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

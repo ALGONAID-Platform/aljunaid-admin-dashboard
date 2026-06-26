@@ -44,8 +44,12 @@ export const authService = {
       password: credentials.password,
     });
 
-    const backendUser = data.user;
-    const accessToken = data.access_token;
+    const payload = data.data ?? data;
+    const backendUser = payload.user;
+    const accessToken = payload.accessToken ?? payload.access_token;
+    if (!backendUser || !accessToken) {
+      throw new Error('Invalid authentication response');
+    }
     const user = adaptUser(backendUser as BackendProfile);
 
     // Persist JWT and user profile

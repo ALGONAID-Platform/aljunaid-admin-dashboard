@@ -29,6 +29,10 @@ const QuizPage = lazy(() =>
 const PublishPage = lazy(() =>
   import('../modules/publish/pages/PublishPage').then((m) => ({ default: m.PublishPage }))
 );
+const AcademicProgressPage = lazy(() =>
+  import('../modules/dashboard/pages/AcademicProgressPage').then((m) => ({ default: m.AcademicProgressPage }))
+);
+
 
 const PageLoader = () => (
   <div className="flex-1 flex items-center justify-center min-h-64">
@@ -50,6 +54,7 @@ function DashboardRoutes() {
           <Route path="content" element={<ContentPage />} />
           <Route path="quiz" element={<QuizPage />} />
           <Route path="publish" element={<PublishPage />} />
+          <Route path="progress" element={<AcademicProgressPage />} />
         </Routes>
       </Suspense>
     </MainDashboardLayout>
@@ -60,6 +65,11 @@ export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route
+          path={ROUTES.home}
+          element={<Navigate to={ROUTES.dashboard} replace />}
+        />
+
         {/* Public auth routes */}
         <Route
           path={ROUTES.login}
@@ -74,7 +84,7 @@ export function AppRouter() {
 
         {/* Protected dashboard routes */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/*" element={<DashboardRoutes />} />
+          <Route path="/admin/*" element={<DashboardRoutes />} />
         </Route>
 
         {/* Fallback */}

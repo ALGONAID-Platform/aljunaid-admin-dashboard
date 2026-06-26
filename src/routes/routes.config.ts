@@ -3,12 +3,14 @@
  */
 export const ROUTES = {
   login: '/login',
-  dashboard: '/',
-  courses: '/courses',
-  lessons: '/lessons',
-  content: '/content',
-  quiz: '/quiz',
-  publish: '/publish',
+  home: '/',
+  dashboard: '/admin',
+  courses: '/admin/courses',
+  lessons: '/admin/lessons',
+  content: '/admin/content',
+  quiz: '/admin/quiz',
+  publish: '/admin/publish',
+  progress: '/admin/progress',
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];

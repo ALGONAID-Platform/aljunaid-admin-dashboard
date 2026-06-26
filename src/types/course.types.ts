@@ -1,10 +1,9 @@
-import type { ID, EducationalLevel } from './common.types';
+import type { ID } from './common.types';
 
 export interface Course {
   id: ID;
   name: string;
   description: string;
-  level: EducationalLevel;
   imagePreview?: string;
   lessonsCount: number;
   createdAt: string;
@@ -13,7 +12,6 @@ export interface Course {
 export interface CreateCoursePayload {
   name: string;
   description: string;
-  level: EducationalLevel;
   imagePreview?: string;
 }
 
@@ -24,6 +22,5 @@ export interface UpdateCoursePayload extends Partial<CreateCoursePayload> {
 export interface CourseFormValues {
   name: string;
   description: string;
-  level: EducationalLevel | '';
   imagePreview?: string;
 }

@@ -10,6 +10,8 @@ export interface Lesson {
   isPublished: boolean;
   hasContent: boolean;
   createdAt: string;
+  publishedAt?: string;
+  publishedBy?: string;
 }
 
 export interface CreateLessonPayload {

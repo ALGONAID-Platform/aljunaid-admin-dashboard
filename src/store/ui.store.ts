@@ -14,7 +14,7 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  isSidebarCollapsed: false,
+  isSidebarCollapsed: typeof window !== 'undefined' ? window.innerWidth < 768 : false,
   activeModal: null,
   toastQueue: [],
 

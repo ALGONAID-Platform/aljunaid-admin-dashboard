@@ -20,6 +20,7 @@ import type {
   BackendCourseResponse,
 } from '../../types/api';
 import type { Course, CreateCoursePayload, UpdateCoursePayload } from '../../types';
+import { uploadService } from './upload.api';
 
 // ─── Adapter: Backend Course → Frontend Course ────────────────────────────────
 
@@ -28,9 +29,8 @@ function adaptCourse(bc: BackendCourse): Course {
     id: String(bc.id),
     name: bc.title,
     description: bc.description ?? '',
-    level: 'SECONDARY',
     imagePreview: bc.thumbnail ?? undefined,
-    lessonsCount: bc._count?.modules ?? 0,
+    lessonsCount: bc.lessonsCount ?? 0,
     createdAt: bc.createdAt,
   };
 }
@@ -94,33 +94,41 @@ export const courseService = {
     return list.map(adaptCourse);
   },
 
-  /** POST /courses — supports both JSON (URL thumbnail) and multipart (File thumbnail) */
-  async create(payload: CreateCoursePayload & { imageFile?: File }): Promise<Course> {
-    const { body, isFormData } = buildCourseBody({
-      name: payload.name,
-      description: payload.description,
-      imagePreview: payload.imagePreview,
-      imageFile: payload.imageFile,
-    });
+  /** POST /courses — uses upload service for file then sends JSON */
+  async create(payload: CreateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {
+    let thumbnailUrl = payload.imagePreview;
 
-    const headers = isFormData ? { 'Content-Type': 'multipart/form-data' } : {};
-    const { data } = await api.post<BackendCourseResponse | BackendCourse>('/courses', body, { headers });
+    if (payload.imageFile) {
+      thumbnailUrl = await uploadService.uploadImage(payload.imageFile, onUploadProgress);
+    }
+
+    const body = {
+      title: payload.name,
+      description: payload.description,
+      thumbnail: thumbnailUrl,
+    };
+
+    const { data } = await api.post<BackendCourseResponse | BackendCourse>('/courses', body);
     const course = (data as BackendCourseResponse).data ?? (data as BackendCourse);
     return adaptCourse(course);
   },
 
-  /** PATCH /courses/{id} — supports both JSON and multipart */
-  async update(payload: UpdateCoursePayload & { imageFile?: File }): Promise<Course> {
+  /** PATCH /courses/{id} — uses upload service for file then sends JSON */
+  async update(payload: UpdateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {
     const { id, ...rest } = payload;
-    const { body, isFormData } = buildCourseBody({
-      name: rest.name,
-      description: rest.description,
-      imagePreview: rest.imagePreview,
-      imageFile: rest.imageFile,
-    });
+    let thumbnailUrl = rest.imagePreview;
 
-    const headers = isFormData ? { 'Content-Type': 'multipart/form-data' } : {};
-    const { data } = await api.patch<BackendCourseResponse | BackendCourse>(`/courses/${id}`, body, { headers });
+    if (rest.imageFile) {
+      thumbnailUrl = await uploadService.uploadImage(rest.imageFile, onUploadProgress);
+    }
+
+    const body = {
+      title: rest.name,
+      description: rest.description,
+      thumbnail: thumbnailUrl,
+    };
+
+    const { data } = await api.patch<BackendCourseResponse | BackendCourse>(`/courses/${id}`, body);
     const course = (data as BackendCourseResponse).data ?? (data as BackendCourse);
     return adaptCourse(course);
   },

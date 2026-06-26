@@ -32,6 +32,7 @@ function adaptExamToQuiz(exam: any): Quiz {
     id: String(q.id ?? Math.random()),
     type: q.type === 'TRUE_FALSE' ? 'truefalse' : 'mcq',
     text: q.text,
+    imageUrl: q.questionImageUrl,
     options: (q.options ?? []).map((o: any) => o.text),
     correctAnswer: (q.options ?? []).find((o: any) => o.isCorrect)?.text ?? '',
     points: q.points,
@@ -61,7 +62,7 @@ function adaptQuizToCreateExamDto(payload: CreateQuizPayload): CreateExamDto {
     maxAttempts: 3,
     lessonId: Number(payload.lessonId),
     questions: payload.questions.map((q) => ({
-      text: q.text,
+      text: q.text?.trim() ?? '',
       type: q.type === 'truefalse' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
       points: q.points ?? 1,
       options: q.options.map((opt, idx) => ({
@@ -76,8 +77,8 @@ function adaptQuizToCreateExamDto(payload: CreateQuizPayload): CreateExamDto {
 
 export const quizService = {
   async getAll(): Promise<Quiz[]> {
-    const { data } = await api.get('/exams');
-    const exams = Array.isArray(data) ? data : (data as any).data ?? [];
+    const { data } = await api.get<BackendExam[] | { data: BackendExam[] }>('/exams');
+    const exams = (data as { data?: BackendExam[] }).data ?? (data as BackendExam[]);
     return exams.map(adaptExamToQuiz);
   },
 
@@ -110,7 +111,7 @@ export const quizService = {
     if (rest.lessonId !== undefined) dto.lessonId = Number(rest.lessonId);
     if (rest.questions) {
       dto.questions = rest.questions.map((q) => ({
-        text: q.text,
+        text: q.text?.trim() ?? '',
         type: q.type === 'truefalse' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
         points: q.points ?? 1,
         options: (q.options ?? []).map((opt) => ({
@@ -146,5 +147,27 @@ export const quizService = {
   async getResult(attemptId: string): Promise<unknown> {
     const { data } = await api.get(`/exams/attempts/${attemptId}/result`);
     return data;
+  },
+
+  /** POST /exams/upload-image */
+  async uploadImage(file: File, onUploadProgress?: (progress: { percent: number; loaded: number; total: number }) => void): Promise<string> {
+    const formData = new FormData();
+    formData.append('image', file);
+    const { data } = await api.post<{ imageUrl?: string; url?: string; data?: { imageUrl?: string; url?: string } }>('/exams/upload-image', formData, {
+      onUploadProgress: (evt) => {
+        if (onUploadProgress && evt.total) {
+          onUploadProgress({
+            loaded: evt.loaded,
+            total: evt.total,
+            percent: Math.round((evt.loaded * 100) / evt.total),
+          });
+        }
+      },
+    });
+    const imageUrl = data.imageUrl ?? data.url ?? data.data?.imageUrl ?? data.data?.url;
+    if (!imageUrl) {
+      throw new Error('Server rejected the uploaded file.');
+    }
+    return imageUrl;
   },
 };

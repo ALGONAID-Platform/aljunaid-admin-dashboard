@@ -9,7 +9,6 @@
  */
 
 import { api } from '../../lib/api';
-import axios from 'axios';
 
 export interface UploadResponse {
   url: string;
@@ -32,8 +31,8 @@ export type UploadError =
   | { type: 'server'; message: string; status?: number }
   | { type: 'unknown'; message: string };
 
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const ALLOWED_IMAGE_EXTS = ['JPG', 'PNG', 'WebP', 'GIF'];
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_IMAGE_EXTS = ['JPG', 'PNG', 'WEBP'];
 const MAX_IMAGE_MB = 5;
 const MAX_PDF_MB = 50;
 
@@ -42,7 +41,11 @@ export function classifyUploadError(err: unknown): UploadError {
   if (!err || typeof err !== 'object') {
     return { type: 'unknown', message: 'حدث خطأ غير متوقع أثناء الرفع.' };
   }
-  const e = err as Error & { status?: number; isNetworkError?: boolean };
+  const e = err as Error & { status?: number; isNetworkError?: boolean; uploadError?: UploadError };
+
+  if (e.uploadError) {
+    return e.uploadError;
+  }
 
   if (e.isNetworkError || e.message?.includes('Network Error') || e.message?.includes('network')) {
     return { type: 'network', message: 'انقطع الاتصال أثناء الرفع. تحقق من اتصالك وحاول مجدداً.' };
@@ -51,7 +54,7 @@ export function classifyUploadError(err: unknown): UploadError {
     return { type: 'network', message: 'انتهت مهلة الرفع. الملف قد يكون كبيراً جداً أو الاتصال بطيء.' };
   }
   if (e.status === 413 || e.message?.includes('too large') || e.message?.includes('file size')) {
-    return { type: 'size', message: `حجم الملف يتجاوز الحد المسموح به.`, maxMB: MAX_PDF_MB };
+    return { type: 'size', message: `حجم الملف يتجاوز الحد المسموح به (${MAX_PDF_MB} MB).`, maxMB: MAX_PDF_MB };
   }
   if (e.status === 415 || e.message?.includes('unsupported') || e.message?.includes('mime')) {
     return { type: 'format', message: 'نوع الملف غير مدعوم.', allowed: ALLOWED_IMAGE_EXTS };
@@ -121,7 +124,6 @@ export const uploadService = {
 
     try {
       const { data } = await api.post<UploadResponse>('/upload/image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (evt) => {
           if (onProgress && evt.total) {
             onProgress({
@@ -133,7 +135,8 @@ export const uploadService = {
         },
       });
 
-      const baseUrl = (import.meta.env.VITE_API_URL as string).replace('/api/v1', '');
+      const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://algonaid-api.onrender.com/api/v1';
+      const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
       return `${baseUrl}${data.url}`;
     } catch (err) {
       const classified = classifyUploadError(err);

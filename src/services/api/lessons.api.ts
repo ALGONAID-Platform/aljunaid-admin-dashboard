@@ -29,16 +29,16 @@ import type { Lesson, CreateLessonPayload, UpdateLessonPayload } from '../../typ
 function adaptLesson(bl: BackendLesson, module?: BackendModule): Lesson {
   return {
     id: String(bl.id),
-    // moduleId maps to courseId in frontend — frontend is flat
     courseId: String(bl.moduleId),
-    // courseName not available directly from lesson endpoint; set from module if present
     courseName: module ? `وحدة: ${module.title}` : `وحدة #${bl.moduleId}`,
     title: bl.title,
     description: bl.description ?? '',
     order: bl.order ?? 0,
-    isPublished: bl.isPublished ?? false,
+    isPublished: (bl as any).status === 'PUBLISHED',
     hasContent: !!(bl.videoUrl ?? bl.pdfUrl ?? bl.content),
     createdAt: bl.createdAt ?? new Date().toISOString(),
+    publishedAt: (bl as any).publishedAt ?? undefined,
+    publishedBy: (bl as any).publishedBy?.name ?? (bl as any).publishedBy ?? undefined,
   };
 }
 
@@ -62,6 +62,9 @@ function buildLessonFormData(payload: {
   if (payload.order !== undefined) fd.append('order', String(payload.order));
   if (payload.moduleId !== undefined) fd.append('moduleId', String(payload.moduleId));
   if (payload.pdf instanceof File) fd.append('pdf', payload.pdf);
+  if (payload.isPublished !== undefined) {
+    fd.append('status', payload.isPublished ? 'PUBLISHED' : 'DRAFT');
+  }
   return fd;
 }
 
@@ -128,6 +131,7 @@ export const lessonService = {
       description: payload.description,
       order: payload.order,
       moduleId: Number(payload.courseId),
+      isPublished: true,
     });
 
     const { data } = await api.post<BackendLesson | { data: BackendLesson }>('/lessons', fd, {

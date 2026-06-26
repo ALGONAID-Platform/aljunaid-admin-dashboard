@@ -10,6 +10,10 @@ export interface Question {
   correctAnswer: string;
   points?: number;
   order?: number;
+  /** Optional image for the question (base64 preview or server URL) */
+  imageUrl?: string;
+  /** File object — used only during form state, not persisted */
+  imageFile?: File;
 }
 
 export interface Quiz {

@@ -19,13 +19,12 @@ export function ProtectedRoute() {
   const { isAuthenticated, user, logout } = useAuthStore();
   const hasToken = Boolean(tokenStorage.get());
 
-  if (!isAuthenticated || !hasToken) {
+  if (!isAuthenticated || !hasToken || !user) {
     return <Navigate to={ROUTES.login} replace />;
   }
 
-  // Dashboard is only for admins and owners (backend roles: ADMIN, OWNER)
-  // Backend has no 'teacher' role — it uses ADMIN for instructors
-  if (user && user.role !== 'admin' && user.role !== 'owner') {
+  // Dashboard is admin-only. The backend remains the source of truth for every API request.
+  if (user.role !== 'admin') {
     logout();
     return <Navigate to={ROUTES.login} replace />;
   }

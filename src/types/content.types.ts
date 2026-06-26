@@ -22,6 +22,14 @@ export interface CreateContentPayload {
   url?: string;
 }
 
+export interface UpdateContentPayload {
+  lessonId?: ID;
+  title?: string;
+  type?: ContentType;
+  file?: File;
+  url?: string;
+}
+
 export interface ContentFormValues {
   lessonId: ID | '';
   title: string;

@@ -1,6 +1,5 @@
 /**
  * Backend API Response Types
- * Generated from Swagger: http://localhost:3000/swagger-json
  * Platform: Aljunaid Educational Platform API v1.0
  */
 
@@ -47,7 +46,7 @@ export interface BackendSignupResponse {
 
 // ─── Courses ──────────────────────────────────────────────────────────────────
 
-export type BackendEducationalLevel = 'SECONDARY' | 'DIPLOMA' | 'UNIVERSITY_LEVEL_1' | 'UNIVERSITY_LEVEL_2' | 'UNIVERSITY_LEVEL_3' | 'UNIVERSITY_LEVEL_4';
+
 
 export interface BackendCourse {
   id: number;
@@ -119,6 +118,8 @@ export interface BackendLesson {
   videoUrl?: string;
   order?: number;
   moduleId: number;
+  isPublished?: boolean;
+  publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   /** PDF file URL returned after upload */
@@ -159,6 +160,7 @@ export interface BackendOption {
 export interface BackendQuestion {
   id?: number;
   text: string;
+  questionImageUrl?: string;
   type: QuestionType;
   points: number;
   options: BackendOption[];
@@ -184,7 +186,7 @@ export interface CreateExamDto {
   questions: Omit<BackendQuestion, 'id'>[];
 }
 
-export interface UpdateExamDto extends Partial<CreateExamDto> {}
+export interface UpdateExamDto extends Partial<CreateExamDto> { }
 
 export interface AnswerDto {
   questionId: number;

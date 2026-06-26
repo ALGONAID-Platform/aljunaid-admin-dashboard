@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import {
   LayoutDashboard, BookOpen, BookMarked, FileText,
-  ClipboardList, Send, LogOut, Menu,
+  ClipboardList, Send, LogOut, Menu, Activity,
 } from 'lucide-react';
 import { useUIStore, useAuthStore } from '../../store';
 import { useNavigate, useLocation } from 'react-router';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { path: ROUTES.content, icon: FileText, label: 'المحتوى' },
   { path: ROUTES.quiz, icon: ClipboardList, label: 'الاختبارات' },
   { path: ROUTES.publish, icon: Send, label: 'نشر الدروس' },
+  { path: ROUTES.progress, icon: Activity, label: 'التقدم الأكاديمي' },
 ];
 
 interface MainDashboardLayoutProps {
@@ -22,7 +23,7 @@ interface MainDashboardLayoutProps {
 }
 
 export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
-  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
+  const { isSidebarCollapsed, toggleSidebar, setSidebarCollapsed } = useUIStore();
   const { logout, user } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,9 +31,30 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
   const currentNavItem = NAV_ITEMS.find((n) => n.path === location.pathname);
   const pageLabel = currentNavItem?.label ?? '';
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && window.innerWidth < 768 && !isSidebarCollapsed) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSidebarCollapsed, setSidebarCollapsed]);
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    if (window.innerWidth < 768) {
+      setSidebarCollapsed(true);
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     navigate(ROUTES.login, { replace: true });
+    if (window.innerWidth < 768) {
+      setSidebarCollapsed(true);
+    }
   };
 
   return (
@@ -41,7 +63,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
       {!isSidebarCollapsed && (
         <div 
           className="fixed inset-0 bg-slate-900/50 z-20 md:hidden backdrop-blur-sm transition-opacity" 
-          onClick={toggleSidebar}
+          onClick={() => setSidebarCollapsed(true)}
         />
       )}
 
@@ -76,7 +98,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => handleNavigation(item.path)}
                 title={isSidebarCollapsed ? item.label : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
                   active

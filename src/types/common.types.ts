@@ -45,13 +45,3 @@ export type UploadStatus = 'ready' | 'uploading' | 'error' | 'pending';
 export type PublishStatus = 'published' | 'draft' | 'archived';
 export type DifficultyLevel = 'مبتدئ' | 'متوسط' | 'متقدم';
 
-export type EducationalLevel = 'SECONDARY' | 'DIPLOMA' | 'UNIVERSITY_LEVEL_1' | 'UNIVERSITY_LEVEL_2' | 'UNIVERSITY_LEVEL_3' | 'UNIVERSITY_LEVEL_4';
-
-export const EDUCATIONAL_LEVELS: Record<EducationalLevel, string> = {
-  SECONDARY: 'المرحلة الثانوية',
-  DIPLOMA: 'دبلوم',
-  UNIVERSITY_LEVEL_1: 'جامعي - المستوى الأول',
-  UNIVERSITY_LEVEL_2: 'جامعي - المستوى الثاني',
-  UNIVERSITY_LEVEL_3: 'جامعي - المستوى الثالث',
-  UNIVERSITY_LEVEL_4: 'جامعي - المستوى الرابع',
-};
