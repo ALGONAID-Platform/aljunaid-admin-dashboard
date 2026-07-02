@@ -7,25 +7,23 @@ import {
 import { useLessonsStore, useContentStore } from '../../../store';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { Loader } from '../../../components/feedback/Loader';
-import { classifyUploadError, validatePdfFile, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
-import type { ContentType } from '../../../types';
+import { classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
 
-const TYPE_CONFIG: Record<ContentType, { label: string; icon: React.ElementType; color: string; bg: string; accept: string; maxMB: number; mode: 'url' | 'file' | 'both' }> = {
-  video: { label: 'مقطع فيديو', icon: Video, color: '#3B82F6', bg: '#EFF6FF', accept: '', maxMB: 0, mode: 'url' },
-  pdf: { label: 'مستند PDF', icon: FileType2, color: '#EF4444', bg: '#FEF2F2', accept: '.pdf', maxMB: 50, mode: 'file' },
-  word: { label: 'محتوى نصي', icon: FileText, color: '#6366F1', bg: '#EEF2FF', accept: '', maxMB: 0, mode: 'url' },
-  image: { label: 'صورة', icon: Image, color: '#10B981', bg: '#ECFDF5', accept: '', maxMB: 0, mode: 'url' },
-  link: { label: 'رابط خارجي', icon: Link, color: '#8B5CF6', bg: '#F5F3FF', accept: '', maxMB: 0, mode: 'url' },
+type LocalContentType = 'video' | 'markdown';
+
+const TYPE_CONFIG: Record<LocalContentType, { label: string; icon: React.ElementType; color: string; bg: string }> = {
+  video: { label: 'مقطع فيديو', icon: Video, color: '#3B82F6', bg: '#EFF6FF' },
+  markdown: { label: 'محتوى نصي (Markdown)', icon: FileText, color: '#6366F1', bg: '#EEF2FF' },
 };
 
 interface FormState {
   lessonId: string;
   title: string;
   description: string;
-  type: ContentType;
-  file: File | null;
-  url: string;
-  uploadMethod: 'file' | 'url';
+  type: LocalContentType;
+  videoUrl: string;
+  pdfUrl: string;
+  content: string;
 }
 
 export function ContentPage() {
@@ -40,59 +38,39 @@ export function ContentPage() {
     void fetchContent();
   }, [fetchLessons, fetchContent]);
 
-  const [filterType, setFilterType] = useState<ContentType | 'all'>('all');
-  const [form, setForm] = useState<FormState>({ lessonId: '', title: '', description: '', type: 'video', file: null, url: '', uploadMethod: 'url' });
+  const [filterType, setFilterType] = useState<LocalContentType | 'all'>('all');
+  const [form, setForm] = useState<FormState>({ lessonId: '', title: '', description: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' });
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadError, setUploadError] = useState<UploadError | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
-  
-  const [dragOver, setDragOver] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const resetModal = () => { 
-    setForm({ lessonId: '', title: '', description: '', type: 'video', file: null, url: '', uploadMethod: 'url' }); 
+    setForm({ lessonId: '', title: '', description: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' }); 
     setErrors({}); 
     setUploadStatus('idle'); 
     setUploadError(null);
     setUploadProgress(null);
     setEditingId(null);
-    setDragOver(false); 
-    if (fileRef.current) fileRef.current.value = '';
-  };
-
-  const handleFile = (file: File) => {
-    const cfg = TYPE_CONFIG[form.type];
-
-    if (cfg.accept === '.pdf') {
-      const validationError = validatePdfFile(file);
-      if (validationError) {
-        setUploadError(validationError);
-        return;
-      }
-    }
-    
-    setForm(p => ({ ...p, file, url: '' }));
-    setUploadError(null);
-    setErrors(p => { const x = { ...p }; delete x.file; return x; });
   };
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (!form.lessonId) e.lessonId = 'يرجى تحديد الدرس المرتبط';
     if (!form.title.trim()) e.title = 'عنوان المحتوى مطلوب للتعريف به';
-    const cfg = TYPE_CONFIG[form.type];
     
-    const isUrlMode = cfg.mode === 'url' || (cfg.mode === 'both' && form.uploadMethod === 'url');
-    
-    if (isUrlMode) {
-      if (!form.url.trim()) e.url = 'الرابط مطلوب';
-      else if (!form.url.startsWith('http')) e.url = 'الرابط غير صالح. تأكد من البداية بـ http:// أو https://';
-      else if (form.url.startsWith('blob:')) e.url = 'عذراً، روابط Blob غير مدعومة. يرجى توفير رابط حقيقي.';
-    } else {
-      if (!form.file && !editingId) e.file = 'يجب إرفاق ملف لرفعه'; 
+    if (form.type === 'video') {
+      if (!form.videoUrl.trim()) e.videoUrl = 'رابط يوتيوب مطلوب';
+      else if (!form.videoUrl.startsWith('http')) e.videoUrl = 'الرابط غير صالح. تأكد من البداية بـ http:// أو https://';
+    } else if (form.type === 'markdown') {
+      if (!form.content.trim()) e.content = 'المحتوى النصي مطلوب';
     }
+
+    if (form.pdfUrl.trim() && !form.pdfUrl.startsWith('http')) {
+      e.pdfUrl = 'الرابط غير صالح. تأكد من البداية بـ http:// أو https://';
+    }
+    
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -105,9 +83,6 @@ export function ContentPage() {
     setUploadProgress(null);
     
     try {
-      const cfg = TYPE_CONFIG[form.type];
-      const isUrlMode = cfg.mode === 'url' || (cfg.mode === 'both' && form.uploadMethod === 'url');
-      
       const onProgress = (evt: any) => {
         if (evt.total) {
           setUploadProgress({
@@ -118,19 +93,22 @@ export function ContentPage() {
         }
       };
 
+      const finalPdfUrl = form.pdfUrl.trim() ? form.pdfUrl.trim() : null;
+
       const payload = {
         lessonId: form.lessonId,
         lessonTitle: lesson.title,
         title: form.title.trim(),
-        type: form.type,
-        file: !isUrlMode ? (form.file ?? undefined) : undefined,
-        url: isUrlMode ? form.url.trim() : undefined,
+        type: form.type as any,
+        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,
+        content: form.type === 'markdown' ? form.content.trim() : undefined,
+        pdfUrl: finalPdfUrl,
       };
 
       if (editingId) {
         await useContentStore.getState().updateContent(editingId, payload, onProgress);
       } else {
-        await addContent(payload, onProgress);
+        await addContent(payload as any, onProgress);
       }
       
       setUploadStatus('success');
@@ -172,11 +150,11 @@ export function ContentPage() {
 
       {/* Filter Tabs */}
       <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm flex flex-wrap gap-2 mb-6">
-        {(['all', ...Object.keys(TYPE_CONFIG)] as (ContentType | 'all')[]).map(type => {
+        {(['all', ...Object.keys(TYPE_CONFIG)] as (LocalContentType | 'all')[]).map(type => {
           const isAll = type === 'all';
           const count = isAll ? content.length : content.filter(c => c.type === type).length;
           const active = filterType === type;
-          const cfg = !isAll ? TYPE_CONFIG[type as ContentType] : null;
+          const cfg = !isAll ? TYPE_CONFIG[type as LocalContentType] : null;
           
           return (
             <button 
@@ -223,7 +201,7 @@ export function ContentPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filtered.map(item => {
-            const cfg = TYPE_CONFIG[item.type];
+            const cfg = TYPE_CONFIG[item.type as LocalContentType] || TYPE_CONFIG['video'];
             return (
               <div key={item.id} className="bg-white rounded-[20px] border border-slate-100 p-5 flex flex-col h-full hover:shadow-lg transition-all duration-300 group hover:-translate-y-1">
                 <div className="flex items-start gap-4 mb-4">
@@ -241,10 +219,10 @@ export function ContentPage() {
                 </div>
 
                 <div className="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100 flex-1 flex flex-col justify-center gap-1.5">
-                  {item.fileName && <div className="text-xs font-semibold text-slate-600 truncate flex items-center gap-1.5"><FileType2 className="w-3.5 h-3.5 text-slate-400" /> {item.fileName}</div>}
-                  {item.fileSize && <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5 text-slate-400" /> حجم الملف: {item.fileSize}</div>}
-                  {item.url && <div className="text-xs font-semibold text-blue-600 truncate flex items-center gap-1.5" dir="ltr"><Link className="w-3.5 h-3.5 text-blue-400 shrink-0" /> {item.url}</div>}
-                  {!item.fileName && !item.url && <div className="text-xs text-slate-400">لا توجد تفاصيل إضافية</div>}
+                  {(item as any).videoUrl && <div className="text-xs font-semibold text-blue-600 truncate flex items-center gap-1.5" dir="ltr"><Link className="w-3.5 h-3.5 text-blue-400 shrink-0" /> {(item as any).videoUrl}</div>}
+                  {(item as any).pdfUrl && <div className="text-xs font-semibold text-red-600 truncate flex items-center gap-1.5" dir="ltr"><FileType2 className="w-3.5 h-3.5 text-red-400 shrink-0" /> {(item as any).pdfUrl}</div>}
+                  {item.url && !((item as any).videoUrl) && <div className="text-xs font-semibold text-blue-600 truncate flex items-center gap-1.5" dir="ltr"><Link className="w-3.5 h-3.5 text-blue-400 shrink-0" /> {item.url}</div>}
+                  {!item.url && !((item as any).videoUrl) && !((item as any).pdfUrl) && <div className="text-xs text-slate-400">لا توجد تفاصيل إضافية</div>}
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
@@ -256,7 +234,15 @@ export function ContentPage() {
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => {
                       setEditingId(item.id);
-                      setForm({ lessonId: item.lessonId, title: item.title, description: '', type: item.type, file: null, url: item.url || '', uploadMethod: item.url ? 'url' : 'file' });
+                      setForm({ 
+                        lessonId: item.lessonId, 
+                        title: item.title, 
+                        description: '', 
+                        type: (item.type as LocalContentType) || 'video', 
+                        videoUrl: (item as any).videoUrl || item.url || '', 
+                        pdfUrl: (item as any).pdfUrl || '', 
+                        content: (item as any).content || '' 
+                      });
                       setErrors({});
                       setUploadStatus('idle');
                       setUploadError(null);
@@ -326,14 +312,14 @@ export function ContentPage() {
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-1">نوع المادة العلمية <span className="text-red-500">*</span></label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                    {(Object.entries(TYPE_CONFIG) as [ContentType, typeof TYPE_CONFIG[ContentType]][]).map(([type, cfg]) => {
+                  <div className="grid grid-cols-2 gap-3">
+                    {(Object.entries(TYPE_CONFIG) as [LocalContentType, typeof TYPE_CONFIG[LocalContentType]][]).map(([type, cfg]) => {
                       const isActive = form.type === type;
                       return (
                         <button 
                           key={type} 
                           type="button" 
-                          onClick={() => setForm(p => ({ ...p, type, file: null, url: '', uploadMethod: cfg.mode === 'file' ? 'file' : 'url' }))} 
+                          onClick={() => setForm(p => ({ ...p, type, videoUrl: '', pdfUrl: '', content: '' }))} 
                           className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${isActive ? 'shadow-sm' : 'hover:bg-slate-50'}`} 
                           style={isActive ? { background: cfg.bg, borderColor: cfg.color } : { background: '#FAFAFA', borderColor: '#E2E8F0' }}
                         >
@@ -347,73 +333,40 @@ export function ContentPage() {
                   </div>
                 </div>
 
-                {TYPE_CONFIG[form.type].mode === 'both' && (
-                  <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
-                    <button 
-                      type="button"
-                      onClick={() => setForm(p => ({ ...p, uploadMethod: 'url' }))}
-                      className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${form.uploadMethod === 'url' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                      رابط خارجي (يوتيوب / درايف)
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setForm(p => ({ ...p, uploadMethod: 'file' }))}
-                      className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${form.uploadMethod === 'file' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                      رفع ملف من الجهاز
-                    </button>
-                  </div>
+                {form.type === 'video' && (
+                  <Field label="رابط يوتيوب (YouTube URL)" required error={errors.videoUrl}>
+                    <input 
+                      value={form.videoUrl} 
+                      onChange={e => { setForm(p => ({ ...p, videoUrl: e.target.value })); setErrors(p => { const x = { ...p }; delete x.videoUrl; return x; }); }} 
+                      placeholder="https://youtube.com/watch?v=..." 
+                      className={inputCls(!!errors.videoUrl, 'font-mono text-left')} 
+                      dir="ltr" 
+                    />
+                  </Field>
                 )}
 
-                {(TYPE_CONFIG[form.type].mode === 'url' || (TYPE_CONFIG[form.type].mode === 'both' && form.uploadMethod === 'url')) ? (
-                  <Field label="الرابط المباشر (URL)" required error={errors.url}>
-                    <input value={form.url} onChange={e => { setForm(p => ({ ...p, url: e.target.value })); setErrors(p => { const x = { ...p }; delete x.url; return x; }); }} placeholder="https://example.com/..." className={inputCls(!!errors.url, 'font-mono text-left')} dir="ltr" />
-                  </Field>
-                ) : (
-                  <Field label={editingId && !form.file ? "تحديث وتغيير الملف (اختياري)" : "إرفاق الملف"} required={!editingId} error={errors.file}>
-                    <input ref={fileRef} type="file" accept={TYPE_CONFIG[form.type].accept} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-                    
-                    {uploadProgress && uploadStatus === 'uploading' && (
-                      <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl mb-4">
-                        <ProgressBar progress={uploadProgress} />
-                      </div>
-                    )}
-                    
-                    {form.file ? (
-                      <div className="flex items-center gap-4 p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl shadow-sm">
-                        <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center shrink-0">
-                          {(() => { const cfg = TYPE_CONFIG[form.type]; return <cfg.icon className="w-6 h-6" style={{ color: cfg.color }} />; })()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-slate-800 font-bold text-sm truncate mb-0.5">{form.file.name}</div>
-                          <div className="text-slate-500 text-xs font-mono bg-white px-2 py-0.5 rounded w-max border border-slate-100">{(form.file.size / (1024 * 1024)).toFixed(2)} MB</div>
-                        </div>
-                        <button type="button" onClick={() => { setForm(p => ({ ...p, file: null })); if (fileRef.current) fileRef.current.value = ''; }} className="w-10 h-10 rounded-xl bg-white border border-red-100 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center shadow-sm">
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div 
-                        onDragOver={e => { e.preventDefault(); setDragOver(true); }} 
-                        onDragLeave={() => setDragOver(false)} 
-                        onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }} 
-                        onClick={() => fileRef.current?.click()} 
-                        className={`border-2 border-dashed rounded-3xl p-10 text-center cursor-pointer transition-all ${dragOver ? 'border-emerald-500 bg-emerald-50/50' : (errors.file ? 'border-red-400 bg-red-50/30' : 'border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-emerald-400')}`} 
-                      >
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 transition-colors ${dragOver ? 'bg-emerald-100 text-emerald-600' : 'bg-white shadow-sm border border-slate-200 text-slate-400'}`}>
-                          <Upload className="w-8 h-8" />
-                        </div>
-                        <p className="text-slate-700 font-bold text-base mb-1">
-                          قم بإسقاط الملف هنا أو <span className="text-emerald-600 underline underline-offset-4">تصفح جهازك</span>
-                        </p>
-                        <p className="text-slate-500 font-medium text-xs">
-                          الامتدادات المقبولة: {TYPE_CONFIG[form.type].accept} (بحجم لا يتجاوز {TYPE_CONFIG[form.type].maxMB} ميجابايت)
-                        </p>
-                      </div>
-                    )}
+                {form.type === 'markdown' && (
+                  <Field label="المحتوى النصي (Markdown)" required error={errors.content}>
+                    <textarea 
+                      value={form.content} 
+                      onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.content; return x; }); }} 
+                      placeholder="اكتب المحتوى هنا..." 
+                      rows={6}
+                      className={`${inputCls(!!errors.content)} resize-y text-sm leading-relaxed`} 
+                    />
                   </Field>
                 )}
+
+                <Field label="رابط مستند PDF (Google Drive) - اختياري" error={errors.pdfUrl}>
+                  <input 
+                    value={form.pdfUrl} 
+                    onChange={e => { setForm(p => ({ ...p, pdfUrl: e.target.value })); setErrors(p => { const x = { ...p }; delete x.pdfUrl; return x; }); }} 
+                    placeholder="https://drive.google.com/..." 
+                    className={inputCls(!!errors.pdfUrl, 'font-mono text-left')} 
+                    dir="ltr" 
+                  />
+                </Field>
+
               </div>
             </div>
             

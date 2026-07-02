@@ -20,6 +20,9 @@ export interface CreateContentPayload {
   type: ContentType;
   file?: File;
   url?: string;
+  videoUrl?: string | null;
+  pdfUrl?: string | null;
+  content?: string | null;
 }
 
 export interface UpdateContentPayload {
@@ -28,6 +31,9 @@ export interface UpdateContentPayload {
   type?: ContentType;
   file?: File;
   url?: string;
+  videoUrl?: string | null;
+  pdfUrl?: string | null;
+  content?: string | null;
 }
 
 export interface ContentFormValues {
