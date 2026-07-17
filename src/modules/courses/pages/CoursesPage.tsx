@@ -1,12 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, BookOpen, X, CheckCircle, AlertCircle, Image as ImageIcon, Link as LinkIcon,
-  Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi
+  Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi, CheckSquare, Square, Copy
 } from 'lucide-react';
-import { useCoursesStore } from '../../../store';
+import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
 import { validateImageFile, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
 import { Loader } from '../../../components/feedback/Loader';
+import { useKeyboardShortcut } from '../../../hooks/useKeyboardShortcuts';
+import { BulkActionBar } from '../../../components/ui/BulkActionBar';
+import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { EmptyState } from '../../../components/feedback/EmptyState';
+import { StatWidget } from '../../../components/ui/StatWidget';
+import { BookMarked, PlayCircle, FolderOpen, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Pagination } from '../../../components/ui/Pagination';
+import { StickyToolbar } from '../../../components/ui/StickyToolbar';
+import { GlobalSearch } from '../../../components/ui/GlobalSearch';
+import { SavedViews } from '../../../components/ui/SavedViews';
 import type { Course } from '../../../types';
 
 interface FormState {
@@ -53,7 +62,7 @@ function UploadErrorBanner({ error, onRetry }: { error: UploadError; onRetry?: (
   );
 }
 
-function ProgressBar({ progress }: { progress: UploadProgress }) {
+function UploadProgressBar({ progress }: { progress: UploadProgress }) {
   return (
     <div className="space-y-2 mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
       <div className="flex justify-between text-xs font-semibold text-slate-700">
@@ -80,13 +89,41 @@ function ProgressBar({ progress }: { progress: UploadProgress }) {
 
 export function CoursesPage() {
   const { courses, addCourse, updateCourse, deleteCourse, fetchCourses, isLoading, error } = useCoursesStore();
+  const { modules, fetchModules } = useModulesStore();
+  const { lessons, fetchLessons } = useLessonsStore();
+
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeView, setActiveView] = useState('all');
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(9);
+  
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { void fetchCourses(); }, [fetchCourses]);
+  useEffect(() => { setCurrentPage(1); setSelectedCourses([]); }, [searchQuery, activeView, itemsPerPage]);
+
+  useEffect(() => { 
+    void fetchCourses(); 
+    void fetchModules();
+    void fetchLessons();
+  }, [fetchCourses, fetchModules, fetchLessons]);
+
+  const stats = useMemo(() => {
+    return {
+      totalCourses: courses.length,
+      totalModules: modules.length,
+      totalLessons: lessons.length,
+      publishedLessons: lessons.filter(l => l.isPublished).length,
+      draftLessons: lessons.filter(l => !l.isPublished).length,
+      completionRate: lessons.length ? Math.round((lessons.filter(l => l.hasContent).length / lessons.length) * 100) : 0,
+    };
+  }, [courses, modules, lessons]);
 
   const [form, setForm] = useState<FormState>({ name: '', description: '', thumbnailUrl: '', thumbnailFile: null });
   const [errors, setErrors] = useState<FormError>({});
@@ -131,7 +168,6 @@ export function CoursesPage() {
   };
 
   const closeModal = () => {
-    // Prevent accidental closure if form is dirty
     const isDirty = form.name || form.description || form.thumbnailFile || form.thumbnailUrl;
     if (isDirty && saveStatus !== 'success' && !confirm('لديك تغييرات غير محفوظة. هل أنت متأكد من الإلغاء؟')) {
       return;
@@ -143,23 +179,15 @@ export function CoursesPage() {
   const validate = (): boolean => {
     const e: FormError = {};
     const nameStr = form.name.trim();
-    
-    // Title Validation
     if (!nameStr) e.name = 'اسم المقرر مطلوب';
     else if (nameStr.length < 5) e.name = 'يجب أن يكون عنوان المقرر 5 أحرف على الأقل';
     else if (nameStr.length > 100) e.name = 'لا يمكن أن يتجاوز عنوان المقرر 100 حرف';
     else if (!/^(?!\s*$).+/.test(form.name)) e.name = 'لا يمكن أن يكون عنوان المقرر مسافات فارغة فقط';
     else if (!editingId && courses.some(c => c.name.toLowerCase() === nameStr.toLowerCase())) e.name = 'اسم المقرر موجود مسبقاً في النظام';
-    
-    // Description Validation
     if (!form.description.trim()) e.description = 'وصف المقرر مطلوب ويفضل أن يكون شاملاً';
-    
-
-    // Image URL Validation (if file is not selected but URL is provided)
     if (!form.thumbnailFile && form.thumbnailUrl && !form.thumbnailUrl.startsWith('http')) {
       e.thumbnailUrl = 'الرابط غير صالح. تأكد من أنه يبدأ بـ http:// أو https://';
     }
-    
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -210,7 +238,7 @@ export function CoursesPage() {
         setErrors(prev => ({ ...prev, submit: Array.isArray(msg) ? msg[0] : msg }));
       }
     }
-  }, [form, editingId, validate, updateCourse, addCourse, closeModal]);
+  }, [form, editingId, validate, updateCourse, addCourse, resetModal]);
 
   const handleFileSelect = (file: File) => {
     const validationErr = validateImageFile(file);
@@ -220,12 +248,8 @@ export function CoursesPage() {
     }
     setUploadError(null);
     setForm(p => ({ ...p, thumbnailFile: file, thumbnailUrl: '' }));
-    
-    // Generate secure preview blob URL
     const preview = URL.createObjectURL(file);
     setPreviewUrl(preview);
-    
-    // Cleanup old URL to prevent memory leaks
     return () => URL.revokeObjectURL(preview);
   };
 
@@ -242,16 +266,57 @@ export function CoursesPage() {
 
   const isFormValid = form.name.trim() && form.description.trim();
   
-  const filteredCourses = courses.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredCourses = courses.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
+    let matchesView = true;
+    if (activeView === 'no_image') matchesView = !c.imagePreview;
+    if (activeView === 'no_desc') matchesView = !c.description?.trim();
+    if (activeView === 'empty') matchesView = c.lessonsCount === 0;
+    return matchesSearch && matchesView;
+  });
+
+  // Keyboard Shortcuts
+  useKeyboardShortcut('f', true, () => searchInputRef.current?.focus()); // Ctrl+F
+  useKeyboardShortcut('escape', false, () => {
+    if (showModal) closeModal();
+    if (deleteConfirm) { setDeleteConfirm(null); setDeleteStatus('idle'); }
+    setSelectedCourses([]);
+  });
+  useKeyboardShortcut('s', true, (e) => {
+    if (showModal && isFormValid && saveStatus !== 'loading' && saveStatus !== 'uploading' && saveStatus !== 'success') {
+      e.preventDefault();
+      void handleSave();
+    }
+  });
+
+  const handleBulkAction = async (action: 'delete' | 'duplicate') => {
+    if (selectedCourses.length === 0) return;
+    if (action === 'delete' && !confirm(`تأكيد حذف ${selectedCourses.length} مقرر نهائياً؟ لا يمكن التراجع.`)) return;
+    
+    setBulkActionLoading(true);
+    try {
+      for (const id of selectedCourses) {
+        if (action === 'delete') await deleteCourse(id);
+        else if (action === 'duplicate') {
+          const c = courses.find(x => x.id === id);
+          if (c) await addCourse({ name: c.name + ' (نسخة)', description: c.description, imagePreview: c.imagePreview } as any);
+        }
+      }
+      setSelectedCourses([]);
+    } catch {
+      alert('حدث خطأ أثناء تنفيذ الإجراء المجمع.');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const paginatedCourses = filteredCourses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (isLoading && courses.length === 0) return <Loader fullPage />;
 
   return (
     <div className="font-sans antialiased text-slate-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
           <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1">
             إدارة المقررات الدراسية
@@ -261,18 +326,7 @@ export function CoursesPage() {
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="relative group">
-            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث عن مقرر أو مرحلة..."
-              className="w-full sm:w-64 pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
-            />
-          </div>
-          
+        <div className="flex items-center gap-3">
           <button
             onClick={openCreate}
             className="flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
@@ -284,7 +338,49 @@ export function CoursesPage() {
         </div>
       </div>
 
-      {/* Main Content Area */}
+      <StickyToolbar position="top">
+        <div className="flex flex-col md:flex-row gap-4 w-full">
+          <div className="relative flex-1 group w-full">
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="البحث في المقررات، وصفها، أو الكلمات المفتاحية... (Ctrl+F)"
+              className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
+            />
+          </div>
+          <SavedViews 
+            activeView={activeView}
+            onChange={setActiveView}
+            views={[
+              { id: 'all', label: 'الكل', icon: BookOpen },
+              { id: 'empty', label: 'بدون دروس', icon: FolderOpen },
+              { id: 'no_image', label: 'بدون غلاف', icon: AlertCircle },
+              { id: 'no_desc', label: 'بدون وصف', icon: AlertCircle },
+            ]}
+          />
+        </div>
+      </StickyToolbar>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <StatWidget title="إجمالي المقررات" value={stats.totalCourses} icon={BookOpen} color="#3B82F6" bg="#EFF6FF" />
+        <StatWidget title="الوحدات الدراسية" value={stats.totalModules} icon={FolderOpen} color="#8B5CF6" bg="#F5F3FF" />
+        <StatWidget title="إجمالي الدروس" value={stats.totalLessons} icon={BookMarked} color="#F59E0B" bg="#FEF3C7" />
+        <StatWidget title="الدروس المنشورة" value={stats.publishedLessons} icon={CheckCircle} color="#10B981" bg="#ECFDF5" />
+        <StatWidget title="دروس المسودة" value={stats.draftLessons} icon={Clock} color="#64748B" bg="#F8FAFC" />
+        <StatWidget title="اكتمال المحتوى" value={`${stats.completionRate}%`} icon={PlayCircle} color="#EC4899" bg="#FDF2F8" />
+      </div>
+
+      <BulkActionBar 
+        selectedCount={selectedCourses.length}
+        onClear={() => setSelectedCourses([])}
+        onDuplicate={() => handleBulkAction('duplicate')}
+        onDelete={() => handleBulkAction('delete')}
+        loading={bulkActionLoading}
+      />
+
       {error && courses.length === 0 ? (
         <div className="bg-white rounded-3xl border border-red-100 p-12 text-center shadow-xl shadow-red-500/5 flex flex-col items-center">
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-5 border-4 border-white shadow-inner">
@@ -317,19 +413,79 @@ export function CoursesPage() {
           <button onClick={() => setSearchQuery('')} className="mt-4 text-emerald-600 hover:text-emerald-700 font-semibold text-sm underline underline-offset-4">مسح البحث</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredCourses.map(course => (
-            <CourseCard
-              key={course.id}
-              course={course}
-              onEdit={() => openEdit(course)}
-              onDelete={() => setDeleteConfirm(course.id)}
-            />
-          ))}
+        <div className="space-y-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-bold text-slate-500 flex items-center gap-2">
+                <button onClick={() => setSelectedCourses(p => p.length === paginatedCourses.length ? [] : paginatedCourses.map(c => c.id))} className="text-slate-400 hover:text-emerald-500 transition-colors" title="تحديد الكل في هذه الصفحة">
+                  {selectedCourses.length > 0 && selectedCourses.length === paginatedCourses.length ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
+                </button>
+                <span>المقررات التعليمية ({filteredCourses.length})</span>
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paginatedCourses.map(course => {
+                const cLessons = lessons.filter(l => l.courseId === course.id);
+                const publishedCLessons = cLessons.filter(l => l.isPublished);
+                const isSelected = selectedCourses.includes(course.id);
+                const toggleSelect = () => setSelectedCourses(p => p.includes(course.id) ? p.filter(id => id !== course.id) : [...p, course.id]);
+
+                return (
+                  <div key={course.id} className={`bg-white rounded-[2rem] border overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col ${isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-100 hover:-translate-y-1'}`}>
+                    <div className="h-40 bg-slate-100 relative group-hover:brightness-105 transition-all overflow-hidden flex items-center justify-center">
+                      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+                        <button onClick={toggleSelect} className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm shadow-sm flex items-center justify-center text-slate-500 hover:text-emerald-600 transition-colors">
+                          {isSelected ? <CheckSquare className="w-5 h-5 text-emerald-600" /> : <Square className="w-5 h-5" />}
+                        </button>
+                      </div>
+                      {course.imagePreview ? (
+                        <img src={course.imagePreview} alt={course.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <BookOpen className="w-12 h-12 text-emerald-200" />
+                      )}
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 backdrop-blur-[1px]">
+                        <button onClick={() => openEdit(course)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-blue-600 hover:scale-110 transition-all shadow-lg" title="تعديل المقرر">
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setDeleteConfirm(course.id)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-red-600 hover:scale-110 transition-all shadow-lg" title="حذف المقرر">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="p-5 flex flex-col flex-1">
+                      <h3 className="text-slate-800 font-bold text-base mb-2 line-clamp-1 leading-tight group-hover:text-emerald-600 transition-colors">{course.name}</h3>
+                      <p className="text-sm text-slate-500 line-clamp-2 min-h-[2.5rem] leading-relaxed mb-4">{course.description}</p>
+                      
+                      <div className="mb-4">
+                        <ProgressBar percent={cLessons.length ? Math.round((publishedCLessons.length / cLessons.length) * 100) : 0} label="نسبة النشر" />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        <div className="flex items-center gap-1.5 text-slate-500 font-medium text-xs border border-slate-100 rounded-lg p-2 bg-slate-50/50">
+                           <BookOpenCheck className="w-4 h-4 text-emerald-500" />
+                           <span>{course.lessonsCount} درس</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md flex items-center justify-center">
+                          {new Date(course.createdAt).toLocaleDateString('ar-SA')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredCourses.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+          />
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
@@ -343,37 +499,34 @@ export function CoursesPage() {
                 أنت على وشك حذف المقرر <span className="font-bold text-slate-700">"{courses.find(c => c.id === deleteConfirm)?.name}"</span>.
               </p>
               <div className="bg-red-50 text-red-600 text-xs p-3 rounded-xl font-medium">
-                تنبيه خطير: سيؤدي هذا إلى حذف جميع الوحدات، الدروس، والملفات المرتبطة به بشكل نهائي. لا يمكن التراجع عن هذا الإجراء.
+                تنبيه خطير: سيؤدي هذا إلى حذف جميع الوحدات، الدروس، والملفات المرتبطة به بشكل نهائي.
               </div>
               
               {deleteStatus === 'error' && (
-                <p className="text-red-600 mt-4 text-sm font-bold animate-pulse">حدث خطأ أثناء محاولة الحذف. يرجى التأكد من صلاحياتك والمحاولة مجدداً.</p>
+                <p className="text-red-600 mt-4 text-sm font-bold animate-pulse">حدث خطأ أثناء محاولة الحذف.</p>
               )}
             </div>
             
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
               <button onClick={() => { setDeleteConfirm(null); setDeleteStatus('idle'); }} className="flex-1 py-3 text-slate-600 rounded-xl font-bold bg-white border border-slate-200 hover:bg-slate-100 transition-colors">
-                إلغاء التراجع
+                إلغاء
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
                 disabled={deleteStatus === 'loading'}
-                className="flex-1 py-3 text-white rounded-xl bg-red-500 hover:bg-red-600 active:bg-red-700 transition-all shadow-md shadow-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold"
+                className="flex-1 py-3 text-white rounded-xl bg-red-500 hover:bg-red-600 active:bg-red-700 transition-all shadow-md shadow-red-500/20 disabled:opacity-50 flex items-center justify-center gap-2 font-bold"
               >
                 {deleteStatus === 'loading' && <Loader2 className="w-5 h-5 animate-spin" />}
-                {deleteStatus === 'loading' ? 'جاري المسح...' : 'نعم، احذف المقرر'}
+                {deleteStatus === 'loading' ? 'جاري المسح...' : 'نعم، احذف'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Ultra-Modern Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col animate-in slide-in-from-bottom-8 duration-300">
-            
-            {/* Modal Header */}
             <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 shrink-0 bg-white rounded-t-[2rem]">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
@@ -393,10 +546,7 @@ export function CoursesPage() {
               </button>
             </div>
 
-            {/* Modal Body - Scrollable */}
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
-              
-              {/* Form Level Errors */}
               {errors.submit && (
                 <div className="mb-6 flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -411,7 +561,6 @@ export function CoursesPage() {
               )}
 
               <div className="space-y-6">
-                {/* Visual Distinction: Section 1 - Basic Info */}
                 <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-5 relative">
                   <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-100 text-xs font-bold text-emerald-600 shadow-sm flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -428,8 +577,6 @@ export function CoursesPage() {
                     />
                   </Field>
 
-
-
                   <Field label="وصف المقرر" required error={errors.description} helperText="اكتب نبذة شاملة عن أهداف المقرر وما سيتعلمه الطالب.">
                     <textarea
                       value={form.description}
@@ -441,15 +588,12 @@ export function CoursesPage() {
                   </Field>
                 </div>
 
-                {/* Visual Distinction: Section 2 - Media */}
                 <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 relative mt-6">
                   <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
                     الوسائط المرئية (اختياري)
                   </div>
                   
                   <Field label="غلاف المقرر (الصورة المصغرة)" error={errors.thumbnailUrl} helperText="سيتم عرض هذه الصورة كواجهة للمقرر في لوحة الطلاب والمشرفين.">
-                    
-                    {/* Active Image Preview Box */}
                     {(previewUrl || (form.thumbnailUrl && form.thumbnailUrl.startsWith('http'))) ? (
                       <div className="mb-4 rounded-2xl overflow-hidden border-2 border-emerald-100 shadow-sm relative group bg-slate-50" style={{ height: 180 }}>
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10 backdrop-blur-[2px]">
@@ -473,7 +617,6 @@ export function CoursesPage() {
                         </div>
                       </div>
                     ) : (
-                      /* Drag & Drop Upload Area */
                       <div
                         className="border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all mb-4 group bg-slate-50"
                         style={{ borderColor: errors.thumbnailUrl ? '#EF4444' : '#CBD5E1' }}
@@ -487,79 +630,53 @@ export function CoursesPage() {
                         </div>
                         <h4 className="text-slate-700 font-bold text-sm mb-1">اضغط لرفع صورة من جهازك</h4>
                         <p className="text-slate-400 text-xs">أو قم بسحب وإفلات الصورة هنا</p>
-                        <div className="mt-4 flex items-center justify-center gap-3 text-[11px] text-slate-500 font-medium">
-                          <span className="bg-white px-2 py-1 rounded border border-slate-200">JPG, PNG, WEBP</span>
-                          <span className="bg-white px-2 py-1 rounded border border-slate-200">Max 5MB</span>
-                        </div>
                       </div>
                     )}
-
                     <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
-
-                    {uploadProgress && saveStatus === 'uploading' && <ProgressBar progress={uploadProgress} />}
-
-                    {/* URL Input Divider */}
+                    {uploadProgress && saveStatus === 'uploading' && <UploadProgressBar progress={uploadProgress} />}
                     {!previewUrl && !form.thumbnailFile && (
-                      <>
-                        <div className="flex items-center gap-3 my-4">
-                          <div className="flex-1 h-px bg-slate-200" />
-                          <span className="text-slate-400 font-semibold text-[11px] uppercase tracking-wider">أو إرفاق رابط خارجي</span>
-                          <div className="flex-1 h-px bg-slate-200" />
-                        </div>
-                        
-                        <div className="relative group">
-                          <LinkIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                          <input
-                            type="url"
-                            value={form.thumbnailUrl}
-                            onChange={e => { setForm(p => ({ ...p, thumbnailUrl: e.target.value, thumbnailFile: null })); setPreviewUrl(null); setUploadError(null); }}
-                            placeholder="https://example.com/images/course-cover.jpg"
-                            className={`${inputCls(!!errors.thumbnailUrl)} pr-11 font-mono text-sm placeholder:font-sans placeholder:text-right`}
-                            style={{ direction: 'ltr', textAlign: 'left' }}
-                          />
-                        </div>
-                      </>
+                      <div className="relative group">
+                        <LinkIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                        <input
+                          type="url"
+                          value={form.thumbnailUrl}
+                          onChange={e => { setForm(p => ({ ...p, thumbnailUrl: e.target.value, thumbnailFile: null })); setPreviewUrl(null); setUploadError(null); }}
+                          placeholder="https://example.com/images/course-cover.jpg"
+                          className={`${inputCls(!!errors.thumbnailUrl)} pr-11 font-mono text-sm placeholder:font-sans placeholder:text-right`}
+                          style={{ direction: 'ltr', textAlign: 'left' }}
+                        />
+                      </div>
                     )}
                   </Field>
                 </div>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2rem] flex items-center justify-end gap-3 shrink-0">
-              <button 
-                onClick={closeModal} 
-                className="px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-all focus:ring-2 focus:ring-slate-200"
-              >
-                إلغاء الأمر
-              </button>
-              
+            <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2rem] flex flex-col sm:flex-row items-center justify-end gap-3 shrink-0">
+              <button onClick={closeModal} className="w-full sm:w-auto px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-all focus:ring-2 focus:ring-slate-200 order-2 sm:order-1">إلغاء الأمر</button>
               <button
                 onClick={handleSave}
                 disabled={!isFormValid || saveStatus === 'loading' || saveStatus === 'uploading' || saveStatus === 'success'}
-                className="px-8 py-3 text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                className="w-full sm:w-auto px-8 py-3 text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 order-1 sm:order-2"
                 style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
               >
                 {(saveStatus === 'loading' || saveStatus === 'uploading') ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> جاري معالجة البيانات...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" /> جاري المعالجة...</>
                 ) : saveStatus === 'success' ? (
-                  <><CheckCircle className="w-5 h-5 animate-bounce" /> تم الاعتماد بنجاح!</>
+                  <><CheckCircle className="w-5 h-5 animate-bounce" /> تم الاعتماد!</>
                 ) : editingId ? (
-                  <><Edit3 className="w-5 h-5" /> حفظ جميع التعديلات</>
+                  <><Edit3 className="w-5 h-5" /> حفظ التعديلات</>
                 ) : (
-                  <><Plus className="w-5 h-5" strokeWidth={3} /> إطلاق المقرر الجديد</>
+                  <><Plus className="w-5 h-5" strokeWidth={3} /> إطلاق المقرر</>
                 )}
               </button>
             </div>
-
           </div>
         </div>
       )}
     </div>
   );
 }
-
-// ─── Helpers & Micro Components ───────────────────────────────────────────────
 
 function Field({ label, required, error, helperText, children }: { label: string; required?: boolean; error?: string; helperText?: string; children: React.ReactNode }) {
   return (
@@ -587,58 +704,5 @@ function inputCls(hasError: boolean, extra = '') {
   } ${extra}`;
 }
 
-// ─── Course Card Component ──────────────────────────────────────────────────
+// ─── Component Helpers ────────────────────────────────────────────────────────
 
-function CourseCard({ course, onEdit, onDelete }: { course: Course; onEdit: () => void; onDelete: () => void }) {
-  return (
-    <div className="bg-white rounded-[20px] border border-slate-100 overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300 group flex flex-col h-full hover:-translate-y-1">
-      {/* Image Header */}
-      <div className="relative h-44 w-full overflow-hidden bg-slate-50">
-        {course.imagePreview ? (
-          <img 
-            src={course.imagePreview} 
-            alt={course.name} 
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-            onError={(e) => { e.currentTarget.src = 'https://placehold.co/600x400/ECFDF5/10B981?text=Course'; }} 
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50/50">
-            <BookOpen className="w-12 h-12 text-emerald-200" />
-          </div>
-        )}
-        
-
-        {/* Overlay Actions (Hover) */}
-        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 backdrop-blur-[1px]">
-          <button onClick={onEdit} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-blue-600 hover:scale-110 transition-all shadow-lg" title="تعديل المقرر">
-            <Edit3 className="w-4 h-4" />
-          </button>
-          <button onClick={onDelete} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-red-600 hover:scale-110 transition-all shadow-lg" title="حذف المقرر">
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-      
-      {/* Content Body */}
-      <div className="p-5 flex flex-col flex-1">
-        <h3 className="text-slate-800 font-bold text-base mb-2 line-clamp-1 leading-tight group-hover:text-emerald-600 transition-colors" title={course.name}>
-          {course.name}
-        </h3>
-        <p className="text-slate-500 text-sm mb-4 line-clamp-2 leading-relaxed flex-1">
-          {course.description}
-        </p>
-        
-        {/* Footer Stats */}
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-slate-500 font-medium text-xs">
-            <BookOpenCheck className="w-4 h-4 text-emerald-500" />
-            <span>{course.lessonsCount} درس متاح</span>
-          </div>
-          <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
-            {new Date(course.createdAt).toLocaleDateString('ar-SA')}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}

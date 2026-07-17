@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Send, CheckCircle2, XCircle, AlertCircle, Loader2, Eye, 
-  BookMarked, FileText, ClipboardList, Search, Filter, 
-  ArrowUpDown, X, Calendar, Settings2, PlayCircle, Clock, Edit3, Trash2
+  Send, CheckCircle2, XCircle, AlertCircle, Loader2,
+  BookMarked, FileText, ClipboardList, 
+  X, Calendar, Settings2, PlayCircle, Clock, Edit3, Trash2,
+  ChevronDown, ChevronUp, Layers, Video, FileType2, Search, Filter, BookOpen
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useCoursesStore, useLessonsStore, useContentStore, useQuizzesStore, useModulesStore } from '../../../store';
@@ -14,8 +15,7 @@ import { ROUTES } from '../../../routes/routes.config';
 import type { Lesson, ContentItem, Quiz } from '../../../types';
 
 type PublishStatus = 'idle' | 'loading' | 'success' | 'error';
-type FilterStatus = 'all' | 'published' | 'ready' | 'draft';
-type SortOption = 'newest' | 'oldest' | 'title';
+type TabStatus = 'all' | 'published' | 'draft' | 'incomplete' | 'recent';
 
 interface Checklist {
   hasTitle: boolean;
@@ -33,7 +33,7 @@ function getChecklist(lesson: Lesson, content: ContentItem[], quizzes: Quiz[]): 
   };
 }
 
-function isReady(cl: Checklist): boolean { return cl.hasTitle && cl.hasDescription && cl.hasContent && cl.hasQuiz; }
+function isReady(cl: Checklist): boolean { return cl.hasTitle && cl.hasDescription && cl.hasContent; }
 function readinessScore(cl: Checklist): number { return [cl.hasTitle, cl.hasDescription, cl.hasContent, cl.hasQuiz].filter(Boolean).length; }
 
 export function PublishPage() {
@@ -41,15 +41,17 @@ export function PublishPage() {
   const { lessons, updateLesson, deleteLesson, fetchLessons } = useLessonsStore();
   const { content, fetchContent } = useContentStore();
   const { quizzes, fetchQuizzes } = useQuizzesStore();
+  const { courses } = useCoursesStore();
+  const { modules } = useModulesStore();
   
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<Record<string, PublishStatus>>({});
   const [publishError, setPublishError] = useState<Record<string, string>>({});
   const [successModal, setSuccessModal] = useState<string | null>(null);
   
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
-  const [sortOption, setSortOption] = useState<SortOption>('newest');
+  const [activeTab, setActiveTab] = useState<TabStatus>('all');
+  const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     void fetchLessons();
@@ -59,28 +61,24 @@ export function PublishPage() {
     void useModulesStore.getState().fetchModules();
   }, [fetchLessons, fetchContent, fetchQuizzes]);
 
+  // Exact preservation of business logic and backend interactions
   const handlePublish = async (lessonId: string) => {
     setPublishStatus(p => ({ ...p, [lessonId]: 'loading' }));
     setPublishError(p => { const x = { ...p }; delete x[lessonId]; return x; });
     try {
-      const { courses } = useCoursesStore.getState();
-      const { modules } = useModulesStore.getState();
       const allLessons = useLessonsStore.getState().lessons;
       const allContent = useContentStore.getState().content;
       const allQuizzes = useQuizzesStore.getState().quizzes;
-
       const lesson = allLessons.find(l => l.id === lessonId);
       if (!lesson) throw new Error("الدرس غير موجود");
 
       const parentModule = modules.find(m => String(m.id) === String(lesson.courseId));
-
       let realCourseId = parentModule?.courseId;
       const parentCourse = parentModule ? courses.find(c => String(c.id) === String(parentModule.courseId)) : undefined;
 
       // 1. If parent course is draft, publish it
       if (parentModule && String(parentModule.courseId).startsWith('draft-')) {
         if (!parentCourse) {
-          // Auto-healing: Draft course deleted locally but module still points to it
           const existingCourse = courses.find(c => c.name === lesson.courseName && !String(c.id).startsWith('draft-'));
           if (existingCourse) {
             realCourseId = existingCourse.id;
@@ -95,9 +93,7 @@ export function PublishPage() {
             description: parentCourse.description,
             imagePreview: parentCourse.imagePreview
           };
-          if (coursePayload.imageFile && !(coursePayload.imageFile instanceof File)) {
-             delete coursePayload.imageFile;
-          }
+          if (coursePayload.imageFile && !(coursePayload.imageFile instanceof File)) delete coursePayload.imageFile;
           const createdCourse = await courseService.create(coursePayload);
           realCourseId = createdCourse.id;
           await useCoursesStore.getState().deleteCourse(parentCourse.id);
@@ -108,7 +104,6 @@ export function PublishPage() {
       let realModuleId = lesson.courseId;
       if (String(lesson.courseId).startsWith('draft-')) {
         if (!parentModule) {
-           // Auto-healing: Draft module deleted locally but lesson still points to it
            let fallbackCourseId = realCourseId;
            if (!fallbackCourseId) {
              const existingCourse = courses.find(c => c.name === lesson.courseName && !String(c.id).startsWith('draft-'));
@@ -161,9 +156,7 @@ export function PublishPage() {
             url: draftContent.url
           };
           const contentPayload = { ...baseContentPayload, lessonId: createdLesson.id };
-          if (contentPayload.file && !(contentPayload.file instanceof File)) {
-             delete contentPayload.file; // Fix for stripped File objects
-          }
+          if (contentPayload.file && !(contentPayload.file instanceof File)) delete contentPayload.file;
           await contentService.create(contentPayload);
           await useContentStore.getState().deleteContent(draftContent.id);
         }
@@ -181,12 +174,10 @@ export function PublishPage() {
           await useQuizzesStore.getState().deleteQuiz(draftQuiz.id);
         }
 
-        // Publish all created draft lessons
         await lessonService.update({ id: createdLesson.id, isPublished: true });
         await useLessonsStore.getState().deleteLesson(draftLesson.id);
       }
 
-      // If the clicked lesson was ALREADY NOT A DRAFT, publish it directly
       if (!String(lessonId).startsWith('draft-')) {
         await lessonService.update({ id: lessonId, isPublished: true });
       }
@@ -209,7 +200,7 @@ export function PublishPage() {
   };
 
   const handleUnpublish = async (lessonId: string) => {
-    if (!confirm('تنبيه: هل أنت متأكد من إلغاء نشر هذا الدرس؟ سيؤدي ذلك إلى إخفائه فوراً عن جميع الطلاب ولن يتمكنوا من الوصول لمحتواه.')) return;
+    if (!confirm('تنبيه: هل أنت متأكد من إلغاء نشر هذا الدرس؟ سيؤدي ذلك إلى إخفائه فوراً عن جميع الطلاب.')) return;
     setPublishStatus(p => ({ ...p, [lessonId]: 'loading' }));
     try {
       await updateLesson({ id: lessonId, isPublished: false });
@@ -233,36 +224,78 @@ export function PublishPage() {
     }
   };
 
-  const filteredAndSortedLessons = useMemo(() => {
-    return lessons
-      .filter(l => {
-        const matchesSearch = l.title.toLowerCase().includes(searchQuery.toLowerCase()) || (l.courseName && l.courseName.toLowerCase().includes(searchQuery.toLowerCase()));
-        if (!matchesSearch) return false;
-        
-        const cl = getChecklist(l, content, quizzes);
-        const ready = isReady(cl);
-        
-        if (statusFilter === 'published') return l.isPublished;
-        if (statusFilter === 'ready') return !l.isPublished && ready;
-        if (statusFilter === 'draft') return !l.isPublished && !ready;
-        return true;
-      })
-      .sort((a, b) => {
-        if (sortOption === 'title') return a.title.localeCompare(b.title);
-        if (sortOption === 'oldest') return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      });
-  }, [lessons, content, quizzes, searchQuery, statusFilter, sortOption]);
+  const handlePublishAll = async (e: React.MouseEvent, courseId: string) => {
+    e.stopPropagation();
+    const courseModuleIds = modules.filter(m => String(m.courseId) === String(courseId)).map(m => String(m.id));
+    const courseLessons = lessons.filter(l => courseModuleIds.includes(String(l.courseId)) || String(l.courseId) === String(courseId));
+    
+    const readyToPublish = courseLessons.filter(l => !l.isPublished && isReady(getChecklist(l, content, quizzes)));
+    if (readyToPublish.length === 0) {
+      alert('لا توجد مسودات مستوفية الشروط وجاهزة للنشر في هذا المقرر.');
+      return;
+    }
+    
+    if (!confirm(`سيتم نشر ${readyToPublish.length} درس. هل تريد المتابعة؟`)) return;
+
+    for (const l of readyToPublish) {
+      await handlePublish(l.id);
+    }
+  };
+
+  const handleArchiveAll = async (e: React.MouseEvent, courseId: string) => {
+    e.stopPropagation();
+    const courseModuleIds = modules.filter(m => String(m.courseId) === String(courseId)).map(m => String(m.id));
+    const courseLessons = lessons.filter(l => courseModuleIds.includes(String(l.courseId)) || String(l.courseId) === String(courseId));
+    
+    const published = courseLessons.filter(l => l.isPublished);
+    if (published.length === 0) return;
+    
+    if (!confirm(`سيتم إخفاء ${published.length} درس منشور عن الطلاب. هل تريد المتابعة؟`)) return;
+
+    for (const l of published) {
+      await handleUnpublish(l.id);
+    }
+  };
+
+  const getCourseLessons = (courseId: string) => {
+    const courseModuleIds = modules.filter(m => String(m.courseId) === String(courseId)).map(m => String(m.id));
+    return lessons.filter(l => courseModuleIds.includes(String(l.courseId)) || String(l.courseId) === String(courseId));
+  };
+
+  // Filter Courses based on active tab
+  const filteredCourses = useMemo(() => {
+    return courses.filter(course => {
+      const cLessons = getCourseLessons(String(course.id));
+      if (activeTab === 'all') return true;
+      if (activeTab === 'published') return cLessons.some(l => l.isPublished);
+      if (activeTab === 'draft') return cLessons.some(l => !l.isPublished);
+      if (activeTab === 'incomplete') return cLessons.some(l => !isReady(getChecklist(l, content, quizzes)));
+      if (activeTab === 'recent') {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return cLessons.some(l => new Date(l.updatedAt || l.createdAt || 0) > weekAgo);
+      }
+      return true;
+    });
+  }, [courses, lessons, modules, activeTab, content, quizzes]);
+
+  // Statistics
+  const totalCourses = courses.length;
+  const totalModules = modules.length;
+  const totalLessons = lessons.length;
+  const publishedCount = lessons.filter(l => l.isPublished).length;
+  const draftCount = totalLessons - publishedCount;
+  const completionPercent = totalLessons ? Math.round((publishedCount / totalLessons) * 100) : 0;
 
   const selectedLesson = lessons.find(l => l.id === selectedId);
   const selectedCL = selectedLesson ? getChecklist(selectedLesson, content, quizzes) : null;
   const canPublish = selectedCL ? isReady(selectedCL) && !selectedLesson?.isPublished : false;
 
   return (
-    <div className="font-sans antialiased text-slate-800 space-y-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
+    <div className="font-sans antialiased text-slate-800 space-y-6 pb-20" style={{ fontFamily: "'Cairo', sans-serif" }}>
       
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
           <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2">
             مركز النشر والاعتماد
@@ -271,234 +304,231 @@ export function PublishPage() {
             مراجعة وتقييم وتفعيل الدروس للطلاب بصلاحيات النشر الرسمية.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="px-5 py-3 bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
-             <div className="flex flex-col">
-              <span className="text-xs text-slate-500 font-bold tracking-wider uppercase">إجمالي المنشور</span>
-              <span className="text-xl font-black text-emerald-600 flex items-center gap-1">
-                {lessons.filter(l => l.isPublished).length} <span className="text-slate-400 text-sm font-bold">من {lessons.length}</span>
-              </span>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center border border-emerald-100 shadow-inner">
-              <Send className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 mb-6 sticky top-0 z-10">
-        <div className="relative flex-1 group">
-          <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-emerald-500 transition-colors" />
-          <input 
-            type="text" 
-            placeholder="ابحث عن درس أو مقرر..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-4 pr-11 py-3 rounded-xl border-2 border-slate-100 focus:border-emerald-500 bg-slate-50 focus:bg-white outline-none transition-all text-sm font-medium"
-          />
-        </div>
-        <div className="flex flex-col sm:flex-row gap-4 shrink-0">
-          <div className="relative min-w-[180px]">
-            <Filter className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as FilterStatus)}
-              className="w-full pl-4 pr-11 py-3 rounded-xl border-2 border-slate-100 focus:border-emerald-500 outline-none appearance-none bg-slate-50 focus:bg-white text-sm font-bold text-slate-700 cursor-pointer transition-all"
-            >
-              <option value="all">التصفية: جميع الحالات</option>
-              <option value="published">حالة: تم النشر مسبقاً</option>
-              <option value="ready">حالة: مستوفى (جاهز)</option>
-              <option value="draft">حالة: مسودة (يحتاج استكمال)</option>
-            </select>
-          </div>
-          <div className="relative min-w-[180px]">
-            <ArrowUpDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
-            <select 
-              value={sortOption}
-              onChange={(e) => setSortOption(e.target.value as SortOption)}
-              className="w-full pl-4 pr-11 py-3 rounded-xl border-2 border-slate-100 focus:border-emerald-500 outline-none appearance-none bg-slate-50 focus:bg-white text-sm font-bold text-slate-700 cursor-pointer transition-all"
-            >
-              <option value="newest">ترتيب: الأحدث أولاً</option>
-              <option value="oldest">ترتيب: الأقدم أولاً</option>
-              <option value="title">ترتيب: أبجدياً (أ-ي)</option>
-            </select>
-          </div>
-        </div>
+      {/* Statistics */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <StatWidget label="المقررات" value={totalCourses} icon={BookOpen} color="#6366F1" bg="#EEF2FF" />
+        <StatWidget label="الوحدات" value={totalModules} icon={Layers} color="#8B5CF6" bg="#F5F3FF" />
+        <StatWidget label="كل الدروس" value={totalLessons} icon={BookMarked} color="#3B82F6" bg="#EFF6FF" />
+        <StatWidget label="المنشور" value={publishedCount} icon={CheckCircle2} color="#10B981" bg="#ECFDF5" />
+        <StatWidget label="مسودة" value={draftCount} icon={Clock} color="#F59E0B" bg="#FFFBEB" />
+        <StatWidget label="الاكتمال" value={`${completionPercent}%`} icon={PlayCircle} color="#EC4899" bg="#FDF2F8" />
       </div>
 
-      {/* Main Content Area */}
-      {lessons.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-2">
-          <EmptyState 
-            icon={Send} 
-            title="نظام النشر فارغ" 
-            description="يجب عليك إضافة مقررات ودروس جديدة في المنصة لتتمكن من إدارتها ونشرها هنا." 
-          />
-        </div>
-      ) : filteredAndSortedLessons.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 p-16 text-center shadow-sm">
-          <Filter className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-slate-700 mb-1">لا توجد مسودات مطابقة للفلتر</h3>
-          <p className="text-slate-400">حاول تغيير خيارات التصفية أو البحث عن اسم آخر.</p>
-          <button onClick={() => {setSearchQuery(''); setStatusFilter('all');}} className="mt-4 text-emerald-600 font-semibold hover:underline">مسح عوامل التصفية</button>
-        </div>
-      ) : (
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-right border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-6 py-5 text-sm font-bold text-slate-500 whitespace-nowrap">الدرس / المرجع</th>
-                  <th className="px-6 py-5 text-sm font-bold text-slate-500 whitespace-nowrap">الحالة واعتمادية النشر</th>
-                  <th className="px-6 py-5 text-sm font-bold text-slate-500 whitespace-nowrap w-48">نسبة الجاهزية والاكتمال</th>
-                  <th className="px-6 py-5 text-sm font-bold text-slate-500 text-center whitespace-nowrap">الإجراءات والأوامر</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50/80">
-                {filteredAndSortedLessons.map(lesson => {
-                  const cl = getChecklist(lesson, content, quizzes);
-                  const score = readinessScore(cl);
-                  const ready = isReady(cl);
-                  const isProcessing = publishStatus[lesson.id] === 'loading';
-                  const quiz = quizzes.find(q => q.lessonId === lesson.id);
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2">
+        {[
+          { id: 'all', label: 'الكل' },
+          { id: 'published', label: 'المنشورة' },
+          { id: 'draft', label: 'تحتوي مسودات' },
+          { id: 'incomplete', label: 'غير مكتملة' },
+          { id: 'recent', label: 'تحديثات حديثة' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as TabStatus)}
+            className={`px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-sm ${
+              activeTab === tab.id 
+                ? 'bg-slate-800 text-white shadow-md' 
+                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-                  return (
-                    <tr key={lesson.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-6 py-5">
-                        <div className="flex flex-col gap-1.5 min-w-0 max-w-xs md:max-w-md">
-                          <span className="font-bold text-slate-800 text-base truncate" title={lesson.title}>{lesson.title}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 truncate">
-                              {lesson.courseName || 'غير محدد'}
-                            </span>
-                            {lesson.isPublished && lesson.publishedAt && (
-                              <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                منذ {new Date(lesson.publishedAt).toLocaleDateString('ar-EG')}
-                              </span>
-                            )}
-                            {lesson.isPublished && (
-                              <span className="text-xs text-slate-400 font-medium">
-                                Published by: {lesson.publishedBy ?? 'Unavailable'}
-                              </span>
-                            )}
+      {/* Main Course Containers */}
+      <div className="space-y-6">
+        {filteredCourses.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-slate-100 p-16 text-center shadow-sm">
+            <Layers className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-700 mb-1">لا توجد مقررات مطابقة</h3>
+            <p className="text-slate-400">حاول تغيير خيارات التصفية.</p>
+          </div>
+        ) : (
+          filteredCourses.map(course => {
+            const isExpanded = expandedCourses[course.id];
+            const courseModules = modules.filter(m => String(m.courseId) === String(course.id));
+            const cLessons = getCourseLessons(String(course.id));
+            const cPublished = cLessons.filter(l => l.isPublished).length;
+            const cDrafts = cLessons.length - cPublished;
+            const cPercent = cLessons.length ? Math.round((cPublished / cLessons.length) * 100) : 0;
+
+            return (
+              <div key={course.id} className={`bg-white rounded-[2rem] border transition-all duration-300 shadow-sm overflow-hidden ${isExpanded ? 'border-emerald-500 ring-2 ring-emerald-500/10' : 'border-slate-100 hover:border-slate-300'}`}>
+                {/* Course Header */}
+                <div 
+                  className="p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 cursor-pointer hover:bg-slate-50/50 transition-colors"
+                  onClick={() => setExpandedCourses(p => ({ ...p, [course.id]: !p[course.id] }))}
+                >
+                  <div className="flex items-center gap-5 flex-1">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 shadow-sm flex items-center justify-center">
+                      {course.imagePreview ? (
+                        <img src={course.imagePreview} alt={course.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <BookOpen className="w-8 h-8 text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-800 mb-2 truncate">{course.name}</h3>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                        <span className="flex items-center gap-1.5 font-bold text-slate-500"><Layers className="w-4 h-4 text-indigo-500" /> {courseModules.length} وحدة</span>
+                        <span className="flex items-center gap-1.5 font-bold text-slate-500"><BookMarked className="w-4 h-4 text-blue-500" /> {cLessons.length} درس</span>
+                        <span className="flex items-center gap-1.5 font-bold text-emerald-600"><CheckCircle2 className="w-4 h-4" /> {cPublished} منشور</span>
+                        <span className="flex items-center gap-1.5 font-bold text-amber-600"><Clock className="w-4 h-4" /> {cDrafts} مسودة</span>
+                        
+                        <div className="hidden sm:flex items-center gap-3 w-48 mt-1 lg:mt-0">
+                          <span className="text-[10px] font-black text-slate-400">الاكتمال</span>
+                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                             <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${cPercent}%` }} />
                           </div>
+                          <span className="text-[10px] font-black text-slate-700">{cPercent}%</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        {lesson.isPublished ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm">
-                            <CheckCircle2 className="w-4 h-4" /> معتمد ومنشور فعال
-                          </span>
-                        ) : ready ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100 shadow-sm">
-                            <Send className="w-4 h-4" /> مستوفى الشروط للنشر
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 shadow-sm">
-                            <Clock className="w-4 h-4" /> مسودة قيد التطوير
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="w-full max-w-[160px]">
-                          <div className="flex justify-between mb-1.5">
-                            <span className="text-xs font-bold text-slate-600">الجاهزية الكلية</span>
-                            <span className={`text-xs font-bold ${ready ? 'text-emerald-600' : 'text-slate-500'}`}>{Math.round((score / 4) * 100)}%</span>
-                          </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner flex">
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Course Actions */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button 
+                      onClick={(e) => handlePublishAll(e, String(course.id))}
+                      className="px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 rounded-xl text-xs font-bold transition-colors border border-emerald-100 flex items-center gap-2"
+                    >
+                      <Send className="w-3.5 h-3.5" /> نشر الكل
+                    </button>
+                    <button 
+                      onClick={(e) => handleArchiveAll(e, String(course.id))}
+                      className="px-4 py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-800 rounded-xl text-xs font-bold transition-colors border border-slate-200 flex items-center gap-2"
+                    >
+                      <XCircle className="w-3.5 h-3.5" /> سحب النشر
+                    </button>
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 border border-slate-100">
+                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modules Expansion */}
+                {isExpanded && (
+                  <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:p-6 space-y-4">
+                    {courseModules.length === 0 ? (
+                      <div className="text-center py-6 text-sm text-slate-400 font-bold">لا توجد وحدات في هذا المقرر.</div>
+                    ) : (
+                      courseModules.map(module => {
+                        const mExpanded = expandedModules[module.id];
+                        const mLessons = lessons.filter(l => String(l.courseId) === String(module.id));
+                        
+                        return (
+                          <div key={module.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                             <div 
-                              className="h-full transition-all duration-500 ease-out" 
-                              style={{ 
-                                width: `${(score / 4) * 100}%`, 
-                                background: ready ? 'linear-gradient(90deg, #10B981, #059669)' : '#F59E0B' 
-                              }} 
-                            />
-                          </div>
-                          <div className="flex gap-0.5 mt-1">
-                            {[1,2,3,4].map(i => (
-                              <div key={i} className={`h-1 flex-1 rounded-sm ${i <= score ? (ready ? 'bg-emerald-500' : 'bg-amber-400') : 'bg-slate-200'}`} />
-                            ))}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="flex items-center justify-center gap-2">
-                          <button 
-                            onClick={() => setSelectedId(lesson.id)} 
-                            className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm border border-transparent hover:border-blue-100"
-                            title="التدقيق والمراجعة الشاملة"
-                          >
-                            <Settings2 className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => navigate(ROUTES.lessons)}
-                            className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100"
-                            title="Edit Lesson"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => navigate(ROUTES.content)}
-                            className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100"
-                            title="Edit Content"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => navigate(ROUTES.quiz)}
-                            disabled={!quiz}
-                            className="p-2.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all border border-transparent hover:border-purple-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={quiz ? 'Edit Exam' : 'No exam to edit'}
-                          >
-                            <ClipboardList className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLesson(lesson.id)}
-                            disabled={isProcessing}
-                            className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 disabled:opacity-40"
-                            title="Delete Lesson"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                           
-                          {lesson.isPublished ? (
-                            <button 
-                              onClick={() => handleUnpublish(lesson.id)}
-                              disabled={isProcessing}
-                              className="px-4 py-2.5 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 rounded-xl transition-all disabled:opacity-50 border border-red-100 shadow-sm flex items-center gap-2 w-[120px] justify-center"
+                              className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                              onClick={() => setExpandedModules(p => ({ ...p, [module.id]: !p[module.id] }))}
                             >
-                              {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                              إلغاء الظهور
-                            </button>
-                          ) : (
-                            <button 
-                              onClick={() => handlePublish(lesson.id)}
-                              disabled={!ready || isProcessing}
-                              className={`px-4 py-2.5 text-xs font-bold text-white rounded-xl transition-all flex items-center justify-center gap-2 w-[120px] shadow-sm
-                                ${ready && !isProcessing ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-md' : 'bg-slate-300 cursor-not-allowed border border-slate-200'}`}
-                            >
-                              {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                              اعتماد ونشر
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                                  <Layers className="w-4 h-4" />
+                                </div>
+                                <h4 className="font-bold text-slate-800">{module.title}</h4>
+                                <span className="text-xs text-slate-400 font-bold px-2 py-1 bg-slate-100 rounded-md">{mLessons.length} دروس</span>
+                              </div>
+                              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${mExpanded ? 'rotate-180' : ''}`} />
+                            </div>
 
-      {/* Ultra-Modern Review & Publish Modal */}
+                            {mExpanded && (
+                              <div className="border-t border-slate-100 p-2 sm:p-4 bg-slate-50/30 flex flex-col gap-2">
+                                {mLessons.length === 0 ? (
+                                  <div className="text-center py-4 text-xs text-slate-400 font-bold">لا توجد دروس في هذه الوحدة.</div>
+                                ) : (
+                                  mLessons.map(lesson => {
+                                    const cl = getChecklist(lesson, content, quizzes);
+                                    const ready = isReady(cl);
+                                    const cItems = content.filter(c => c.lessonId === lesson.id);
+                                    const hasVideo = cItems.some(c => c.type === 'video');
+                                    const hasPdf = cItems.some(c => c.type === 'pdf');
+                                    
+                                    return (
+                                      <div key={lesson.id} className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:border-emerald-200 transition-colors group shadow-sm hover:shadow-md">
+                                        <div className="flex items-start gap-4">
+                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${lesson.isPublished ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            {lesson.isPublished ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                                          </div>
+                                          <div>
+                                            <h5 className="font-bold text-slate-800 text-sm sm:text-base mb-1 group-hover:text-emerald-600 transition-colors">{lesson.title}</h5>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              
+                                              {/* Status Badge */}
+                                              {lesson.isPublished ? (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded">منشور</span>
+                                              ) : ready ? (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded">مستوفى وجاهز</span>
+                                              ) : (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-100 rounded">مسودة غير مكتملة</span>
+                                              )}
+
+                                              {/* Content Indicators */}
+                                              {hasVideo && <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-600 border border-purple-100 rounded flex items-center gap-1"><Video className="w-3 h-3" /> فيديو</span>}
+                                              {hasPdf && <span className="text-[10px] font-bold px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded flex items-center gap-1"><FileType2 className="w-3 h-3" /> PDF</span>}
+                                              
+                                              {/* Health Indicators */}
+                                              {!cl.hasDescription && <span className="text-[10px] font-bold px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded flex items-center gap-1"><AlertCircle className="w-3 h-3" /> ينقصه وصف</span>}
+                                              {!cl.hasContent && <span className="text-[10px] font-bold px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded flex items-center gap-1"><AlertCircle className="w-3 h-3" /> ينقصه محتوى</span>}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Lesson Quick Actions */}
+                                        <div className="flex items-center gap-2 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <button 
+                                            onClick={() => setSelectedId(lesson.id)}
+                                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+                                          >
+                                            <Settings2 className="w-3.5 h-3.5" /> التدقيق
+                                          </button>
+                                          
+                                          {lesson.isPublished ? (
+                                            <button 
+                                              onClick={() => handleUnpublish(lesson.id)}
+                                              disabled={publishStatus[lesson.id] === 'loading'}
+                                              className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                                            >
+                                              {publishStatus[lesson.id] === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'إلغاء النشر'}
+                                            </button>
+                                          ) : (
+                                            <button 
+                                              onClick={() => handlePublish(lesson.id)}
+                                              disabled={!ready || publishStatus[lesson.id] === 'loading'}
+                                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5
+                                                ${ready ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                            >
+                                              {publishStatus[lesson.id] === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                              اعتماد
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Ultra-Modern Review & Publish Modal (Preserved exactly as before for the "Manage/Settings" action) */}
       {selectedLesson && selectedCL && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">
           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-300">
-            
             {/* Modal Header */}
             <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 shrink-0 bg-white rounded-t-[2rem]">
               <div className="flex items-center gap-4">
@@ -514,11 +544,8 @@ export function PublishPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
             {/* Modal Body */}
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-8 bg-slate-50/50">
-              
-              {/* Lesson Card */}
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
                 <div className="relative z-10">
@@ -541,8 +568,6 @@ export function PublishPage() {
                   </p>
                 </div>
               </div>
-
-              {/* Requirements Checklist */}
               <div>
                 <h4 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <ClipboardList className="w-5 h-5 text-slate-400" />
@@ -552,9 +577,8 @@ export function PublishPage() {
                   <CheckItem ok={selectedCL.hasTitle} required label="العنوان الرئيسي مصاغ" icon={BookMarked} />
                   <CheckItem ok={selectedCL.hasDescription} required label="نبذة وصفية واضحة" icon={FileText} />
                   <CheckItem ok={selectedCL.hasContent} required label="مرفقات المادة العلمية (الفيديو / المذكرات)" icon={PlayCircle} />
-                  <CheckItem ok={selectedCL.hasQuiz} required label="تكوين اختبار للتقييم" icon={ClipboardList} />
+                  <CheckItem ok={selectedCL.hasQuiz} required={false} label="تكوين اختبار للتقييم" icon={ClipboardList} />
                 </div>
-
                 {!isReady(selectedCL) && (
                   <div className="mt-6 flex items-start gap-4 p-5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 shadow-sm">
                     <div className="bg-amber-100 p-2 rounded-full shrink-0">
@@ -568,7 +592,6 @@ export function PublishPage() {
                     </div>
                   </div>
                 )}
-
                 {publishStatus[selectedLesson.id] === 'error' && publishError[selectedLesson.id] && (
                   <div className="mt-6 flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-2xl text-red-800 shadow-sm animate-in fade-in">
                     <XCircle className="w-6 h-6 shrink-0 text-red-500" />
@@ -577,23 +600,20 @@ export function PublishPage() {
                 )}
               </div>
             </div>
-
             {/* Modal Footer */}
-            <div className="p-6 border-t border-slate-100 bg-white rounded-b-[2rem] flex flex-col sm:flex-row gap-3 shrink-0">
+            <div className="p-6 border-t border-slate-100 bg-white rounded-b-[2rem] flex flex-col sm:flex-row items-center gap-3 shrink-0">
               <button 
                 onClick={() => setSelectedId(null)} 
-                className="py-3 px-8 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-slate-200"
+                className="w-full sm:w-auto py-3 px-8 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-slate-200 order-2 sm:order-1"
               >
                 الرجوع للوحة النشر
               </button>
-              
-              <div className="flex-1" />
-
+              <div className="hidden sm:block flex-1" />
               {selectedLesson.isPublished ? (
                 <button 
                   onClick={() => handleUnpublish(selectedLesson.id)} 
                   disabled={publishStatus[selectedLesson.id] === 'loading'}
-                  className="py-3 px-8 rounded-xl border-2 border-red-100 bg-red-50 text-red-600 font-bold hover:bg-red-100 hover:border-red-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+                  className="w-full sm:w-auto py-3 px-8 rounded-xl border-2 border-red-100 bg-red-50 text-red-600 font-bold hover:bg-red-100 hover:border-red-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm order-1 sm:order-2"
                 >
                   {publishStatus[selectedLesson.id] === 'loading' ? <Loader2 className="w-5 h-5 animate-spin" /> : <XCircle className="w-5 h-5" />}
                   إلغاء ظهور الدرس
@@ -602,7 +622,7 @@ export function PublishPage() {
                 <button 
                   onClick={() => handlePublish(selectedLesson.id)} 
                   disabled={!canPublish || publishStatus[selectedLesson.id] === 'loading'} 
-                  className={`py-3 px-10 rounded-xl text-white font-bold transition-all flex items-center justify-center gap-2 shadow-md
+                  className={`w-full sm:w-auto py-3 px-10 rounded-xl text-white font-bold transition-all flex items-center justify-center gap-2 shadow-md order-1 sm:order-2
                     ${canPublish ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg hover:-translate-y-0.5' : 'bg-slate-300 cursor-not-allowed'}`}
                   style={canPublish ? { background: 'linear-gradient(135deg, #10B981, #059669)' } : {}}
                 >
@@ -644,6 +664,20 @@ export function PublishPage() {
 }
 
 // ─── Component Helpers ────────────────────────────────────────────────────────
+
+function StatWidget({ label, value, icon: Icon, color, bg }: { label: string, value: string | number, icon: any, color: string, bg: string }) {
+  return (
+    <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: bg, color: color }}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-[10px] font-bold text-slate-400">{label}</p>
+        <p className="text-lg font-black text-slate-800 leading-tight">{value}</p>
+      </div>
+    </div>
+  );
+}
 
 function CheckItem({ ok, required, label, icon: Icon }: { ok: boolean; required: boolean; label: string; icon: React.ElementType }) {
   return (

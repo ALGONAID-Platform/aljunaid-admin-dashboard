@@ -6,6 +6,7 @@ import {
 import { useUIStore, useAuthStore } from '../../store';
 import { useNavigate, useLocation } from 'react-router';
 import { ROUTES } from '../../routes/routes.config';
+import { AIAssistantCopilot } from '../ui/AIAssistantCopilot';
 import logo from '../../assets/logo.png';
 
 const NAV_ITEMS = [
@@ -62,7 +63,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
       {/* Mobile Backdrop */}
       {!isSidebarCollapsed && (
         <div 
-          className="fixed inset-0 bg-slate-900/50 z-20 md:hidden backdrop-blur-sm transition-opacity" 
+          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-sm transition-opacity" 
           onClick={() => setSidebarCollapsed(true)}
         />
       )}
@@ -70,7 +71,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
       {/* Sidebar */}
       <aside
         style={{ width: isSidebarCollapsed ? 80 : 260, transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', flexShrink: 0 }}
-        className={`bg-white border-l border-slate-200 flex flex-col absolute z-30 h-full md:relative right-0 ${isSidebarCollapsed ? 'translate-x-full md:translate-x-0 md:w-[80px]' : 'translate-x-0'} shadow-2xl md:shadow-none`}
+        className={`bg-white border-l border-slate-200 flex flex-col absolute z-50 h-full md:relative right-0 ${isSidebarCollapsed ? 'translate-x-full md:translate-x-0 md:w-[80px]' : 'translate-x-0'} shadow-2xl md:shadow-none`}
       >
         {/* Brand */}
         <div className="h-16 flex items-center px-4 border-b border-slate-100 gap-3 overflow-hidden">
@@ -164,7 +165,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-6 gap-4 flex-shrink-0">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 sm:px-6 gap-3 sm:gap-4 flex-shrink-0 z-30">
           <button
             onClick={toggleSidebar}
             className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
@@ -186,10 +187,12 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
           <div className="max-w-7xl mx-auto w-full">
             {children}
           </div>
+          {/* AI Copilot integrated globally */}
+          <AIAssistantCopilot />
         </main>
       </div>
     </div>

@@ -8,6 +8,7 @@ import { useCoursesStore, useLessonsStore, useQuizzesStore, useModulesStore } fr
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { Loader } from '../../../components/feedback/Loader';
 import { QuestionImageUpload } from '../components/QuestionImageUpload';
+import { MarkdownQuestionEditor } from '../components/MarkdownQuestionEditor';
 import type { BackendModule } from '../../../types/api';
 import type { Question, QuestionType } from '../../../types';
 
@@ -570,24 +571,13 @@ export function QuizPage() {
 
                       {/* Question Body */}
                       <div className="p-6 space-y-5">
-                        <div className="relative">
-                          {qErrors[`q_${idx}_text`] && <span className="absolute -top-3 right-2 text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded shadow-sm z-10">{qErrors[`q_${idx}_text`]}</span>}
-                          <textarea 
-                            value={q.text} 
-                            onChange={e => updateQuestion(idx, { text: e.target.value })} 
-                            placeholder="اكتب نص السؤال بدقة ووضوح هنا..." 
-                            rows={3} 
-                            className={`w-full px-4 py-3.5 rounded-2xl border-2 outline-none resize-none transition-all text-sm leading-relaxed ${qErrors[`q_${idx}_text`] ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-slate-200 bg-slate-50 focus:border-emerald-400 focus:bg-white focus:shadow-sm'}`} 
-                          />
-                        </div>
-                        
-                        <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
-                          <QuestionImageUpload
-                            imageUrl={q.imageUrl}
-                            onImageUploaded={(url) => updateQuestion(idx, { imageUrl: url })}
-                            onImageRemoved={() => updateQuestion(idx, { imageUrl: undefined })}
-                          />
-                        </div>
+                        <MarkdownQuestionEditor
+                          value={q.text}
+                          onChange={(val) => updateQuestion(idx, { text: val })}
+                          error={qErrors[`q_${idx}_text`]}
+                          placeholder="اكتب نص السؤال باستخدام Markdown... يدعم المعادلات الرياضية والأكواد وصور السحب والإفلات."
+                        />
+
 
                         {/* Answers Section */}
                         <div className="pt-2 border-t border-slate-100">
