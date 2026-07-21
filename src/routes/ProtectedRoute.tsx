@@ -23,8 +23,8 @@ export function ProtectedRoute() {
     return <Navigate to={ROUTES.login} replace />;
   }
 
-  // Dashboard is admin-only. The backend remains the source of truth for every API request.
-  if (user.role !== 'admin') {
+  // Dashboard is admin & owner accessible. The backend remains the source of truth for every API request.
+  if (user.role !== 'admin' && user.role !== 'owner') {
     logout();
     return <Navigate to={ROUTES.login} replace />;
   }

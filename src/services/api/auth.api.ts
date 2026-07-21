@@ -1,9 +1,12 @@
 /**
  * Auth API Service — src/services/api/auth.api.ts
  *
- * Replaces: src/services/auth.service.ts (mock)
  * Endpoints:
  *   POST /auth/signin
+ *   POST /auth/signup
+ *   POST /auth/forgot-password
+ *   POST /auth/reset-password
+ *   POST /auth/google/mobile
  *   POST /auth/logout
  *   GET  /users/profile
  */
@@ -11,7 +14,14 @@
 import { api, tokenStorage, userStorage } from '../../lib/api';
 import type {
   BackendSigninResponse,
+  BackendSignupResponse,
   BackendProfile,
+  UserRegisterDto,
+  UserLoginDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  GoogleMobileLoginDto,
+  AuthMessageResponse,
 } from '../../types/api';
 import type { AuthCredentials, AuthSession, User } from '../../types';
 
@@ -22,9 +32,9 @@ function adaptUser(backendUser: BackendProfile): User {
     id: String(backendUser.id),
     name: backendUser.name,
     email: backendUser.email,
-    // Backend uses STUDENT/TEACHER/ADMIN — map to lowercase frontend roles
+    // Backend uses STUDENT/TEACHER/ADMIN/OWNER — map to lowercase frontend roles
     role: backendUser.role.toLowerCase() as User['role'],
-    avatarUrl: backendUser.avatarUrl,
+    avatarUrl: backendUser.avatarUrl ?? undefined,
     isActive: true,
     createdAt: backendUser.createdAt ?? new Date().toISOString(),
   };
@@ -36,10 +46,10 @@ export const authService = {
   /**
    * Sign in with email + password.
    * Backend: POST /auth/signin
-   * Response: { message, data: { user, accessToken } }
+   * Response: { message, user, access_token }
    */
   async login(credentials: AuthCredentials): Promise<AuthSession> {
-    const { data } = await api.post<any>('/auth/signin', {
+    const { data } = await api.post<BackendSigninResponse>('/auth/signin', {
       email: credentials.email,
       password: credentials.password,
     });
@@ -59,7 +69,6 @@ export const authService = {
     const session: AuthSession = {
       user,
       token: accessToken,
-      // Backend does not return expiry — set a sensible client-side default
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
 
@@ -67,7 +76,78 @@ export const authService = {
   },
 
   /**
-   * Logout — invalidate token on backend.
+   * Register a new user account.
+   * Backend: POST /auth/signup
+   * Request Body: UserRegisterDto
+   */
+  async signup(payload: UserRegisterDto): Promise<AuthSession> {
+    const { data } = await api.post<BackendSignupResponse>('/auth/signup', payload);
+
+    const responsePayload = data.data ?? data;
+    const backendUser = responsePayload.user;
+    const accessToken = responsePayload.accessToken ?? responsePayload.access_token;
+
+    if (!backendUser || !accessToken) {
+      throw new Error('Invalid signup response');
+    }
+
+    const user = adaptUser(backendUser as BackendProfile);
+    tokenStorage.set(accessToken);
+    userStorage.set(user);
+
+    return {
+      user,
+      token: accessToken,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+  },
+
+  /**
+   * Request password reset token via email.
+   * Backend: POST /auth/forgot-password
+   */
+  async forgotPassword(payload: ForgotPasswordDto): Promise<AuthMessageResponse> {
+    const { data } = await api.post<AuthMessageResponse>('/auth/forgot-password', payload);
+    return data;
+  },
+
+  /**
+   * Reset account password using reset token.
+   * Backend: POST /auth/reset-password
+   */
+  async resetPassword(payload: ResetPasswordDto): Promise<AuthMessageResponse> {
+    const { data } = await api.post<AuthMessageResponse>('/auth/reset-password', payload);
+    return data;
+  },
+
+  /**
+   * Mobile/OAuth Google login via ID token.
+   * Backend: POST /auth/google/mobile
+   */
+  async googleLogin(payload: GoogleMobileLoginDto): Promise<AuthSession> {
+    const { data } = await api.post<BackendSigninResponse>('/auth/google/mobile', payload);
+
+    const responsePayload = data.data ?? data;
+    const backendUser = responsePayload.user;
+    const accessToken = responsePayload.accessToken ?? responsePayload.access_token;
+
+    if (!backendUser || !accessToken) {
+      throw new Error('Invalid Google authentication response');
+    }
+
+    const user = adaptUser(backendUser as BackendProfile);
+    tokenStorage.set(accessToken);
+    userStorage.set(user);
+
+    return {
+      user,
+      token: accessToken,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+  },
+
+  /**
+   * Logout — invalidate token on backend token blacklist table.
    * Backend: POST /auth/logout
    */
   async logout(): Promise<void> {
@@ -86,7 +166,6 @@ export const authService = {
    */
   async getProfile(): Promise<User> {
     const { data } = await api.get<{ data?: BackendProfile } | BackendProfile>('/users/profile');
-    // Handle both wrapped { data: ... } and unwrapped responses
     const profile = (data as { data?: BackendProfile }).data ?? (data as BackendProfile);
     return adaptUser(profile);
   },
@@ -101,3 +180,4 @@ export const authService = {
     return userStorage.get<User>();
   },
 };
+

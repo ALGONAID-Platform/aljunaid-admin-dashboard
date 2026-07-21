@@ -12,6 +12,7 @@ import { modulesService } from '../../../services/api/modules.api';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { resolveErrorMessage } from '../../../lib/errors';
 import { ROUTES } from '../../../routes/routes.config';
+import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import type { Lesson, ContentItem, Quiz } from '../../../types';
 
 type PublishStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -48,6 +49,7 @@ export function PublishPage() {
   const [publishStatus, setPublishStatus] = useState<Record<string, PublishStatus>>({});
   const [publishError, setPublishError] = useState<Record<string, string>>({});
   const [successModal, setSuccessModal] = useState<string | null>(null);
+  const [deleteLessonTargetId, setDeleteLessonTargetId] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState<TabStatus>('all');
   const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
@@ -211,17 +213,8 @@ export function PublishPage() {
     }
   };
 
-  const handleDeleteLesson = async (lessonId: string) => {
-    if (!confirm('تنبيه: حذف الدرس سيحذف ارتباطاته التعليمية. هل تريد المتابعة؟')) return;
-    setPublishStatus(p => ({ ...p, [lessonId]: 'loading' }));
-    try {
-      await deleteLesson(lessonId);
-      setPublishStatus(p => ({ ...p, [lessonId]: 'idle' }));
-      setSelectedId(null);
-    } catch (err) {
-      setPublishStatus(p => ({ ...p, [lessonId]: 'error' }));
-      setPublishError(p => ({ ...p, [lessonId]: resolveErrorMessage(err) }));
-    }
+  const handleDeleteLesson = (lessonId: string) => {
+    setDeleteLessonTargetId(lessonId);
   };
 
   const handlePublishAll = async (e: React.MouseEvent, courseId: string) => {
@@ -297,10 +290,10 @@ export function PublishPage() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2">
             مركز النشر والاعتماد
           </h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
             مراجعة وتقييم وتفعيل الدروس للطلاب بصلاحيات النشر الرسمية.
           </p>
         </div>
@@ -659,6 +652,12 @@ export function PublishPage() {
           </div>
         </div>
       )}
+      <CascadeDeleteModal
+        isOpen={!!deleteLessonTargetId}
+        targetType="lesson"
+        targetId={deleteLessonTargetId || ''}
+        onClose={() => setDeleteLessonTargetId(null)}
+      />
     </div>
   );
 }

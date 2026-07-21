@@ -19,29 +19,71 @@ export interface ApiErrorResponse {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export type BackendUserRole = 'STUDENT' | 'TEACHER' | 'ADMIN';
+export type BackendUserRole = 'STUDENT' | 'ADMIN' | 'OWNER' | 'TEACHER';
 
 export interface BackendUser {
   id: number;
-  name: string;
   email: string;
+  name: string;
   role: BackendUserRole;
+  avatar?: string | null;
+  avatarUrl?: string | null;
+  academicId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BackendAuthPayload {
   user: BackendUser;
-  accessToken: string;
+  access_token?: string;
+  accessToken?: string;
 }
 
 export interface BackendSigninResponse {
-  message: string;
-  data: BackendAuthPayload;
+  message?: string;
+  user?: BackendUser;
+  access_token?: string;
+  accessToken?: string;
+  data?: BackendAuthPayload;
 }
 
 export interface BackendSignupResponse {
-  statusCode: number;
+  statusCode?: number;
   message: string;
-  data: BackendAuthPayload;
+  user?: BackendUser;
+  access_token?: string;
+  accessToken?: string;
+  data?: BackendAuthPayload;
+}
+
+export interface UserRegisterDto {
+  email: string;
+  password: string;
+  name: string;
+  role?: 'STUDENT' | 'ADMIN' | 'OWNER';
+}
+
+export interface UserLoginDto {
+  email: string;
+  password: string;
+}
+
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface ResetPasswordDto {
+  token: string;
+  newPassword: string;
+}
+
+export interface GoogleMobileLoginDto {
+  idToken: string;
+}
+
+export interface AuthMessageResponse {
+  statusCode?: number;
+  message: string;
 }
 
 // ─── Courses ──────────────────────────────────────────────────────────────────
@@ -51,31 +93,45 @@ export interface BackendSignupResponse {
 export interface BackendCourse {
   id: number;
   title: string;
-  description: string;
-  thumbnail: string | null;
-  authorId: number;
-  createdAt: string;
-  updatedAt: string;
-  /** Optional – present when course includes module/lesson counts */
+  description?: string | null;
+  thumbnail?: string | null;
+  instructorId?: number;
+  authorId?: number;
+  moduleTitles?: string[];
+  modulesCount?: number;
+  lessonsCount?: number;
+  isEnrolled?: boolean;
+  enrollmentStatus?: string;
+  totalLessons?: number;
+  completedLessons?: number;
+  progressPercentage?: number;
+  createdAt?: string;
+  updatedAt?: string;
   _count?: {
     modules?: number;
     enrollments?: number;
   };
 }
 
+export interface BackendCourseSearchResponse {
+  courses: BackendCourse[];
+  modules?: any[];
+  lessons?: any[];
+}
+
 export interface BackendCoursesListResponse {
-  statusCode: number;
+  statusCode?: number;
   data: BackendCourse[];
 }
 
 export interface BackendCourseResponse {
-  statusCode: number;
+  statusCode?: number;
   data: BackendCourse;
 }
 
 export interface CreateCourseDto {
   title: string;
-  description: string;
+  description?: string;
   thumbnail?: string;
 }
 
@@ -84,6 +140,7 @@ export interface UpdateCourseDto {
   description?: string;
   thumbnail?: string;
 }
+
 
 // ─── Modules ──────────────────────────────────────────────────────────────────
 
@@ -110,31 +167,36 @@ export interface UpdateModuleDto {
 
 // ─── Lessons ──────────────────────────────────────────────────────────────────
 
+export type LessonStatus = 'DRAFT' | 'PUBLISHED';
+
 export interface BackendLesson {
   id: number;
   title: string;
-  description?: string;
-  content?: string;
-  videoUrl?: string;
+  description?: string | null;
+  content?: string | null;
+  videoUrl?: string | null;
+  pdfUrl?: string | null;
+  status?: LessonStatus;
   order?: number;
   moduleId: number;
   isPublished?: boolean;
   publishedAt?: string;
+  publishedBy?: { id: number; name: string } | string;
   createdAt?: string;
   updatedAt?: string;
-  /** PDF file URL returned after upload */
-  pdfUrl?: string;
 }
 
-// Lessons are created via multipart/form-data
+// Lessons are created via multipart/form-data or JSON
 export interface CreateLessonDto {
   title: string;
   description?: string;
   content?: string;
   videoUrl?: string;
+  pdfUrl?: string;
+  pdf?: File;
+  status?: LessonStatus;
   order?: number;
   moduleId: number;
-  pdf?: File;
 }
 
 export interface UpdateLessonDto {
@@ -142,10 +204,13 @@ export interface UpdateLessonDto {
   description?: string;
   content?: string;
   videoUrl?: string;
+  pdfUrl?: string;
+  pdf?: File;
+  status?: LessonStatus;
   order?: number;
   moduleId?: number;
-  pdf?: File;
 }
+
 
 // ─── Exams ────────────────────────────────────────────────────────────────────
 

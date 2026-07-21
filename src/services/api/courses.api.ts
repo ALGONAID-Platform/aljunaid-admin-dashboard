@@ -30,32 +30,9 @@ function adaptCourse(bc: BackendCourse): Course {
     name: bc.title,
     description: bc.description ?? '',
     imagePreview: bc.thumbnail ?? undefined,
-    lessonsCount: bc.lessonsCount ?? 0,
-    createdAt: bc.createdAt,
+    lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? bc._count?.modules ?? 0,
+    createdAt: bc.createdAt ?? new Date().toISOString(),
   };
-}
-
-// ─── Build request body (JSON or FormData depending on whether image is a File) ─
-
-function buildCourseBody(payload: {
-  name?: string;
-  description?: string;
-  imagePreview?: string;
-  imageFile?: File;
-}): { body: FormData | Record<string, string>; isFormData: boolean } {
-  if (payload.imageFile instanceof File) {
-    const fd = new FormData();
-    if (payload.name) fd.append('title', payload.name);
-    if (payload.description) fd.append('description', payload.description);
-    fd.append('thumbnail', payload.imageFile);
-    return { body: fd, isFormData: true };
-  }
-
-  const body: Record<string, string> = {};
-  if (payload.name) body.title = payload.name;
-  if (payload.description) body.description = payload.description;
-  if (payload.imagePreview) body.thumbnail = payload.imagePreview;
-  return { body, isFormData: false };
 }
 
 // ─── Courses Service ──────────────────────────────────────────────────────────
@@ -84,15 +61,15 @@ export const courseService = {
   },
 
   async search(query: string): Promise<Course[]> {
-    const { data } = await api.get<BackendCoursesListResponse | BackendCourse[]>(
-      '/courses/search',
-      { params: { q: query } }
-    );
+    const { data } = await api.get<any>('/courses/search', {
+      params: { q: query }
+    });
     const list = Array.isArray(data)
       ? data
-      : (data as BackendCoursesListResponse).data ?? [];
+      : data.courses ?? (data as BackendCoursesListResponse).data ?? [];
     return list.map(adaptCourse);
   },
+
 
   /** POST /courses — uses upload service for file then sends JSON */
   async create(payload: CreateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {

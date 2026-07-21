@@ -3,7 +3,7 @@ import {
   Plus, BookOpen, X, CheckCircle, AlertCircle, Image as ImageIcon, Link as LinkIcon,
   Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi, CheckSquare, Square, Copy
 } from 'lucide-react';
-import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
+import { useCoursesStore, useLessonsStore, useModulesStore, useExamModelsStore } from '../../../store';
 import { validateImageFile, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
 import { Loader } from '../../../components/feedback/Loader';
 import { useKeyboardShortcut } from '../../../hooks/useKeyboardShortcuts';
@@ -11,11 +11,12 @@ import { BulkActionBar } from '../../../components/ui/BulkActionBar';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { StatWidget } from '../../../components/ui/StatWidget';
-import { BookMarked, PlayCircle, FolderOpen, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { BookMarked, PlayCircle, FolderOpen, Clock, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
 import { Pagination } from '../../../components/ui/Pagination';
 import { StickyToolbar } from '../../../components/ui/StickyToolbar';
 import { GlobalSearch } from '../../../components/ui/GlobalSearch';
 import { SavedViews } from '../../../components/ui/SavedViews';
+import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import type { Course } from '../../../types';
 
 interface FormState {
@@ -91,6 +92,7 @@ export function CoursesPage() {
   const { courses, addCourse, updateCourse, deleteCourse, fetchCourses, isLoading, error } = useCoursesStore();
   const { modules, fetchModules } = useModulesStore();
   const { lessons, fetchLessons } = useLessonsStore();
+  const { examModels, fetchExamModels } = useExamModelsStore();
 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,7 +114,8 @@ export function CoursesPage() {
     void fetchCourses(); 
     void fetchModules();
     void fetchLessons();
-  }, [fetchCourses, fetchModules, fetchLessons]);
+    void fetchExamModels();
+  }, [fetchCourses, fetchModules, fetchLessons, fetchExamModels]);
 
   const stats = useMemo(() => {
     return {
@@ -180,17 +183,17 @@ export function CoursesPage() {
     const e: FormError = {};
     const nameStr = form.name.trim();
     if (!nameStr) e.name = 'اسم المقرر مطلوب';
-    else if (nameStr.length < 5) e.name = 'يجب أن يكون عنوان المقرر 5 أحرف على الأقل';
+    else if (nameStr.length < 3) e.name = 'يجب أن يكون عنوان المقرر 3 أحرف على الأقل';
     else if (nameStr.length > 100) e.name = 'لا يمكن أن يتجاوز عنوان المقرر 100 حرف';
     else if (!/^(?!\s*$).+/.test(form.name)) e.name = 'لا يمكن أن يكون عنوان المقرر مسافات فارغة فقط';
     else if (!editingId && courses.some(c => c.name.toLowerCase() === nameStr.toLowerCase())) e.name = 'اسم المقرر موجود مسبقاً في النظام';
-    if (!form.description.trim()) e.description = 'وصف المقرر مطلوب ويفضل أن يكون شاملاً';
     if (!form.thumbnailFile && form.thumbnailUrl && !form.thumbnailUrl.startsWith('http')) {
       e.thumbnailUrl = 'الرابط غير صالح. تأكد من أنه يبدأ بـ http:// أو https://';
     }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
+
 
   const handleSave = useCallback(async () => {
     if (!validate()) return;
@@ -318,18 +321,18 @@ export function CoursesPage() {
     <div className="font-sans antialiased text-slate-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1">
+          <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1">
             إدارة المقررات الدراسية
           </h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
             نظرة شاملة على {courses.length} مقرر مسجّل في المنصة. تحكم، أضف، ونظم المحتوى.
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <button
             onClick={openCreate}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
             style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 600 }}
           >
             <Plus className="w-4 h-4" strokeWidth={3} />
@@ -486,43 +489,12 @@ export function CoursesPage() {
         </div>
       )}
 
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-6 relative">
-                <div className="absolute inset-0 bg-red-100 rounded-full animate-ping opacity-20"></div>
-                <Trash2 className="w-10 h-10 text-red-500 relative z-10" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-3">هل أنت متأكد تماماً؟</h3>
-              <p className="text-slate-500 text-sm mb-2 leading-relaxed">
-                أنت على وشك حذف المقرر <span className="font-bold text-slate-700">"{courses.find(c => c.id === deleteConfirm)?.name}"</span>.
-              </p>
-              <div className="bg-red-50 text-red-600 text-xs p-3 rounded-xl font-medium">
-                تنبيه خطير: سيؤدي هذا إلى حذف جميع الوحدات، الدروس، والملفات المرتبطة به بشكل نهائي.
-              </div>
-              
-              {deleteStatus === 'error' && (
-                <p className="text-red-600 mt-4 text-sm font-bold animate-pulse">حدث خطأ أثناء محاولة الحذف.</p>
-              )}
-            </div>
-            
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
-              <button onClick={() => { setDeleteConfirm(null); setDeleteStatus('idle'); }} className="flex-1 py-3 text-slate-600 rounded-xl font-bold bg-white border border-slate-200 hover:bg-slate-100 transition-colors">
-                إلغاء
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                disabled={deleteStatus === 'loading'}
-                className="flex-1 py-3 text-white rounded-xl bg-red-500 hover:bg-red-600 active:bg-red-700 transition-all shadow-md shadow-red-500/20 disabled:opacity-50 flex items-center justify-center gap-2 font-bold"
-              >
-                {deleteStatus === 'loading' && <Loader2 className="w-5 h-5 animate-spin" />}
-                {deleteStatus === 'loading' ? 'جاري المسح...' : 'نعم، احذف'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CascadeDeleteModal
+        isOpen={!!deleteConfirm}
+        targetType="course"
+        targetId={deleteConfirm || ''}
+        onClose={() => setDeleteConfirm(null)}
+      />
 
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">

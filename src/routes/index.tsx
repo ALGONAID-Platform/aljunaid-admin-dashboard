@@ -26,6 +26,9 @@ const ContentPage = lazy(() =>
 const QuizPage = lazy(() =>
   import('../modules/quizzes/pages/QuizPage').then((m) => ({ default: m.QuizPage }))
 );
+const ExamModelsPage = lazy(() =>
+  import('../modules/examModels/pages/ExamModelsPage').then((m) => ({ default: m.ExamModelsPage }))
+);
 const PublishPage = lazy(() =>
   import('../modules/publish/pages/PublishPage').then((m) => ({ default: m.PublishPage }))
 );
@@ -53,6 +56,7 @@ function DashboardRoutes() {
           <Route path="lessons" element={<LessonsPage />} />
           <Route path="content" element={<ContentPage />} />
           <Route path="quiz" element={<QuizPage />} />
+          <Route path="exam-models" element={<ExamModelsPage />} />
           <Route path="publish" element={<PublishPage />} />
           <Route path="progress" element={<AcademicProgressPage />} />
         </Routes>

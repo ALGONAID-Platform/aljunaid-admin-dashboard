@@ -1,20 +1,15 @@
 import { useEffect } from 'react';
-import { useCoursesStore, useLessonsStore, useContentStore, useQuizzesStore } from '../store';
+import { syncService } from '../services/sync/sync.service';
 
 /**
- * Initializes all global data stores on app mount.
- * Call this once at the root of the authenticated app.
+ * Enterprise Data Synchronization Hook.
+ * Connects the app to the Single Source of Truth Synchronization Engine.
+ * Automatically handles window focus, network reconnection, and periodic background sync.
  */
 export function useAppData() {
-  const fetchCourses = useCoursesStore((s) => s.fetchCourses);
-  const fetchLessons = useLessonsStore((s) => s.fetchLessons);
-  const fetchContent = useContentStore((s) => s.fetchContent);
-  const fetchQuizzes = useQuizzesStore((s) => s.fetchQuizzes);
-
   useEffect(() => {
-    void fetchCourses();
-    void fetchLessons();
-    void fetchContent();
-    void fetchQuizzes();
-  }, [fetchCourses, fetchLessons, fetchContent, fetchQuizzes]);
+    // Start automatic multi-device synchronization engine
+    const cleanup = syncService.initAutoSync(30000); // 30-second background polling
+    return cleanup;
+  }, []);
 }

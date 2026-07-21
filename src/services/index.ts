@@ -15,3 +15,4 @@ export { modulesService } from './api/modules.api';
 export { enrollmentService } from './api/enrollment.api';
 export { progressService } from './api/progress.api';
 export { usersService } from './api/users.api';
+export { examModelsService } from './api/examModels.service';

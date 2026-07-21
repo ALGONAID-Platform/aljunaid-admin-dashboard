@@ -20,6 +20,8 @@ import { StickyToolbar } from '../../../components/ui/StickyToolbar';
 import { GlobalSearch } from '../../../components/ui/GlobalSearch';
 import { AdvancedFilters } from '../../../components/ui/AdvancedFilters';
 import { SavedViews } from '../../../components/ui/SavedViews';
+import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
+import { ModuleManagerModal } from '../../../components/ui/ModuleManagerModal';
 import { Layers } from 'lucide-react';
 import type { BackendModule } from '../../../types/api';
 
@@ -40,8 +42,10 @@ export function LessonsPage() {
   const { modules: allModules, fetchModules, addModule: createModule, updateModule: editModule, deleteModule: removeModule } = useModulesStore();
   
   const [showModal, setShowModal] = useState(false);
+  const [showModuleManager, setShowModuleManager] = useState(false);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'lesson' | 'module'; id: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
   const [courseFilter, setCourseFilter] = useState<string>('all');
@@ -198,15 +202,8 @@ export function LessonsPage() {
     }
   };
 
-  const handleDeleteModule = async (moduleId: number | string) => {
-    if (!confirm('تنبيه: حذف الوحدة قد يؤثر على الدروس المرتبطة بها. هل تريد المتابعة؟')) return;
-    setModulesError(null);
-    try {
-      await removeModule(moduleId);
-      setForm(prev => ({ ...prev, moduleId: prev.moduleId === String(moduleId) ? '' : prev.moduleId }));
-    } catch {
-      setModulesError('تعذر حذف الوحدة. تحقق من الصلاحيات أو الارتباطات ثم حاول مجدداً.');
-    }
+  const handleDeleteModule = (moduleId: number | string) => {
+    setDeleteTarget({ type: 'module', id: String(moduleId) });
   };
 
   const validate = (): boolean => {
@@ -214,13 +211,13 @@ export function LessonsPage() {
     if (!form.courseId) e.courseId = 'يرجى اختيار المقرر المرجعي';
     if (!form.moduleId) e.moduleId = 'يرجى تحديد الوحدة التي ينتمي لها الدرس';
     if (!form.title.trim()) e.title = 'عنوان الدرس مطلوب';
-    else if (form.title.trim().length < 5) e.title = 'يجب أن يكون عنوان الدرس 5 أحرف على الأقل';
-    if (!form.description.trim()) e.description = 'نبذة الدرس مطلوبة لتوضيح المحتوى';
+    else if (form.title.trim().length < 2) e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
     if (!form.order.trim()) e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
     else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = 'يجب أن يكون الترتيب رقماً موجباً';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
+
 
   const handleSave = async () => {
     if (!validate()) return;
@@ -251,15 +248,8 @@ export function LessonsPage() {
     }
   };
 
-  const handleDelete = async (lessonId: string) => {
-    if (!confirm('تنبيه: هل تريد حذف هذا الدرس نهائياً؟')) return;
-    setDeleteStatus('loading');
-    try {
-      await deleteLesson(lessonId);
-      setDeleteStatus('idle');
-    } catch {
-      setDeleteStatus('error');
-    }
+  const handleDelete = (lessonId: string) => {
+    setDeleteTarget({ type: 'lesson', id: lessonId });
   };
 
   const isFormValid = form.courseId && form.moduleId && form.title.trim() && form.description.trim() && form.order.trim();
@@ -342,18 +332,25 @@ export function LessonsPage() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1">
+          <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1">
             إدارة الدروس والمحتوى
           </h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
             تصفح، أضف، ونظّم {lessons.length} درس مسجّل. قم ببناء الهيكل التعليمي لمقرراتك.
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={() => setShowModuleManager(true)}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-indigo-700 hover:bg-indigo-50 border-2 border-indigo-100 rounded-xl font-bold text-sm transition-all shadow-sm"
+          >
+            <Layers className="w-4 h-4 text-indigo-600" />
+            إدارة الوحدات التعليمية
+          </button>
           <button
             onClick={openModal}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
             style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 600 }}
           >
             <Plus className="w-4 h-4" strokeWidth={3} />
@@ -468,8 +465,93 @@ export function LessonsPage() {
           <button onClick={() => setSearchQuery('')} className="mt-4 text-emerald-600 hover:text-emerald-700 font-semibold text-sm underline underline-offset-4">مسح عوامل التصفية</button>
         </div>
       ) : (
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto custom-scrollbar pb-24">
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden mb-6">
+          {/* Mobile Stacked Cards Layout */}
+          <div className="md:hidden divide-y divide-slate-50/80 bg-slate-50/50">
+            {/* Mobile Select All Header */}
+            <div className="p-4 flex items-center justify-between bg-white border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedLessons(p => p.length === paginatedLessons.length ? [] : paginatedLessons.map(l => l.id))}
+                  className="text-slate-400 hover:text-emerald-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center p-2"
+                >
+                  {selectedLessons.length > 0 && selectedLessons.length === paginatedLessons.length ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
+                </button>
+                <span className="text-xs font-bold text-slate-500">تحديد الكل</span>
+              </div>
+            </div>
+
+            {paginatedLessons.map(lesson => (
+              <div key={lesson.id} className={`p-4 space-y-4 bg-white transition-colors ${selectedLessons.includes(lesson.id) ? 'bg-emerald-50/30' : ''}`}>
+                <div className="flex items-start gap-3">
+                  <button onClick={() => setSelectedLessons(p => p.includes(lesson.id) ? p.filter(id => id !== lesson.id) : [...p, lesson.id])} className="mt-1 text-slate-400 hover:text-emerald-500 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center -m-2">
+                    {selectedLessons.includes(lesson.id) ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-800 font-bold mb-1 truncate max-w-[200px]" title={lesson.title}>{lesson.title}</div>
+                    <div className="text-slate-500 text-xs line-clamp-2 leading-relaxed" title={lesson.description}>
+                      {lesson.description}
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
+                    {lesson.order}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="space-y-1">
+                    <div className="text-[11px] text-slate-400 font-bold">الارتباط:</div>
+                    <Breadcrumbs items={[
+                      { label: lesson.courseName || 'مقرر مجهول' },
+                      { label: allModules.find(m => String(m.id) === String(lesson.courseId))?.title || 'وحدة مجهولة' },
+                      { label: lesson.title }
+                    ]} />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <HealthBadge condition={!lesson.description?.trim()} label="وصف مفقود" type="warning" />
+                      <HealthBadge condition={!lesson.hasContent} label="بدون محتوى" type="error" />
+                      <HealthBadge condition={!lesson.isPublished} label="غير منشور" type="info" />
+                    </div>
+                    {lesson.hasContent ? (
+                      <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100 shadow-sm w-fit">
+                        <PlayCircle className="w-3 h-3" /> مادة علمية מתوفرة
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full bg-slate-100 text-slate-500 font-semibold border border-slate-200 w-fit">
+                        <AlertCircle className="w-3 h-3" /> قيد الإعداد
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                  <div className="flex flex-col gap-1.5">
+                    <StatusBadge status={lesson.isPublished ? 'published' : 'draft'} />
+                    <span className="text-[10px] text-slate-400">تحديث: {new Date(lesson.updatedAt).toLocaleDateString('ar-SA')}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setPreviewLesson(lesson)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="وضع معاينة الطالب">
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => updateLesson({ id: lesson.id, isPublished: !lesson.isPublished })} className={`p-2 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center ${lesson.isPublished ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={lesson.isPublished ? "إلغاء النشر (مسودة)" : "نشر الدرس"}>
+                      {lesson.isPublished ? <Clock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                    </button>
+                    <button onClick={() => void openEdit(lesson)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="تعديل">
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => void handleDelete(lesson.id)} disabled={deleteStatus === 'loading'} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50" title="حذف">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden md:block overflow-x-auto custom-scrollbar pb-24">
             <table className="w-full text-sm text-right">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
@@ -551,16 +633,16 @@ export function LessonsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setPreviewLesson(lesson)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="وضع معاينة الطالب">
+                        <button onClick={() => setPreviewLesson(lesson)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" title="وضع معاينة الطالب">
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button onClick={() => updateLesson({ id: lesson.id, isPublished: !lesson.isPublished })} className={`p-2 rounded-lg transition-colors ${lesson.isPublished ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={lesson.isPublished ? "إلغاء النشر (مسودة)" : "نشر الدرس"}>
+                        <button onClick={() => updateLesson({ id: lesson.id, isPublished: !lesson.isPublished })} className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${lesson.isPublished ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={lesson.isPublished ? "إلغاء النشر (مسودة)" : "نشر الدرس"}>
                           {lesson.isPublished ? <Clock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
                         <div className="w-px h-4 bg-slate-200"></div>
                         <button
                           onClick={() => void openEdit(lesson)}
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="تعديل"
                         >
                           <Edit3 className="w-4 h-4" />
@@ -568,7 +650,7 @@ export function LessonsPage() {
                         <button
                           onClick={() => void handleDelete(lesson.id)}
                           disabled={deleteStatus === 'loading'}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50"
                           title="حذف"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -721,8 +803,8 @@ export function LessonsPage() {
                             {filteredModules.map(m => <option key={m.id} value={String(m.id)}>{m.title}</option>)}
                           </select>
                         </div>
-                        <button type="button" onClick={() => setIsCreatingModule(true)} title="تأسيس وحدة جديدة" className="shrink-0 px-4 py-3 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 hover:text-emerald-700 font-bold transition-all border-2 border-emerald-100 shadow-sm flex items-center gap-2 text-sm">
-                          <Plus className="w-4 h-4" strokeWidth={3} /> وحدة جديدة
+                        <button type="button" onClick={() => setShowModuleManager(true)} title="إدارة وتأسيس الوحدات" className="shrink-0 px-4 py-3 bg-white text-indigo-600 rounded-xl hover:bg-indigo-50 hover:text-indigo-700 font-bold transition-all border-2 border-indigo-100 shadow-sm flex items-center gap-2 text-sm">
+                          <Layers className="w-4 h-4 text-indigo-600" /> إدارة الوحدات
                         </button>
                       </div>
                       <div className="grid gap-2">
@@ -813,6 +895,18 @@ export function LessonsPage() {
           </div>
         </div>
       )}
+      <CascadeDeleteModal
+        isOpen={!!deleteTarget}
+        targetType={deleteTarget?.type || 'lesson'}
+        targetId={deleteTarget?.id || ''}
+        onClose={() => setDeleteTarget(null)}
+      />
+      <ModuleManagerModal
+        isOpen={showModuleManager}
+        onClose={() => setShowModuleManager(false)}
+        initialCourseId={form.courseId}
+        onModuleSelected={(modId) => setForm(p => ({ ...p, moduleId: modId }))}
+      />
     </div>
   );
 }

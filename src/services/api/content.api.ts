@@ -113,16 +113,26 @@ export const contentService = {
    * POST /lessons (multipart) or PATCH /lessons/{id}
    */
   async create(
-    payload: CreateContentPayload & { lessonTitle: string },
+    payload: CreateContentPayload & { lessonTitle: string; pdfUrl?: string | null; videoUrl?: string; content?: string },
     onUploadProgress?: (progressEvent: any) => void
   ): Promise<ContentItem> {
     const fd = new FormData();
 
-    if (payload.type === 'video' && payload.url) {
+    if (payload.videoUrl) {
+      fd.append('videoUrl', payload.videoUrl);
+    } else if (payload.type === 'video' && payload.url) {
       fd.append('videoUrl', payload.url);
+    }
+
+    if (payload.pdfUrl) {
+      fd.append('pdfUrl', payload.pdfUrl);
     } else if (payload.type === 'pdf' && payload.file) {
       fd.append('pdf', payload.file);
-    } else if (['link', 'word', 'image'].includes(payload.type) && payload.url) {
+    }
+
+    if (payload.content) {
+      fd.append('content', payload.content);
+    } else if (['link', 'word', 'image', 'markdown'].includes(payload.type) && payload.url) {
       fd.append('content', payload.url);
     }
 
@@ -131,6 +141,7 @@ export const contentService = {
       fd,
       { onUploadProgress }
     );
+
     const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
     const items = extractContentItems(lesson);
 

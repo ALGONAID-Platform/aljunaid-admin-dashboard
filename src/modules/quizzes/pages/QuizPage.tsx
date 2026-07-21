@@ -9,6 +9,7 @@ import { EmptyState } from '../../../components/feedback/EmptyState';
 import { Loader } from '../../../components/feedback/Loader';
 import { QuestionImageUpload } from '../components/QuestionImageUpload';
 import { MarkdownQuestionEditor } from '../components/MarkdownQuestionEditor';
+import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import type { BackendModule } from '../../../types/api';
 import type { Question, QuestionType } from '../../../types';
 
@@ -33,6 +34,7 @@ export function QuizPage() {
   const { modules, fetchModules } = useModulesStore();
   const [showModal, setShowModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteQuizTarget, setDeleteQuizTarget] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchCourses();
@@ -121,11 +123,11 @@ export function QuizPage() {
       }
     }
     if (!title.trim()) e.title = 'عنوان الاختبار مطلوب';
-    else if (title.trim().length < 3) e.title = 'يجب أن يكون العنوان 3 أحرف على الأقل';
-    if (!description.trim()) e.description = 'وصف الاختبار مطلوب';
-    if (!instructions.trim()) e.instructions = 'تعليمات الاختبار مطلوبة لإرشاد الطلاب';
-    if (!passingScore || isNaN(Number(passingScore)) || Number(passingScore) < 1 || Number(passingScore) > 100) e.passingScore = 'درجة النجاح يجب أن تكون بين 1 و 100';
+    else if (title.trim().length < 2) e.title = 'يجب أن يكون العنوان حرفين على الأقل';
+    if (description.trim() && description.trim().length > 500) e.description = 'الوصف يتجاوز الحد الأقصى (500 حرف)';
+    if (!passingScore || isNaN(Number(passingScore)) || Number(passingScore) < 0 || Number(passingScore) > 100) e.passingScore = 'درجة النجاح يجب أن تكون بين 0 و 100';
     if (!timeLimit || isNaN(Number(timeLimit)) || Number(timeLimit) < 1) e.timeLimit = 'الوقت يجب أن يكون أكبر من صفر (بالدقائق)';
+
     setInfoErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -240,17 +242,17 @@ export function QuizPage() {
     <div className="font-sans antialiased text-slate-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
       
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 md:mb-8">
         <div>
-          <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1">
+          <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1">
             إدارة الاختبارات والتقييم
           </h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
             نظرة شاملة على {quizzes.length} اختبار مسجّل. قم بإنشاء وتقييم وتحديث الأسئلة لطلابك.
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
           <div className="relative group">
             <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
             <input
@@ -279,7 +281,60 @@ export function QuizPage() {
             <h3 className="text-sm font-bold text-slate-700">Lesson Exam Dashboard</h3>
             <span className="text-xs text-slate-400">{lessonExamRows.length} lessons</span>
           </div>
-          <div className="overflow-x-auto">
+
+          {/* Mobile Stacked Cards Layout */}
+          <div className="md:hidden divide-y divide-slate-100">
+            {lessonExamRows.slice(0, 8).map(row => (
+              <div key={row.lesson.id} className="p-4 space-y-3">
+                <div>
+                  <div className="font-semibold text-slate-800">{row.lesson.title}</div>
+                  <div className="text-xs text-slate-400 mt-1">{row.lesson.courseName}</div>
+                </div>
+                
+                <div className="flex items-center justify-between gap-2">
+                  {row.quiz ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-100">
+                      <CheckCircle className="w-3 h-3" /> Exam Created
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-700 border border-amber-100">
+                      <AlertCircle className="w-3 h-3" /> Missing Exam
+                    </span>
+                  )}
+                  <span className="text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                    Q: <span className="font-mono text-slate-700 font-bold">{row.questionsCount}</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <span className="text-[10px] text-slate-400">
+                    {new Date(row.lastUpdated).toLocaleDateString('en-GB')}
+                  </span>
+                  
+                  {row.quiz ? (
+                    <button onClick={() => openEditModal(row.quiz)} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors">
+                      Edit Exam
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        resetModal();
+                        setCourseId(getCourseIdForLesson(row.lesson.id));
+                        setLessonId(row.lesson.id);
+                        setShowModal(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                    >
+                      Create Exam
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm text-right">
               <thead className="bg-slate-50 text-slate-500">
                 <tr>
@@ -313,7 +368,7 @@ export function QuizPage() {
                     <td className="px-5 py-3">
                       <div className="flex justify-center">
                         {row.quiz ? (
-                          <button onClick={() => openEditModal(row.quiz)} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors">
+                          <button onClick={() => openEditModal(row.quiz)} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors min-h-[44px]">
                             Edit Exam
                           </button>
                         ) : (
@@ -324,7 +379,7 @@ export function QuizPage() {
                               setLessonId(row.lesson.id);
                               setShowModal(true);
                             }}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                            className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors min-h-[44px]"
                           >
                             Create Exam
                           </button>
@@ -397,7 +452,7 @@ export function QuizPage() {
                     <button onClick={() => openEditModal(quiz)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-white rounded-lg transition-all shadow-sm" title="تعديل الاختبار">
                       <FileEdit className="w-4 h-4" />
                     </button>
-                    <button onClick={() => { if(confirm('تنبيه خطير: هل أنت متأكد تماماً من رغبتك في حذف هذا الاختبار بشكل نهائي؟')) useQuizzesStore.getState().deleteQuiz(quiz.id); }} className="p-2 text-slate-500 hover:text-red-600 hover:bg-white rounded-lg transition-all shadow-sm" title="حذف الاختبار">
+                    <button onClick={() => setDeleteQuizTarget(quiz.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-white rounded-lg transition-all shadow-sm" title="حذف الاختبار">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -700,6 +755,12 @@ export function QuizPage() {
           </div>
         </div>
       )}
+      <CascadeDeleteModal
+        isOpen={!!deleteQuizTarget}
+        targetType="quiz"
+        targetId={deleteQuizTarget || ''}
+        onClose={() => setDeleteQuizTarget(null)}
+      />
     </div>
   );
 }

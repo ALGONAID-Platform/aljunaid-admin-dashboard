@@ -115,18 +115,18 @@ export function AcademicProgressPage() {
     <div className="font-sans antialiased text-slate-800 space-y-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
       
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 md:mb-8">
         <div>
-          <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2">
             التقدم الأكاديمي الشامل
           </h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
             تتبع حالة المحتوى التعليمي للمقررات والدروس وتحديد النواقص لضمان الجاهزية.
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <div className="px-5 py-3 bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="w-full md:w-auto px-5 py-3 bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between gap-4 transition-all hover:shadow-md">
             <div className="flex flex-col">
               <span className="text-xs text-slate-500 font-bold tracking-wider uppercase">معدل الإنجاز العام</span>
               <span className="text-xl font-black text-slate-800 flex items-center gap-1">

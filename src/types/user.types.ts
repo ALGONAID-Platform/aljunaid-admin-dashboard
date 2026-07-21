@@ -1,6 +1,6 @@
 import type { ID } from './common.types';
 
-export type UserRole = 'admin' | 'teacher' | 'student';
+export type UserRole = 'admin' | 'owner' | 'teacher' | 'student';
 
 export interface User {
   id: ID;

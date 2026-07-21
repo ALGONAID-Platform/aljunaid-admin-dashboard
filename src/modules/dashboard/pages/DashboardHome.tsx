@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   BookOpen, BookMarked, ClipboardList, CheckCircle2, Clock, 
   AlertCircle, TrendingUp, Sparkles, GraduationCap, ArrowUpRight
 } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useQuizzesStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
+import { QuickCourseBuilderModal } from '../../../components/ui/QuickCourseBuilderModal';
 
 export function DashboardHome() {
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const courses = useCoursesStore((s) => s.courses);
   const fetchCourses = useCoursesStore((s) => s.fetchCourses);
   const lessons = useLessonsStore((s) => s.lessons);
@@ -78,11 +80,21 @@ export function DashboardHome() {
               </p>
             </div>
           </div>
-          <button className="px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 rounded-xl text-white font-bold transition-all shadow-sm flex items-center gap-2 text-sm w-fit shrink-0">
-            تحديث البيانات <ArrowUpRight className="w-4 h-4" />
+          <button 
+            onClick={() => setIsBuilderOpen(true)}
+            className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-emerald-50 text-emerald-800 rounded-xl font-extrabold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2.5 text-sm shrink-0 border border-white/40 group active:scale-95 cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
+            <span>✨ Quick Course Builder</span>
           </button>
         </div>
       </div>
+
+      {/* Quick Course Builder Modal Integration */}
+      <QuickCourseBuilderModal
+        isOpen={isBuilderOpen}
+        onClose={() => setIsBuilderOpen(false)}
+      />
 
       {/* Primary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -9,6 +9,7 @@ export const ROUTES = {
   lessons: '/admin/lessons',
   content: '/admin/content',
   quiz: '/admin/quiz',
+  examModels: '/admin/exam-models',
   publish: '/admin/publish',
   progress: '/admin/progress',
 } as const;

@@ -1,12 +1,13 @@
 import { type ReactNode, useEffect } from 'react';
 import {
   LayoutDashboard, BookOpen, BookMarked, FileText,
-  ClipboardList, Send, LogOut, Menu, Activity,
+  ClipboardList, Send, LogOut, Menu, Activity, FileSpreadsheet
 } from 'lucide-react';
 import { useUIStore, useAuthStore } from '../../store';
 import { useNavigate, useLocation } from 'react-router';
 import { ROUTES } from '../../routes/routes.config';
 import { AIAssistantCopilot } from '../ui/AIAssistantCopilot';
+import { SaveStatusIndicator } from '../ui/SaveStatusIndicator';
 import logo from '../../assets/logo.png';
 
 const NAV_ITEMS = [
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
   { path: ROUTES.lessons, icon: BookMarked, label: 'الدروس' },
   { path: ROUTES.content, icon: FileText, label: 'المحتوى' },
   { path: ROUTES.quiz, icon: ClipboardList, label: 'الاختبارات' },
+  { path: ROUTES.examModels, icon: FileSpreadsheet, label: 'نماذج الامتحانات' },
   { path: ROUTES.publish, icon: Send, label: 'نشر الدروس' },
   { path: ROUTES.progress, icon: Activity, label: 'التقدم الأكاديمي' },
 ];
@@ -101,7 +103,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
                 key={item.path}
                 onClick={() => handleNavigation(item.path)}
                 title={isSidebarCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                className={`w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-xl transition-all ${
                   active
                     ? 'text-emerald-700'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
@@ -168,20 +170,22 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 sm:px-6 gap-3 sm:gap-4 flex-shrink-0 z-30">
           <button
             onClick={toggleSidebar}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
+            className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          <div>
-            <h1 className="text-slate-800" style={{ fontSize: 17, fontWeight: 700 }}>{pageLabel}</h1>
-            <p className="text-slate-400" style={{ fontSize: 12 }}>منصة الجنيد التعليمية</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-slate-800 truncate" style={{ fontSize: 16, fontWeight: 700 }}>{pageLabel}</h1>
+            <p className="text-slate-400 hidden sm:block truncate" style={{ fontSize: 12 }}>منصة الجنيد التعليمية</p>
           </div>
-          <div className="mr-auto flex items-center gap-2">
+          <div className="mr-auto flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <SaveStatusIndicator />
             <div
-              className="px-3 py-1.5 rounded-lg text-emerald-700"
-              style={{ background: '#ECFDF5', border: '1px solid #D1FAE5', fontSize: 12 }}
+              className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-emerald-700 whitespace-nowrap"
+              style={{ background: '#ECFDF5', border: '1px solid #D1FAE5', fontSize: 11, fontWeight: 700 }}
             >
-              {user?.role === 'admin' ? 'مشرف النظام' : user?.role ?? 'مستخدم'}
+              <span className="hidden sm:inline">{user?.role === 'admin' ? 'مشرف النظام' : user?.role === 'owner' ? 'مالك المنصة' : user?.role ?? 'مستخدم'}</span>
+              <span className="sm:hidden">{user?.role === 'admin' ? 'مشرف' : user?.role === 'owner' ? 'مالك' : 'مستخدم'}</span>
             </div>
           </div>
         </header>

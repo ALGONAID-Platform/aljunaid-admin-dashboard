@@ -14,6 +14,7 @@ import { Pagination } from '../../../components/ui/Pagination';
 import { StickyToolbar } from '../../../components/ui/StickyToolbar';
 import { GlobalSearch } from '../../../components/ui/GlobalSearch';
 import { SavedViews } from '../../../components/ui/SavedViews';
+import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 
 type LocalContentType = 'video' | 'markdown';
 
@@ -38,6 +39,7 @@ export function ContentPage() {
   
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const [activeView, setActiveView] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -146,18 +148,18 @@ export function ContentPage() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2">
             مكتبة المحتوى الرقمي
           </h2>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
             إدارة المرفقات، مقاطع الفيديو، ومصادر التعلم المرتبطة بالدروس.
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
           <button 
             onClick={() => { resetModal(); setShowModal(true); }} 
-            className="flex items-center justify-center gap-2 px-6 py-3 text-white rounded-2xl transition-all shadow-md hover:shadow-lg font-bold" 
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 min-h-[44px] text-white rounded-2xl transition-all shadow-md hover:shadow-lg font-bold" 
             style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
           >
             <Plus className="w-5 h-5" strokeWidth={3} /> رفع وإضافة محتوى
@@ -259,10 +261,10 @@ export function ContentPage() {
                         setUploadError(null);
                         setUploadProgress(null);
                         setShowModal(true);
-                      }} className="p-2 text-slate-500 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-lg transition-all shadow-sm" title="تعديل المحتوى">
+                      }} className="p-2 text-slate-500 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-lg transition-all shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center" title="تعديل المحتوى">
                         <Edit3 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => { if(confirm('هل أنت متأكد تماماً من حذف هذا المحتوى بشكل نهائي؟')) deleteContent(item.id); }} className="p-2 text-slate-500 hover:text-red-600 bg-white border border-slate-200 hover:border-red-200 hover:bg-red-50 rounded-lg transition-all shadow-sm" title="حذف المحتوى">
+                      <button onClick={() => setDeleteTargetId(item.id)} className="p-2 text-slate-500 hover:text-red-600 bg-white border border-slate-200 hover:border-red-200 hover:bg-red-50 rounded-lg transition-all shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center" title="حذف المحتوى">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -390,13 +392,12 @@ export function ContentPage() {
             </div>
             
             <div className="p-6 border-t border-slate-100 bg-white rounded-b-[2rem] flex flex-col sm:flex-row gap-3 shrink-0 items-center justify-end">
-              <button onClick={() => { setShowModal(false); resetModal(); }} className="px-6 py-3 w-full sm:w-auto text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all focus:ring-2 focus:ring-slate-200 order-2 sm:order-1">
+              <button onClick={() => { setShowModal(false); resetModal(); }} className="px-6 py-3 w-full sm:w-auto text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all focus:ring-2 focus:ring-slate-200 order-2 sm:order-1 min-h-[44px]">
                 إلغاء الأمر
               </button>
               <button 
                 onClick={handleSave} 
                 disabled={uploadStatus === 'uploading' || uploadStatus === 'success'} 
-                className="px-8 py-3 w-full sm:w-auto text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg active:scale-95 order-1 sm:order-2" 
                 style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
               >
                 {uploadStatus === 'uploading' && <Loader2 className="w-5 h-5 animate-spin" />}
@@ -407,6 +408,12 @@ export function ContentPage() {
           </div>
         </div>
       )}
+      <CascadeDeleteModal
+        isOpen={!!deleteTargetId}
+        targetType="content"
+        targetId={deleteTargetId || ''}
+        onClose={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }
