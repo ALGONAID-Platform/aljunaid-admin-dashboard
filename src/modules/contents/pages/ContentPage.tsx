@@ -217,12 +217,12 @@ export function ContentPage() {
             {paginatedContent.map(item => {
               const cfg = TYPE_CONFIG[item.type as LocalContentType] || TYPE_CONFIG['video'];
               return (
-                <div key={item.id} className="bg-white rounded-[20px] border border-slate-100 p-5 flex flex-col h-full hover:shadow-lg transition-all duration-300 group hover:-translate-y-1">
-                  <div className="flex items-start gap-4 mb-4">
+                <div key={item.id} className="bg-white rounded-[20px] border border-slate-100 p-4 sm:p-5 flex flex-col h-full hover:shadow-lg transition-all duration-300 group hover:-translate-y-1 min-w-0 max-w-full overflow-hidden">
+                  <div className="flex items-start gap-3 mb-3 min-w-0 max-w-full">
                     <MediaIndicator type={item.type} />
-                    <div className="flex-1 min-w-0 mt-1">
-                      <h3 className="text-slate-800 font-bold text-base truncate group-hover:text-emerald-600 transition-colors" title={item.title}>{item.title}</h3>
-                      <div className="mt-2">
+                    <div className="flex-1 min-w-0 max-w-full mt-0.5 overflow-hidden">
+                      <h3 className="text-slate-800 font-bold text-sm sm:text-base truncate group-hover:text-emerald-600 transition-colors" title={item.title}>{item.title}</h3>
+                      <div className="mt-1.5 min-w-0 max-w-full overflow-hidden">
                         <Breadcrumbs items={[
                           { label: lessons.find(l => l.id === item.lessonId)?.courseName || 'مقرر مجهول' },
                           { label: item.lessonTitle || 'درس مجهول' }
@@ -231,20 +231,37 @@ export function ContentPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100 flex-1 flex flex-col justify-center gap-1.5">
-                    {(item as any).videoUrl && <div className="text-xs font-semibold text-blue-600 truncate flex items-center gap-1.5" dir="ltr"><Link className="w-3.5 h-3.5 text-blue-400 shrink-0" /> {(item as any).videoUrl}</div>}
-                    {(item as any).pdfUrl && <div className="text-xs font-semibold text-red-600 truncate flex items-center gap-1.5" dir="ltr"><FileType2 className="w-3.5 h-3.5 text-red-400 shrink-0" /> {(item as any).pdfUrl}</div>}
-                    {item.url && !((item as any).videoUrl) && <div className="text-xs font-semibold text-blue-600 truncate flex items-center gap-1.5" dir="ltr"><Link className="w-3.5 h-3.5 text-blue-400 shrink-0" /> {item.url}</div>}
-                    {!item.url && !((item as any).videoUrl) && !((item as any).pdfUrl) && <div className="text-xs text-slate-400">لا توجد تفاصيل إضافية</div>}
+                  <div className="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100 flex-1 flex flex-col justify-center gap-1.5 min-w-0 max-w-full overflow-hidden">
+                    {(item as any).videoUrl && (
+                      <div className="text-xs font-semibold text-blue-600 flex items-center gap-1.5 min-w-0 max-w-full overflow-hidden" dir="ltr">
+                        <Link className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span className="truncate flex-1 min-w-0">{(item as any).videoUrl}</span>
+                      </div>
+                    )}
+                    {(item as any).pdfUrl && (
+                      <div className="text-xs font-semibold text-red-600 flex items-center gap-1.5 min-w-0 max-w-full overflow-hidden" dir="ltr">
+                        <FileType2 className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                        <span className="truncate flex-1 min-w-0">{(item as any).pdfUrl}</span>
+                      </div>
+                    )}
+                    {item.url && !((item as any).videoUrl) && (
+                      <div className="text-xs font-semibold text-blue-600 flex items-center gap-1.5 min-w-0 max-w-full overflow-hidden" dir="ltr">
+                        <Link className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span className="truncate flex-1 min-w-0">{item.url}</span>
+                      </div>
+                    )}
+                    {!item.url && !((item as any).videoUrl) && !((item as any).pdfUrl) && (
+                      <div className="text-xs text-slate-400">لا توجد تفاصيل إضافية</div>
+                    )}
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between min-w-0">
+                    <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1 shrink-0">
                       <FolderOpen className="w-3.5 h-3.5" />
                       {new Date(item.createdAt).toLocaleDateString('ar-SA')}
                     </span>
                     
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       <button onClick={() => {
                         setEditingId(item.id);
                         setForm({ 
@@ -261,10 +278,10 @@ export function ContentPage() {
                         setUploadError(null);
                         setUploadProgress(null);
                         setShowModal(true);
-                      }} className="p-2 text-slate-500 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-lg transition-all shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center" title="تعديل المحتوى">
+                      }} className="p-2 text-slate-500 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-200 hover:bg-blue-50 rounded-lg transition-all shadow-2xs" title="تعديل المحتوى">
                         <Edit3 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setDeleteTargetId(item.id)} className="p-2 text-slate-500 hover:text-red-600 bg-white border border-slate-200 hover:border-red-200 hover:bg-red-50 rounded-lg transition-all shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center" title="حذف المحتوى">
+                      <button onClick={() => setDeleteTargetId(item.id)} className="p-2 text-slate-500 hover:text-red-600 bg-white border border-slate-200 hover:border-red-200 hover:bg-red-50 rounded-lg transition-all shadow-2xs" title="حذف المحتوى">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -285,27 +302,27 @@ export function ContentPage() {
 
       {/* Creation / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all">
+          <div className="bg-white w-full h-full sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300 overflow-hidden">
             
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 shrink-0 bg-white rounded-t-[2rem]">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shadow-sm">
-                  <Upload className="w-6 h-6 text-emerald-600" />
+            <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                  <Upload className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800">
+                  <h3 className="text-base sm:text-xl font-bold text-slate-800">
                     {editingId ? 'تحديث وتعديل المحتوى' : 'إرفاق محتوى جديد'}
                   </h3>
-                  <p className="text-xs text-slate-500 font-medium mt-1">اربط المحتوى بدرس محدد لتنظيم المادة العلمية.</p>
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">اربط المحتوى بدرس محدد لتنظيم المادة العلمية.</p>
                 </div>
               </div>
-              <button onClick={() => { setShowModal(false); resetModal(); }} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 bg-slate-50 rounded-xl transition-all border border-slate-100">
+              <button onClick={() => { setShowModal(false); resetModal(); }} className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 bg-slate-50 rounded-xl transition-all border border-slate-100 touch-target shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6 bg-slate-50/50">
+            <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1 space-y-4 sm:space-y-6 bg-slate-50/50">
               
               {uploadError && <UploadErrorBanner error={uploadError} onRetry={handleSave} />}
               

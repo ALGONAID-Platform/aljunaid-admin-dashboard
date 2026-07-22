@@ -81,27 +81,27 @@ export const CascadeDeleteModal: React.FC<CascadeDeleteModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-md transition-all animate-in fade-in duration-200" dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
-      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden border border-red-100 animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all animate-in fade-in duration-200" dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
+      <div className="bg-white rounded-t-3xl sm:rounded-[2.5rem] shadow-2xl w-full max-w-xl max-h-[90vh] sm:max-h-[92vh] flex flex-col overflow-hidden border border-red-100 animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-200">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-red-50 bg-red-50/40 shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-red-100/80 rounded-2xl flex items-center justify-center text-red-600 shadow-inner">
-              <AlertTriangle className="w-6 h-6" />
+        <div className="flex items-center justify-between px-4 sm:px-8 py-4 sm:py-6 border-b border-red-50 bg-red-50/40 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100/80 rounded-2xl flex items-center justify-center text-red-600 shadow-inner shrink-0">
+              <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-red-600 bg-red-100 px-2.5 py-0.5 rounded-full border border-red-200">
-                  إجراء حذف نهائي وتراكمي
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-extrabold text-red-600 bg-red-100 px-2 py-0.5 rounded-full border border-red-200">
+                  حذف تراكمي
                 </span>
                 {impact.isDraft && (
-                  <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
                     مسودة
                   </span>
                 )}
               </div>
-              <h3 className="text-xl font-black text-slate-800 mt-1">
+              <h3 className="text-base sm:text-xl font-black text-slate-800 mt-1 truncate">
                 تأكيد حذف {customTitle || impact.targetTitle}
               </h3>
             </div>
@@ -109,7 +109,7 @@ export const CascadeDeleteModal: React.FC<CascadeDeleteModalProps> = ({
           <button 
             onClick={onClose} 
             disabled={isDeleting}
-            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all border border-slate-100 disabled:opacity-50"
+            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 disabled:opacity-50 touch-target shrink-0"
           >
             <X className="w-5 h-5" />
           </button>

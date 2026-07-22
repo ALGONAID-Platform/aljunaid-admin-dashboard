@@ -75,43 +75,11 @@ export const questionSchema = z.object({
 // ─── Exam Model ──────────────────────────────────────────────────────────────
 
 export const examModelSchema = z.object({
-  courseId: z.string().min(1, 'المقرر الدراسي مطلوب (حقل إجباري)'),
-  moduleId: z.string().optional().nullable(),
-  title: z.string().min(2, 'عنوان نموذج الامتحان مطلوب (حد أدنى حرفان)').max(100),
-  description: z.string().min(5, 'وصف نموذج الامتحان مطلوب (حد أدنى 5 أحرف)').max(500),
-  category: z.enum(['MIDTERM', 'FINAL', 'QUIZ', 'PRACTICE', 'PREVIOUS_EXAM', 'ASSIGNMENT'], {
-    errorMap: () => ({ message: 'يرجى اختيار تصنيف النموذج' }),
-  }),
-  contentType: z.enum(['PDF', 'IMAGE', 'MARKDOWN'], {
-    errorMap: () => ({ message: 'يرجى اختيار نوع المحتوى (PDF أو صورة أو Markdown)' }),
-  }),
+  title: z.string().min(2, 'عنوان النموذج مطلوب (حد أدنى حرفان)').max(100),
+  description: z.string().optional(),
   pdfUrl: z.string().optional().nullable(),
-  imageUrl: z.string().optional().nullable(),
-  markdownContent: z.string().optional().nullable(),
-  semester: z.string().min(1, 'الفصل الدراسي مطلوب'),
-  academicYear: z.string().min(1, 'العام الدراسي مطلوب'),
-}).superRefine((data, ctx) => {
-  if (data.contentType === 'PDF' && !data.pdfUrl) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'يرجى رفع ملف PDF أو إدخال رابط PDF مباشر',
-      path: ['pdfUrl'],
-    });
-  }
-  if (data.contentType === 'IMAGE' && !data.imageUrl) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'يرجى رفع صورة أو إدخال رابط صورة مباشر',
-      path: ['imageUrl'],
-    });
-  }
-  if (data.contentType === 'MARKDOWN' && (!data.markdownContent || !data.markdownContent.trim())) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'يرجى كتابة محتوى المقال/النموذج بنسق Markdown',
-      path: ['markdownContent'],
-    });
-  }
+  grade: z.string().optional(),
+  courseId: z.string().optional(),
 });
 
 // Inferred Types

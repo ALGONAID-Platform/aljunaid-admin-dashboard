@@ -54,38 +54,38 @@ export function DashboardHome() {
   );
 
   return (
-    <div className="font-sans antialiased space-y-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
+    <div className="font-sans antialiased space-y-4 sm:space-y-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
       
       {/* Dynamic Welcome Banner */}
-      <div className="relative overflow-hidden rounded-[2rem] p-8 sm:p-10 shadow-lg" style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 60%, #047857 100%)' }}>
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-[2rem] p-5 sm:p-10 shadow-lg" style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 60%, #047857 100%)' }}>
         {/* Abstract Background Elements */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-900/20 rounded-full blur-2xl translate-y-1/3 -translate-x-1/4" />
         
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div className="flex items-start sm:items-center gap-5">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/30 shrink-0">
-              <GraduationCap className="w-8 h-8 text-white drop-shadow-md" />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
+          <div className="flex items-start sm:items-center gap-3.5 sm:gap-5">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/30 shrink-0">
+              <GraduationCap className="w-6 h-6 sm:w-8 sm:h-8 text-white drop-shadow-md" />
             </div>
             <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <Sparkles className="w-4 h-4 text-emerald-200" />
-                <span className="text-emerald-100 font-bold tracking-wider text-xs uppercase">النظام النشط</span>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
+                <span className="text-emerald-100 font-bold tracking-wider text-[11px] uppercase">النظام النشط</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl text-white font-extrabold tracking-tight drop-shadow-sm mb-1.5">
+              <h2 className="text-xl sm:text-3xl text-white font-extrabold tracking-tight drop-shadow-xs mb-1">
                 أهلاً بك، مشرف المنصة
               </h2>
-              <p className="text-emerald-50 text-sm sm:text-base font-medium opacity-90">
+              <p className="text-emerald-50 text-xs sm:text-base font-medium opacity-90">
                 أنت الآن تتصفح وتدير منصة الجنيد التعليمية. إليك ملخص الإحصائيات.
               </p>
             </div>
           </div>
           <button 
             onClick={() => setIsBuilderOpen(true)}
-            className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-emerald-50 text-emerald-800 rounded-xl font-extrabold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2.5 text-sm shrink-0 border border-white/40 group active:scale-95 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-3 bg-white hover:bg-emerald-50 text-emerald-800 rounded-xl font-extrabold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-xs sm:text-sm shrink-0 border border-white/40 group active:scale-95 cursor-pointer touch-target"
           >
             <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span>✨ Quick Course Builder</span>
+            <span>منشئ المقررات السريع</span>
           </button>
         </div>
       </div>
@@ -97,7 +97,7 @@ export function DashboardHome() {
       />
 
       {/* Primary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <StatCard 
           icon={BookOpen} 
           label="المقررات الدراسية" 
@@ -260,16 +260,16 @@ function StatCard({ icon: Icon, label, value, color, lightBg, sub }: {
   icon: React.ElementType; label: string; value: number; color: string; lightBg: string; sub: string;
 }) {
   return (
-    <div className="bg-white rounded-[2rem] border border-slate-100 p-6 flex items-start gap-4 shadow-sm hover:shadow-md transition-shadow group">
-      <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110 duration-300 shadow-inner" style={{ background: lightBg, border: `1px solid ${color}20` }}>
-        <Icon className="w-7 h-7" style={{ color }} />
+    <div className="bg-white rounded-2xl sm:rounded-[2rem] border border-slate-100 p-4 sm:p-6 flex items-start gap-3 sm:gap-4 shadow-xs hover:shadow-md transition-all group">
+      <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 duration-300 shadow-inner" style={{ background: lightBg, border: `1px solid ${color}20` }}>
+        <Icon className="w-5 h-5 sm:w-7 sm:h-7" style={{ color }} />
       </div>
-      <div className="flex-1 mt-1">
-        <h3 className="text-slate-500 font-bold text-sm mb-1">{label}</h3>
-        <div className="text-slate-800 text-3xl font-black tracking-tight mb-2 flex items-baseline gap-2">
+      <div className="flex-1 min-w-0">
+        <h3 className="text-slate-500 font-bold text-xs sm:text-sm mb-1 truncate">{label}</h3>
+        <div className="text-slate-800 text-2xl sm:text-3xl font-black tracking-tight mb-1 flex items-baseline gap-2">
           {value}
         </div>
-        <p className="text-slate-400 text-xs font-semibold">{sub}</p>
+        <p className="text-slate-400 text-[11px] sm:text-xs font-semibold truncate">{sub}</p>
       </div>
     </div>
   );

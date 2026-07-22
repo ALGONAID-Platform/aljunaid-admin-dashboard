@@ -121,32 +121,32 @@ export function LoginPage() {
       </div>
 
       {/* Login form panel */}
-      <div className="w-full lg:w-[480px] flex flex-col items-center justify-center p-8 bg-white">
-        <div className="lg:hidden text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl shadow-md mb-3 overflow-hidden bg-white border border-slate-100">
+      <div className="w-full lg:w-[480px] flex flex-col items-center justify-center p-4 sm:p-8 bg-white min-h-screen lg:min-h-0">
+        <div className="lg:hidden text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl shadow-sm mb-3 overflow-hidden bg-white border border-slate-100">
             <img src={logo} alt="شعار منصة الجنيد" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-slate-800" style={{ fontSize: 20, fontWeight: 700 }}>منصة الجنيد التعليمية</h1>
+          <h1 className="text-slate-900 font-extrabold text-lg sm:text-xl">منصة الجنيد التعليمية</h1>
         </div>
 
         <div className="w-full max-w-sm">
-          <div className="mb-8">
-            <h2 className="text-slate-800" style={{ fontSize: 26, fontWeight: 700 }}>مرحباً بك</h2>
-            <p className="text-slate-500 mt-1" style={{ fontSize: 14 }}>سجّل دخولك للوصول إلى لوحة التحكم</p>
+          <div className="mb-6 sm:mb-8 text-center sm:text-right">
+            <h2 className="text-slate-800 font-extrabold text-xl sm:text-2xl">مرحباً بك</h2>
+            <p className="text-slate-500 text-xs sm:text-sm mt-1">سجّل دخولك للوصول إلى لوحة التحكم</p>
           </div>
 
-          {/* Error banner — shows real API error message, no mock hints */}
+          {/* Error banner */}
           {err && (
-            <div className={`flex items-center gap-3 p-4 rounded-xl border mb-5 ${err.cls}`}>
+            <div className={`flex items-center gap-3 p-3.5 rounded-xl border mb-5 text-xs sm:text-sm ${err.cls}`}>
               <err.icon className="w-5 h-5 flex-shrink-0" />
-              <span style={{ fontSize: 14 }}>{err.text}</span>
+              <span>{err.text}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5" autoComplete="on">
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4 sm:space-y-5" autoComplete="on">
             {/* Email */}
             <div>
-              <label className="block text-slate-700 mb-2" style={{ fontSize: 14, fontWeight: 500 }}>
+              <label className="block text-slate-700 text-xs sm:text-sm font-bold mb-1.5">
                 البريد الإلكتروني <span className="text-red-500">*</span>
               </label>
               <input
@@ -156,21 +156,21 @@ export function LoginPage() {
                 autoComplete="email"
                 placeholder="example@domain.com"
                 disabled={isLoading}
-                className={`w-full px-4 py-3 rounded-xl border outline-none transition-all disabled:opacity-60 ${
+                className={`w-full min-h-[44px] px-4 py-3 rounded-xl border outline-none transition-all text-sm disabled:opacity-60 ${
                   errors.email
                     ? 'border-red-400 bg-red-50'
                     : 'border-slate-200 bg-slate-50 focus:border-emerald-400 focus:bg-white'
                 }`}
-                style={{ fontSize: 14, direction: 'ltr', textAlign: 'right' }}
+                style={{ direction: 'ltr', textAlign: 'right' }}
               />
               {errors.email && (
-                <p className="text-red-500 mt-1" style={{ fontSize: 12 }}>{errors.email.message}</p>
+                <p className="text-red-500 text-xs mt-1 font-medium">{errors.email.message}</p>
               )}
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-slate-700 mb-2" style={{ fontSize: 14, fontWeight: 500 }}>
+              <label className="block text-slate-700 text-xs sm:text-sm font-bold mb-1.5">
                 كلمة المرور <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -181,17 +181,16 @@ export function LoginPage() {
                   autoComplete="current-password"
                   placeholder="أدخل كلمة المرور"
                   disabled={isLoading}
-                  className={`w-full px-4 py-3 pr-12 rounded-xl border outline-none transition-all disabled:opacity-60 ${
+                  className={`w-full min-h-[44px] px-4 py-3 pr-12 rounded-xl border outline-none transition-all text-sm disabled:opacity-60 ${
                     errors.password
                       ? 'border-red-400 bg-red-50'
                       : 'border-slate-200 bg-slate-50 focus:border-emerald-400 focus:bg-white'
                   }`}
-                  style={{ fontSize: 14 }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass((v) => !v)}
-                  className="absolute top-1/2 right-3.5 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute top-1/2 right-3.5 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1.5 touch-target flex items-center justify-center"
                   aria-label={showPass ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                 >
                   {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

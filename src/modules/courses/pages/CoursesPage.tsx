@@ -415,7 +415,7 @@ export function CoursesPage() {
           <p className="text-slate-400">لم يتم العثور على مقررات تطابق بحثك "{searchQuery}"</p>
           <button onClick={() => setSearchQuery('')} className="mt-4 text-emerald-600 hover:text-emerald-700 font-semibold text-sm underline underline-offset-4">مسح البحث</button>
         </div>
-      ) : (
+) : (
         <div className="space-y-6">
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-bold text-slate-500 flex items-center gap-2">
@@ -434,19 +434,32 @@ export function CoursesPage() {
                 const toggleSelect = () => setSelectedCourses(p => p.includes(course.id) ? p.filter(id => id !== course.id) : [...p, course.id]);
 
                 return (
-                  <div key={course.id} className={`bg-white rounded-[2rem] border overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col ${isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-100 hover:-translate-y-1'}`}>
-                    <div className="h-40 bg-slate-100 relative group-hover:brightness-105 transition-all overflow-hidden flex items-center justify-center">
-                      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-                        <button onClick={toggleSelect} className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm shadow-sm flex items-center justify-center text-slate-500 hover:text-emerald-600 transition-colors">
+                  <div key={course.id} className={`bg-white rounded-2xl sm:rounded-[2rem] border overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col ${isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-100 hover:-translate-y-1'}`}>
+                    <div className="h-36 sm:h-40 bg-slate-100 relative group-hover:brightness-105 transition-all overflow-hidden flex items-center justify-center">
+                      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                        <button onClick={toggleSelect} className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm shadow-sm flex items-center justify-center text-slate-500 hover:text-emerald-600 transition-colors touch-target">
                           {isSelected ? <CheckSquare className="w-5 h-5 text-emerald-600" /> : <Square className="w-5 h-5" />}
                         </button>
                       </div>
+                      
+                      {/* Mobile Visible Action Buttons */}
+                      <div className="absolute top-3 left-3 z-10 flex items-center gap-2 md:hidden">
+                        <button onClick={() => openEdit(course)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-700 shadow-sm touch-target">
+                          <Edit3 className="w-4 h-4 text-blue-600" />
+                        </button>
+                        <button onClick={() => setDeleteConfirm(course.id)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-700 shadow-sm touch-target">
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+
                       {course.imagePreview ? (
                         <img src={course.imagePreview} alt={course.name} className="w-full h-full object-cover" />
                       ) : (
                         <BookOpen className="w-12 h-12 text-emerald-200" />
                       )}
-                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 backdrop-blur-[1px]">
+
+                      {/* Desktop Hover Action Buttons */}
+                      <div className="hidden md:flex absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 items-center justify-center gap-3 backdrop-blur-[1px]">
                         <button onClick={() => openEdit(course)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-blue-600 hover:scale-110 transition-all shadow-lg" title="تعديل المقرر">
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -456,17 +469,17 @@ export function CoursesPage() {
                       </div>
                     </div>
                     
-                    <div className="p-5 flex flex-col flex-1">
-                      <h3 className="text-slate-800 font-bold text-base mb-2 line-clamp-1 leading-tight group-hover:text-emerald-600 transition-colors">{course.name}</h3>
-                      <p className="text-sm text-slate-500 line-clamp-2 min-h-[2.5rem] leading-relaxed mb-4">{course.description}</p>
+                    <div className="p-4 sm:p-5 flex flex-col flex-1">
+                      <h3 className="text-slate-800 font-bold text-sm sm:text-base mb-1.5 line-clamp-1 leading-tight group-hover:text-emerald-600 transition-colors">{course.name}</h3>
+                      <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 min-h-[2.2rem] sm:min-h-[2.5rem] leading-relaxed mb-3 sm:mb-4">{course.description}</p>
                       
-                      <div className="mb-4">
+                      <div className="mb-3 sm:mb-4">
                         <ProgressBar percent={cLessons.length ? Math.round((publishedCLessons.length / cLessons.length) * 100) : 0} label="نسبة النشر" />
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-2 mb-4">
-                        <div className="flex items-center gap-1.5 text-slate-500 font-medium text-xs border border-slate-100 rounded-lg p-2 bg-slate-50/50">
-                           <BookOpenCheck className="w-4 h-4 text-emerald-500" />
+                      <div className="grid grid-cols-2 gap-2 mt-auto">
+                        <div className="flex items-center gap-1.5 text-slate-500 font-medium text-xs border border-slate-100 rounded-lg p-1.5 sm:p-2 bg-slate-50/50">
+                           <BookOpenCheck className="w-3.5 h-3.5 text-emerald-500" />
                            <span>{course.lessonsCount} درس</span>
                         </div>
                         <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md flex items-center justify-center">
@@ -497,18 +510,18 @@ export function CoursesPage() {
       />
 
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col animate-in slide-in-from-bottom-8 duration-300">
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 shrink-0 bg-white rounded-t-[2rem]">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all">
+          <div className="bg-white w-full h-full sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300 overflow-hidden">
+            <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                  {editingId ? <Edit3 className="w-6 h-6 text-emerald-600" /> : <BookOpen className="w-6 h-6 text-emerald-600" />}
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0">
+                  {editingId ? <Edit3 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" /> : <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />}
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800">
+                  <h3 className="text-base sm:text-xl font-bold text-slate-800">
                     {editingId ? 'تعديل تفاصيل المقرر' : 'بناء مقرر جديد'}
                   </h3>
-                  <p className="text-xs text-slate-500 font-medium mt-1">
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
                     {editingId ? 'قم بتحديث المعلومات الأساسية للمقرر.' : 'أدخل المعلومات الأساسية لإضافة المقرر إلى المنصة.'}
                   </p>
                 </div>

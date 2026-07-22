@@ -16,12 +16,9 @@ interface ExamModelsState {
 
   fetchExamModels: (options?: ExamModelFilterOptions) => Promise<void>;
   fetchByCourse: (courseId: string | number) => Promise<ExamModel[]>;
-  fetchByModule: (moduleId: string | number) => Promise<ExamModel[]>;
   addExamModel: (payload: CreateExamModelPayload) => Promise<ExamModel>;
   updateExamModel: (payload: UpdateExamModelPayload) => Promise<ExamModel>;
   deleteExamModel: (id: string) => Promise<void>;
-  togglePublish: (id: string) => Promise<void>;
-  bulkPublish: (ids: string[], isPublished: boolean) => Promise<void>;
   bulkDelete: (ids: string[]) => Promise<void>;
   setFilters: (newFilters: Partial<ExamModelFilterOptions>) => void;
   resetFilters: () => void;
@@ -30,13 +27,8 @@ interface ExamModelsState {
 
 const DEFAULT_FILTERS: ExamModelFilterOptions = {
   searchQuery: '',
-  category: 'ALL',
-  contentType: 'ALL',
   courseId: 'ALL',
-  moduleId: 'ALL',
-  isPublished: 'ALL',
-  semester: 'ALL',
-  academicYear: 'ALL',
+  grade: 'ALL',
   sortBy: 'createdAt',
   sortOrder: 'desc',
 };
@@ -63,15 +55,6 @@ export const useExamModelsStore = create<ExamModelsState>()((set, get) => ({
       return await examModelsService.getByCourse(courseId);
     } catch (err) {
       console.error('Error fetching exam models for course:', err);
-      return [];
-    }
-  },
-
-  fetchByModule: async (moduleId) => {
-    try {
-      return await examModelsService.getByModule(moduleId);
-    } catch (err) {
-      console.error('Error fetching exam models for module:', err);
       return [];
     }
   },
@@ -122,56 +105,12 @@ export const useExamModelsStore = create<ExamModelsState>()((set, get) => ({
     }
   },
 
-  togglePublish: async (id) => {
-    const currentItem = get().examModels.find((x) => String(x.id) === String(id));
-    if (!currentItem) return;
-
-    const newPublishState = !currentItem.isPublished;
-
-    // Optimistic update
-    set((state) => ({
-      examModels: state.examModels.map((item) =>
-        String(item.id) === String(id) ? { ...item, isPublished: newPublishState } : item
-      ),
-    }));
-
-    try {
-      await examModelsService.publish(id, newPublishState);
-    } catch (err) {
-      // Revert optimistic update
-      set((state) => ({
-        examModels: state.examModels.map((item) =>
-          String(item.id) === String(id) ? { ...item, isPublished: !newPublishState } : item
-        ),
-        error: resolveErrorMessage(err),
-      }));
-    }
-  },
-
-  bulkPublish: async (ids, isPublished) => {
-    set({ isLoading: true, error: null });
-    try {
-      await examModelsService.bulkPublish(ids, isPublished);
-      const idSet = new Set(ids.map(String));
-      set((state) => ({
-        examModels: state.examModels.map((item) =>
-          idSet.has(String(item.id)) ? { ...item, isPublished } : item
-        ),
-        isLoading: false,
-      }));
-    } catch (err) {
-      set({ error: resolveErrorMessage(err), isLoading: false });
-      throw err;
-    }
-  },
-
   bulkDelete: async (ids) => {
     set({ isLoading: true, error: null });
     try {
       await examModelsService.bulkDelete(ids);
-      const idSet = new Set(ids.map(String));
       set((state) => ({
-        examModels: state.examModels.filter((item) => !idSet.has(String(item.id))),
+        examModels: state.examModels.filter((item) => !ids.includes(String(item.id))),
         isLoading: false,
       }));
     } catch (err) {
@@ -181,14 +120,15 @@ export const useExamModelsStore = create<ExamModelsState>()((set, get) => ({
   },
 
   setFilters: (newFilters) => {
-    const filters = { ...get().filters, ...newFilters };
-    set({ filters });
-    void get().fetchExamModels(filters);
+    set((state) => ({
+      filters: { ...state.filters, ...newFilters },
+    }));
+    void get().fetchExamModels();
   },
 
   resetFilters: () => {
     set({ filters: DEFAULT_FILTERS });
-    void get().fetchExamModels(DEFAULT_FILTERS);
+    void get().fetchExamModels();
   },
 
   clearError: () => set({ error: null }),

@@ -33,23 +33,23 @@ export function ExamModelToolbar({
         />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         {/* Toggle Filters Button */}
         <button
           type="button"
           onClick={onToggleFilters}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border ${
+          className={`flex items-center justify-center flex-1 sm:flex-none gap-2 px-3 sm:px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border ${
             showFilters
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
           }`}
         >
           <Filter className="w-4 h-4 text-emerald-600" />
-          <span>الفلاتر والتصفية</span>
+          <span className="whitespace-nowrap">الفلاتر</span>
         </button>
 
         {/* View Mode Switcher */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs">
+        <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs shrink-0">
           <button
             type="button"
             onClick={() => onViewModeChange('grid')}
@@ -76,11 +76,11 @@ export function ExamModelToolbar({
         <button
           type="button"
           onClick={onCreateOpen}
-          className="flex items-center gap-2 px-5 py-2.5 text-white rounded-2xl text-xs font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+          className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 sm:px-5 py-2.5 text-white rounded-2xl text-xs font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 shrink-0"
           style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
         >
-          <Plus className="w-4 h-4" strokeWidth={2.5} />
-          <span>إضافة نموذج امتحان</span>
+          <Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />
+          <span className="whitespace-nowrap">إضافة نموذج</span>
         </button>
       </div>
     </div>

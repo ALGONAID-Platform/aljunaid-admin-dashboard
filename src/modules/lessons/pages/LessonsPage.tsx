@@ -466,88 +466,109 @@ export function LessonsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden mb-6">
-          {/* Mobile Stacked Cards Layout */}
-          <div className="md:hidden divide-y divide-slate-50/80 bg-slate-50/50">
+          {/* Mobile Stacked Cards Layout with Clear Visual Separation */}
+          <div className="md:hidden space-y-4 p-3 bg-slate-50/50">
             {/* Mobile Select All Header */}
-            <div className="p-4 flex items-center justify-between bg-white border-b border-slate-100">
+            <div className="p-3.5 flex items-center justify-between bg-white border border-slate-200/80 rounded-2xl shadow-sm">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSelectedLessons(p => p.length === paginatedLessons.length ? [] : paginatedLessons.map(l => l.id))}
-                  className="text-slate-400 hover:text-emerald-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center p-2"
+                  className="text-slate-400 hover:text-emerald-500 transition-colors p-1"
                 >
                   {selectedLessons.length > 0 && selectedLessons.length === paginatedLessons.length ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
                 </button>
-                <span className="text-xs font-bold text-slate-500">تحديد الكل</span>
+                <span className="text-xs font-bold text-slate-600">تحديد كل الدروس في الصفحة</span>
               </div>
+              <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                {paginatedLessons.length} درس
+              </span>
             </div>
 
-            {paginatedLessons.map(lesson => (
-              <div key={lesson.id} className={`p-4 space-y-4 bg-white transition-colors ${selectedLessons.includes(lesson.id) ? 'bg-emerald-50/30' : ''}`}>
-                <div className="flex items-start gap-3">
-                  <button onClick={() => setSelectedLessons(p => p.includes(lesson.id) ? p.filter(id => id !== lesson.id) : [...p, lesson.id])} className="mt-1 text-slate-400 hover:text-emerald-500 transition-colors p-2 min-h-[44px] min-w-[44px] flex items-center justify-center -m-2">
-                    {selectedLessons.includes(lesson.id) ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-slate-800 font-bold mb-1 truncate max-w-[200px]" title={lesson.title}>{lesson.title}</div>
-                    <div className="text-slate-500 text-xs line-clamp-2 leading-relaxed" title={lesson.description}>
-                      {lesson.description}
+            {paginatedLessons.map(lesson => {
+              const moduleObj = allModules.find(m => String(m.id) === String(lesson.courseId));
+              return (
+                <div 
+                  key={lesson.id} 
+                  className={`p-4 space-y-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-sm hover:shadow-md transition-all ${
+                    selectedLessons.includes(lesson.id) ? 'bg-emerald-50/40 border-emerald-300' : ''
+                  }`}
+                >
+                  {/* Header with Lesson order & course badge */}
+                  <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <button 
+                        onClick={() => setSelectedLessons(p => p.includes(lesson.id) ? p.filter(id => id !== lesson.id) : [...p, lesson.id])} 
+                        className="text-slate-400 hover:text-emerald-500 transition-colors shrink-0"
+                      >
+                        {selectedLessons.includes(lesson.id) ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
+                      </button>
+                      <div className="w-8 h-8 shrink-0 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 font-extrabold text-xs shadow-xs">
+                        {lesson.order}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-slate-900 font-extrabold text-sm truncate" title={lesson.title}>{lesson.title}</div>
+                        <div className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5 truncate">
+                          <BookMarked className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{lesson.courseName || 'مقرر مجهول'}</span>
+                        </div>
+                      </div>
                     </div>
+                    <StatusBadge status={lesson.isPublished ? 'published' : 'draft'} />
                   </div>
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
-                    {lesson.order}
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-1">
-                    <div className="text-[11px] text-slate-400 font-bold">الارتباط:</div>
+                  {/* Description */}
+                  {lesson.description && (
+                    <p className="text-slate-600 text-xs line-clamp-2 leading-relaxed bg-slate-50/60 p-2.5 rounded-xl border border-slate-100/60" title={lesson.description}>
+                      {lesson.description}
+                    </p>
+                  )}
+
+                  {/* Breadcrumbs / Connection info */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="text-[11px] text-slate-400 font-bold flex items-center gap-1">
+                      <Layers className="w-3 h-3 text-slate-400" /> التبعية والمسار:
+                    </div>
                     <Breadcrumbs items={[
-                      { label: lesson.courseName || 'مقرر مجهول' },
-                      { label: allModules.find(m => String(m.id) === String(lesson.courseId))?.title || 'وحدة مجهولة' },
+                      { label: lesson.courseName || 'المقرر' },
+                      { label: moduleObj ? moduleObj.title.replace(/^وحدة:\s*/, '') : 'الوحدة' },
                       { label: lesson.title }
                     ]} />
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
+
+                  {/* Badges & content indicator */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <div className="flex flex-wrap gap-1.5">
                       <HealthBadge condition={!lesson.description?.trim()} label="وصف مفقود" type="warning" />
                       <HealthBadge condition={!lesson.hasContent} label="بدون محتوى" type="error" />
-                      <HealthBadge condition={!lesson.isPublished} label="غير منشور" type="info" />
+                      {lesson.hasContent ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100 shadow-2xs">
+                          <PlayCircle className="w-3 h-3" /> مادة علمية متوفرة
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold border border-slate-200">
+                          <AlertCircle className="w-3 h-3" /> قيد الإعداد
+                        </span>
+                      )}
                     </div>
-                    {lesson.hasContent ? (
-                      <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100 shadow-sm w-fit">
-                        <PlayCircle className="w-3 h-3" /> مادة علمية מתوفرة
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full bg-slate-100 text-slate-500 font-semibold border border-slate-200 w-fit">
-                        <AlertCircle className="w-3 h-3" /> قيد الإعداد
-                      </span>
-                    )}
+                    
+                    <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                      <button onClick={() => setPreviewLesson(lesson)} className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-all" title="معاينة">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => updateLesson({ id: lesson.id, isPublished: !lesson.isPublished })} className={`p-1.5 rounded-lg transition-all ${lesson.isPublished ? 'text-slate-500 hover:text-amber-600 hover:bg-white' : 'text-slate-500 hover:text-emerald-600 hover:bg-white'}`} title={lesson.isPublished ? "مسودة" : "نشر"}>
+                        {lesson.isPublished ? <Clock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                      </button>
+                      <button onClick={() => void openEdit(lesson)} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-lg transition-all" title="تعديل">
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => void handleDelete(lesson.id)} disabled={deleteStatus === 'loading'} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-white rounded-lg transition-all disabled:opacity-50" title="حذف">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                  <div className="flex flex-col gap-1.5">
-                    <StatusBadge status={lesson.isPublished ? 'published' : 'draft'} />
-                    <span className="text-[10px] text-slate-400">تحديث: {new Date(lesson.updatedAt).toLocaleDateString('ar-SA')}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => setPreviewLesson(lesson)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="وضع معاينة الطالب">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => updateLesson({ id: lesson.id, isPublished: !lesson.isPublished })} className={`p-2 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center ${lesson.isPublished ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={lesson.isPublished ? "إلغاء النشر (مسودة)" : "نشر الدرس"}>
-                      {lesson.isPublished ? <Clock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                    </button>
-                    <button onClick={() => void openEdit(lesson)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title="تعديل">
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => void handleDelete(lesson.id)} disabled={deleteStatus === 'loading'} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50" title="حذف">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Desktop Table Layout */}
@@ -693,21 +714,21 @@ export function LessonsPage() {
 
       {/* Ultra-Modern Create Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col animate-in slide-in-from-bottom-8 duration-300">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all">
+          <div className="bg-white w-full h-full sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300 overflow-hidden">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 shrink-0 bg-white rounded-t-[2rem]">
+            <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                  <BookMarked className="w-6 h-6 text-emerald-600" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0">
+                  <BookMarked className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800">{editingLessonId ? 'تعديل بيانات الدرس' : 'صياغة درس جديد'}</h3>
-                  <p className="text-xs text-slate-500 font-medium mt-1">أدخل تفاصيل الدرس واربطه بالوحدة التعليمية المناسبة.</p>
+                  <h3 className="text-base sm:text-xl font-bold text-slate-800">{editingLessonId ? 'تعديل بيانات الدرس' : 'صياغة درس جديد'}</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">أدخل تفاصيل الدرس واربطه بالوحدة التعليمية المناسبة.</p>
                 </div>
               </div>
-              <button onClick={closeModal} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 bg-slate-50 rounded-xl transition-all border border-slate-100">
+              <button onClick={closeModal} className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 bg-slate-50 rounded-xl transition-all border border-slate-100 touch-target shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>

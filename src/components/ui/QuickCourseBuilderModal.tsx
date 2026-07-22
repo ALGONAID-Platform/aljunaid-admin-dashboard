@@ -407,29 +407,29 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
   const readyPercent = Math.round((readyScore / 5) * 100);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-lg transition-all" dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
-      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-7xl h-[94vh] flex flex-col overflow-hidden border border-emerald-100 animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md transition-all" dir="rtl" style={{ fontFamily: "'Cairo', sans-serif" }}>
+      <div className="bg-white w-full h-full sm:h-[94vh] sm:max-w-7xl rounded-none sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border-0 sm:border border-emerald-100 animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-200">
         
         {/* Header Bar */}
-        <div className="px-8 py-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md">
+        <div className="px-4 sm:px-8 py-3.5 sm:py-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md shrink-0">
               <Sparkles className="w-5 h-5 animate-spin" style={{ animationDuration: '8s' }} />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-black tracking-tight text-white">منشئ المقررات السريع (Quick Course Builder)</h3>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
-                  Parity Ready v2.1
+                <h3 className="text-sm sm:text-lg font-black tracking-tight text-white truncate">منشئ المقررات السريع</h3>
+                <span className="hidden xs:inline-block px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                  Parity Ready
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-medium">بناء وتنسيق المقرر والأبواب والدروس والمواد المرئية/النصية والاختبارات التفاعلية.</p>
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate">بناء وتنسيق المقرر والأبواب والدروس والاختبارات التفاعلية</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-all border border-white/10"
+            className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-all border border-white/10 touch-target shrink-0"
             title="إغلاق المعالج"
           >
             <X className="w-5 h-5" />
@@ -437,7 +437,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
         </div>
 
         {/* Stepper Bar */}
-        <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between overflow-x-auto custom-scrollbar shrink-0 gap-2">
+        <div className="px-3 sm:px-6 py-2 sm:py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between overflow-x-auto custom-scrollbar shrink-0 gap-2">
           {STEPS.map((step, idx) => {
             const isActive = step.id === currentStep;
             const isPassed = idx < currentStepIndex;
@@ -447,19 +447,22 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
               <button
                 key={step.id}
                 onClick={() => setCurrentStep(step.id)}
-                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl transition-all shrink-0 text-right ${
-                  isActive ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-bold' :
+                className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl transition-all shrink-0 text-right touch-target ${
+                  isActive ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-extrabold' :
                   isPassed ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold' :
                   'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100 font-medium'
                 }`}
               >
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center shrink-0 text-xs ${
                   isActive ? 'bg-white/20 text-white' :
                   isPassed ? 'bg-emerald-600 text-white' :
                   'bg-slate-100 text-slate-400'
                 }`}>
-                  {isPassed ? <CheckCircle2 className="w-4 h-4" /> : <StepIcon className="w-4 h-4" />}
+                  {isPassed ? <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <StepIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                 </div>
+                <span className="text-xs leading-none whitespace-nowrap md:hidden font-bold">
+                  {step.label}
+                </span>
                 <div className="hidden md:block">
                   <div className="text-xs leading-none mb-0.5">{step.label}</div>
                   <div className={`text-[10px] opacity-75 ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>{step.subLabel}</div>
@@ -1235,21 +1238,19 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
             )}
 
             {/* Footer Action Bar */}
-            <div className="pt-6 border-t border-slate-200 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={onClose}
-                  className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-xs transition-colors"
-                >
-                  إلغاء وخروج
-                </button>
-              </div>
+            <div className="pt-4 mt-auto border-t border-slate-200 flex items-center justify-between gap-2 shrink-0 bg-white pb-safe">
+              <button
+                onClick={onClose}
+                className="px-3.5 sm:px-5 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-xs transition-colors touch-target shrink-0"
+              >
+                إلغاء
+              </button>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {currentStepIndex > 0 && (
                   <button
                     onClick={handleBack}
-                    className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5"
+                    className="px-3.5 sm:px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-xl font-bold text-xs transition-all flex items-center gap-1 touch-target shrink-0"
                   >
                     <ChevronRight className="w-4 h-4" /> السابق
                   </button>
@@ -1259,7 +1260,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                   <button
                     onClick={handleNext}
                     disabled={isSaving}
-                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-4 sm:px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1 disabled:opacity-50 touch-target shrink-0"
                   >
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                     <span>التالي</span>

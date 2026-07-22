@@ -8,19 +8,19 @@ export function LessonPreviewModal({ lesson, onClose }: { lesson: Lesson; onClos
   const lessonContent = content.filter(c => c.lessonId === lesson.id);
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 sm:p-6 transition-all animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-slate-950/80 backdrop-blur-md p-0 sm:p-6 transition-all animate-in fade-in duration-200">
+      <div className="bg-white w-full h-full sm:max-h-[90vh] sm:max-w-4xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-8 sm:zoom-in-95">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-100 shrink-0">
-          <div>
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-b border-slate-100 shrink-0">
+          <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">وضع معاينة الطالب</span>
+              <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">وضع معاينة الطالب</span>
             </div>
-            <h2 className="text-lg font-bold text-slate-800">{lesson.title}</h2>
+            <h2 className="text-base sm:text-lg font-bold text-slate-800 truncate">{lesson.title}</h2>
           </div>
-          <button onClick={onClose} className="p-2 bg-white rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-800 shadow-sm">
+          <button onClick={onClose} className="p-2 bg-white rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-800 shadow-sm touch-target shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>

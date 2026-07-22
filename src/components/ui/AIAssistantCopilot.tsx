@@ -19,29 +19,30 @@ export function AIAssistantCopilot() {
       {/* Floating Action Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 z-[90] w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl hover:shadow-2xl hover:scale-110 transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100 animate-bounce-slow'}`}
+        className={`fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[90] w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white shadow-xl hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}
         style={{ background: 'linear-gradient(135deg, #6366F1, #D946EF)' }}
+        aria-label="افتح المساعد الذكي"
       >
-        <Bot className="w-7 h-7" />
-        <div className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
+        <Bot className="w-6 h-6 md:w-7 md:h-7" />
+        <div className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
       </button>
 
-      {/* Copilot Panel */}
+      {/* Copilot Panel - Mobile Sheet & Desktop Popover */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-[110] w-[380px] bg-white rounded-3xl shadow-[0_20px_50px_rgba(99,102,241,0.2)] border border-indigo-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-8 slide-in-from-right-8 duration-300">
+        <div className="fixed inset-x-0 bottom-0 md:inset-auto md:bottom-6 md:right-6 z-[110] w-full md:w-[380px] max-h-[85vh] md:max-h-[540px] bg-white rounded-t-3xl md:rounded-3xl shadow-[0_20px_50px_rgba(99,102,241,0.25)] border border-indigo-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-8 duration-300">
           
           {/* Header */}
-          <div className="px-5 py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500 flex items-center justify-between text-white shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md">
-                <BrainCircuit className="w-6 h-6 text-white" />
+          <div className="px-4 md:px-5 py-3.5 md:py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500 flex items-center justify-between text-white shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 md:w-10 md:h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md shrink-0">
+                <BrainCircuit className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
               <div>
-                <h3 className="font-bold text-sm flex items-center gap-1.5">المساعد الذكي (AI Copilot) <Sparkles className="w-3.5 h-3.5 text-yellow-300" /></h3>
-                <p className="text-[10px] text-indigo-100 font-medium tracking-wide">تحليلات، توصيات، وتدقيق آلي للمحتوى</p>
+                <h3 className="font-extrabold text-xs md:text-sm flex items-center gap-1.5">المساعد الذكي (AI Copilot) <Sparkles className="w-3.5 h-3.5 text-yellow-300" /></h3>
+                <p className="text-[10px] text-indigo-100 font-medium tracking-wide">تحليلات وتوصيات وتدقيق آلي للمحتوى</p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+            <button onClick={() => setIsOpen(false)} className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors touch-target">
               <X className="w-4 h-4" />
             </button>
           </div>

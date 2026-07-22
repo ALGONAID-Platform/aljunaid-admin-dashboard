@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
-  FileSpreadsheet, Plus, CheckCircle, Clock, BookOpen, FolderOpen, 
-  FileText, FileImage, FileCode, AlertCircle, Trash2, Search, Filter, RefreshCw
+  FileSpreadsheet, Plus, AlertCircle, Trash2, Search
 } from 'lucide-react';
-import { useExamModelsStore, useCoursesStore, useModulesStore } from '../../../store';
+import { useExamModelsStore, useCoursesStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { StatWidget } from '../../../components/ui/StatWidget';
@@ -32,13 +31,10 @@ export function ExamModelsPage() {
     addExamModel,
     updateExamModel,
     deleteExamModel,
-    togglePublish,
-    bulkPublish,
     bulkDelete
   } = useExamModelsStore();
 
   const { courses, fetchCourses } = useCoursesStore();
-  const { fetchModules } = useModulesStore();
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [showFilters, setShowFilters] = useState(false);
@@ -61,8 +57,7 @@ export function ExamModelsPage() {
   useEffect(() => {
     void fetchExamModels();
     void fetchCourses();
-    void fetchModules();
-  }, [fetchExamModels, fetchCourses, fetchModules]);
+  }, [fetchExamModels, fetchCourses]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -74,7 +69,6 @@ export function ExamModelsPage() {
     setFilters({ searchQuery: q });
   };
 
-  // Filtered Exam Models
   const filteredModels = useMemo(() => {
     return examModels.filter((item) => {
       let matchesSearch = true;
@@ -82,7 +76,7 @@ export function ExamModelsPage() {
         const q = searchQuery.toLowerCase().trim();
         matchesSearch =
           item.title.toLowerCase().includes(q) ||
-          item.description.toLowerCase().includes(q) ||
+          (item.description && item.description.toLowerCase().includes(q)) ||
           (item.courseName && item.courseName.toLowerCase().includes(q));
       }
       return matchesSearch;
@@ -92,13 +86,7 @@ export function ExamModelsPage() {
   const stats = useMemo(() => {
     return {
       total: examModels.length,
-      midterms: examModels.filter((x) => x.category === 'MIDTERM').length,
-      finals: examModels.filter((x) => x.category === 'FINAL').length,
-      published: examModels.filter((x) => x.isPublished).length,
-      drafts: examModels.filter((x) => !x.isPublished).length,
-      pdfCount: examModels.filter((x) => x.contentType === 'PDF').length,
-      imageCount: examModels.filter((x) => x.contentType === 'IMAGE').length,
-      markdownCount: examModels.filter((x) => x.contentType === 'MARKDOWN').length,
+      pdfs: examModels.filter((x) => x.pdfUrl).length,
     };
   }, [examModels]);
 
@@ -144,7 +132,7 @@ export function ExamModelsPage() {
     }
   };
 
-  const handleBulkAction = async (action: 'publish' | 'unpublish' | 'delete') => {
+  const handleBulkAction = async (action: 'delete') => {
     if (selectedIds.length === 0) return;
 
     if (action === 'delete' && !confirm(`تأكيد حذف ${selectedIds.length} نموذج امتحان؟ لا يمكن التراجع.`)) {
@@ -153,9 +141,7 @@ export function ExamModelsPage() {
 
     setBulkLoading(true);
     try {
-      if (action === 'publish') await bulkPublish(selectedIds, true);
-      else if (action === 'unpublish') await bulkPublish(selectedIds, false);
-      else if (action === 'delete') await bulkDelete(selectedIds);
+      if (action === 'delete') await bulkDelete(selectedIds);
       setSelectedIds([]);
     } catch {
       alert('حدث خطأ أثناء تنفيذ الإجراء المجمع.');
@@ -183,10 +169,10 @@ export function ExamModelsPage() {
         <div>
           <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2.5">
             <FileSpreadsheet className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
-            إدارة نماذج الامتحانات (Exam Models)
+            إدارة نماذج الامتحانات (Practice Exams)
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 font-medium">
-            نماذج امتحانات واختبارات مستقلة للمقررات والوحدات (PDF، صورة، أو Markdown).
+            نماذج امتحانات واختبارات تطبيقية للمقررات والمراحل.
           </p>
         </div>
 
@@ -197,131 +183,79 @@ export function ExamModelsPage() {
             style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
           >
             <Plus className="w-4 h-4" strokeWidth={3} />
-            إضافة نموذج امتحان
+            إضافة نموذج جديد
           </button>
         </div>
       </div>
 
-      {/* Analytics & Stats Widgets */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatWidget title="إجمالي النماذج" value={stats.total} icon={FileSpreadsheet} color="#3B82F6" bg="#EFF6FF" />
-        <StatWidget title="امتحانات نصفية" value={stats.midterms} icon={Clock} color="#F59E0B" bg="#FEF3C7" />
-        <StatWidget title="امتحانات نهائية" value={stats.finals} icon={CheckCircle} color="#10B981" bg="#ECFDF5" />
-        <StatWidget title="النماذج المنشورة" value={stats.published} icon={CheckCircle} color="#059669" bg="#D1FAE5" />
-        <StatWidget title="نماذج PDF" value={stats.pdfCount} icon={FileText} color="#EF4444" bg="#FEF2F2" />
-        <StatWidget title="Markdown / صور" value={stats.markdownCount + stats.imageCount} icon={FileCode} color="#8B5CF6" bg="#F5F3FF" />
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-bold animate-in fade-in">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* Stats Area */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatWidget title="إجمالي النماذج" value={stats.total} icon={FileSpreadsheet} color="blue" />
+        <StatWidget title="ملفات PDF" value={stats.pdfs} icon={FileSpreadsheet} color="emerald" />
       </div>
 
-      {/* Toolbar & Filter Drawer */}
-      <div className="space-y-4">
+      {/* Main Content Area */}
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-4 sm:p-6 space-y-6 relative z-10 overflow-hidden">
         <ExamModelToolbar
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           showFilters={showFilters}
-          onToggleFilters={() => setShowFilters((p) => !p)}
-          onCreateOpen={handleOpenCreate}
+          onToggleFilters={() => setShowFilters(!showFilters)}
+          itemCount={filteredModels.length}
         />
 
         {showFilters && (
-          <ExamModelFilters
-            filters={filters}
-            onChange={(newF) => setFilters(newF)}
-            onReset={resetFilters}
+          <div className="animate-in slide-in-from-top-4 fade-in duration-200">
+            <ExamModelFilters
+              filters={filters}
+              onChange={setFilters}
+              onReset={resetFilters}
+            />
+          </div>
+        )}
+
+        {filteredModels.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title="لا توجد نماذج متطابقة"
+            description="جرب تعديل كلمات البحث أو تغيير إعدادات الفلترة للعثور على النماذج المطلوبة."
+          />
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+            {paginatedModels.map((item) => (
+              <ExamModelCard
+                key={item.id}
+                examModel={item}
+                isSelected={selectedIds.includes(String(item.id))}
+                onSelect={handleToggleSelect}
+                onEdit={handleOpenEdit}
+                onDelete={(id) => setDeleteConfirmId(id)}
+                onPreview={handleOpenPreview}
+              />
+            ))}
+          </div>
+        ) : (
+          <ExamModelTable
+            examModels={paginatedModels}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onToggleSelectAll={handleToggleSelectAll}
+            onEdit={handleOpenEdit}
+            onDelete={(id) => setDeleteConfirmId(id)}
+            onPreview={handleOpenPreview}
           />
         )}
-      </div>
 
-      {/* Bulk Action Bar */}
-      <BulkActionBar
-        selectedCount={selectedIds.length}
-        onClear={() => setSelectedIds([])}
-        onDelete={() => handleBulkAction('delete')}
-        onPublish={() => handleBulkAction('publish')}
-        onUnpublish={() => handleBulkAction('unpublish')}
-        loading={bulkLoading}
-      />
-
-      {/* Content Rendering */}
-      {error && examModels.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-red-100 p-12 text-center shadow-xl flex flex-col items-center">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-2">تعذر تحميل بيانات نماذج الامتحانات</h3>
-          <p className="text-sm text-slate-500 mb-6 max-w-md">{error}</p>
-          <button
-            onClick={() => void fetchExamModels()}
-            className="px-6 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-bold text-xs shadow-md"
-          >
-            إعادة المحاولة
-          </button>
-        </div>
-      ) : examModels.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm">
-          <EmptyState
-            icon={FileSpreadsheet}
-            title="لا توجد نماذج امتحانات مضافة بعد"
-            description="أنشئ نماذج امتحانات مستقلة للمقررات والوحدات (نصفية، نهائية، أسئلة سنوات سابقة) وارفاق ملفات PDF أو صور أو محتوى مقالي."
-            action={
-              <button
-                onClick={handleOpenCreate}
-                className="px-6 py-3 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all"
-                style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
-              >
-                إنشاء أول نموذج امتحان الآن
-              </button>
-            }
-          />
-        </div>
-      ) : filteredModels.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 p-16 text-center shadow-sm">
-          <Search className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-          <h3 className="text-base font-bold text-slate-700 mb-1">لا توجد نتائج مطابقة لفلتر البحث</h3>
-          <p className="text-xs text-slate-400">لم يتم العثور على نماذج امتحانات تطابق المعايير المحددة.</p>
-          <button
-            onClick={resetFilters}
-            className="mt-4 text-emerald-600 hover:text-emerald-700 font-bold text-xs underline underline-offset-4"
-          >
-            مسح الفلاتر
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-            <span>نماذج الامتحانات ({filteredModels.length})</span>
-            <span>الصفحة {currentPage} من {Math.ceil(filteredModels.length / itemsPerPage)}</span>
-          </div>
-
-          {viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {paginatedModels.map((model) => (
-                <ExamModelCard
-                  key={model.id}
-                  examModel={model}
-                  isSelected={selectedIds.includes(String(model.id))}
-                  onSelect={handleToggleSelect}
-                  onEdit={handleOpenEdit}
-                  onDelete={handleDeleteSingle}
-                  onPreview={handleOpenPreview}
-                  onTogglePublish={togglePublish}
-                />
-              ))}
-            </div>
-          ) : (
-            <ExamModelTable
-              examModels={paginatedModels}
-              selectedIds={selectedIds}
-              onToggleSelect={handleToggleSelect}
-              onToggleSelectAll={handleToggleSelectAll}
-              onEdit={handleOpenEdit}
-              onDelete={handleDeleteSingle}
-              onPreview={handleOpenPreview}
-              onTogglePublish={togglePublish}
-            />
-          )}
-
+        {filteredModels.length > 0 && (
           <Pagination
             currentPage={currentPage}
             totalItems={filteredModels.length}
@@ -329,22 +263,51 @@ export function ExamModelsPage() {
             onPageChange={setCurrentPage}
             onItemsPerPageChange={setItemsPerPage}
           />
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Form Modal */}
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        onClearSelection={() => setSelectedIds([])}
+        actions={[
+          {
+            label: 'حذف المحدد',
+            icon: Trash2,
+            onClick: () => handleBulkAction('delete'),
+            variant: 'danger'
+          }
+        ]}
+        isLoading={bulkLoading}
+      />
+
       <ExamModelFormModal
         isOpen={showFormModal}
-        editingModel={editingModel}
         onClose={() => setShowFormModal(false)}
+        editingModel={editingModel}
         onSave={handleSaveForm}
       />
 
-      {/* Preview Modal */}
-      <ExamModelPreviewModal
-        isOpen={showPreviewModal}
-        examModel={previewModel}
-        onClose={() => setShowPreviewModal(false)}
+      {previewModel && (
+        <ExamModelPreviewModal
+          isOpen={showPreviewModal}
+          onClose={() => setShowPreviewModal(false)}
+          examModel={previewModel}
+        />
+      )}
+
+      <CascadeDeleteModal
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => {
+          if (deleteConfirmId) {
+            void handleDeleteSingle(deleteConfirmId);
+            setDeleteConfirmId(null);
+          }
+        }}
+        title="حذف نموذج الامتحان"
+        message="هل أنت متأكد من رغبتك في حذف هذا النموذج؟ هذا الإجراء سيؤدي إلى حذف جميع البيانات المرتبطة به نهائياً ولا يمكن التراجع عنه."
+        itemType="examModel"
       />
     </div>
   );

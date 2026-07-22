@@ -475,27 +475,27 @@ export function QuizPage() {
 
       {/* Ultra-Modern Creation Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl h-[92vh] flex flex-col animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all">
+          <div className="bg-white w-full h-full sm:h-[92vh] sm:max-w-4xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300 overflow-hidden">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 shrink-0 bg-white rounded-t-[2rem]">
-              <div className="flex items-center gap-6">
-                <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center shadow-sm">
-                  <ClipboardList className="w-7 h-7 text-emerald-600" />
+            <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
+              <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+                <div className="w-10 h-10 sm:w-14 sm:h-14 bg-emerald-50 rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                  <ClipboardList className="w-5 h-5 sm:w-7 sm:h-7 text-emerald-600" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">
+                <div className="min-w-0">
+                  <h3 className="text-base sm:text-xl font-bold text-slate-800 mb-1 truncate">
                     {editingQuizId ? 'تحديث وتعديل الاختبار' : 'إعداد اختبار جديد'}
                   </h3>
                   <div className="flex items-center gap-2">
                     <StepDot active={step === 'info'} done={step === 'questions'} label="1. إعدادات الاختبار" onClick={() => setStep('info')} />
-                    <div className="w-10 h-0.5 bg-slate-100 rounded-full" />
+                    <div className="w-6 sm:w-10 h-0.5 bg-slate-200 rounded-full" />
                     <StepDot active={step === 'questions'} done={false} label="2. بنك الأسئلة" onClick={() => { if(validateInfo()) setStep('questions'); }} />
                   </div>
                 </div>
               </div>
-              <button onClick={closeModal} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 bg-slate-50 rounded-xl transition-all border border-slate-100">
+              <button onClick={closeModal} className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 bg-slate-50 rounded-xl transition-all border border-slate-100 touch-target shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -503,7 +503,7 @@ export function QuizPage() {
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50">
               {step === 'info' ? (
-                <div className="p-8 max-w-3xl mx-auto space-y-6">
+                <div className="p-4 sm:p-8 max-w-3xl mx-auto space-y-4 sm:space-y-6">
                   
                   {/* Info Panel: Links */}
                   <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-5 relative">
