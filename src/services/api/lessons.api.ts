@@ -135,7 +135,8 @@ export const lessonService = {
    * POST /lessons (multipart/form-data)
    * Frontend's courseId is treated as moduleId.
    */
-  async create(payload: CreateLessonPayload & { courseName?: string; pdf?: File; pdfUrl?: string; videoUrl?: string; content?: string; status?: 'DRAFT' | 'PUBLISHED' }): Promise<Lesson> {
+  async create(payload: CreateLessonPayload & { courseName?: string; pdf?: File; pdfUrl?: string; videoUrl?: string; content?: string; status?: 'DRAFT' | 'PUBLISHED'; isPublished?: boolean }): Promise<Lesson> {
+    const status = payload.status ?? ((payload.isPublished ?? true) ? 'PUBLISHED' : 'DRAFT');
     const fd = buildLessonFormData({
       title: payload.title,
       description: payload.description,
@@ -145,12 +146,11 @@ export const lessonService = {
       order: payload.order,
       moduleId: Number(payload.courseId),
       pdf: (payload as any).pdf,
-      status: (payload as any).status ?? (payload.isPublished ? 'PUBLISHED' : 'DRAFT'),
+      status,
       isPublished: payload.isPublished ?? true,
     });
 
     const { data } = await api.post<BackendLesson | { data: BackendLesson }>('/lessons', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
     });
     const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
     return adaptLesson(lesson);
@@ -170,7 +170,6 @@ export const lessonService = {
     });
 
     const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
     });
     const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
     return adaptLesson(lesson);
@@ -190,10 +189,8 @@ export const lessonService = {
     const newStatus = lesson.isPublished ? 'DRAFT' : 'PUBLISHED';
     const fd = buildLessonFormData({ status: newStatus });
     const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
     });
     const updated = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
     return adaptLesson(updated);
   },
 };
-

@@ -140,7 +140,7 @@ export function ContentPage() {
 
   const paginatedContent = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  if (isLoading && content.length === 0) return <Loader fullPage />;
+  if (isLoading && content.length === 0 && !showModal) return <Loader fullPage />;
 
   return (
     <div className="font-sans antialiased text-slate-800 space-y-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
