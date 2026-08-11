@@ -214,7 +214,7 @@ export interface UpdateLessonDto {
 
 // ─── Exams ────────────────────────────────────────────────────────────────────
 
-export type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
+export type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER';
 
 export interface BackendOption {
   id?: number;
@@ -225,10 +225,12 @@ export interface BackendOption {
 export interface BackendQuestion {
   id?: number;
   text: string;
+  imageUrl?: string;
   questionImageUrl?: string;
   type: QuestionType;
   points: number;
   options: BackendOption[];
+  answerText?: string | null;
 }
 
 export interface BackendExam {
@@ -255,7 +257,8 @@ export interface UpdateExamDto extends Partial<CreateExamDto> { }
 
 export interface AnswerDto {
   questionId: number;
-  selectedOptionId: number;
+  selectedOptionId?: number;
+  answerText?: string;
 }
 
 export interface SubmitExamDto {

@@ -5,6 +5,7 @@ import {
   AlertCircle, PlayCircle, FileType2, Save, ArrowRight, Eye, RefreshCw, Link as LinkIcon, Image as ImageIcon, FileSpreadsheet
 } from 'lucide-react';
 import { useCoursesStore, useModulesStore, useLessonsStore, useContentStore, useQuizzesStore } from '../../store';
+import { resolveErrorMessage } from '../../lib/errors';
 import { courseService, lessonService, contentService, quizService, publishService } from '../../services';
 import { uploadService } from '../../services/api/upload.api';
 import { MarkdownQuestionEditor } from '../../modules/quizzes/components/MarkdownQuestionEditor';
@@ -28,6 +29,23 @@ const STEPS: StepDefinition[] = [
   { id: 'review', label: 'المراجعة الأكاديمية', subLabel: 'فحص اكتمال العناصر', icon: Eye },
   { id: 'publish', label: 'اعتماد النشر', subLabel: 'إتاحة المقرر للطلاب', icon: Send },
 ];
+
+const QUESTION_TYPE_LABELS: Record<Question['type'], string> = {
+  mcq: 'اختيار متعدد',
+  truefalse: 'صح / خطأ',
+  short: 'إجابة قصيرة',
+};
+
+function createQuestion(type: Question['type'] = 'mcq'): Question {
+  return {
+    id: Date.now().toString() + Math.random(),
+    type,
+    text: '',
+    options: type === 'mcq' ? ['', '', '', ''] : type === 'truefalse' ? ['صح', 'خطأ'] : [],
+    correctAnswer: type === 'truefalse' ? 'صح' : '',
+    points: 1,
+  };
+}
 
 interface QuickCourseBuilderModalProps {
   isOpen: boolean;
@@ -86,16 +104,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
   const [passingScore, setPassingScore] = useState<number>(60);
   const [timeLimit, setTimeLimit] = useState<number>(30);
   const [maxAttempts, setMaxAttempts] = useState<number>(3);
-  const [questions, setQuestions] = useState<Question[]>([
-    {
-      id: 'q1',
-      type: 'mcq',
-      text: '',
-      options: ['', '', '', ''],
-      correctAnswer: '',
-      points: 1,
-    }
-  ]);
+  const [questions, setQuestions] = useState<Question[]>([createQuestion('mcq')]);
 
   // Load data on open
   useEffect(() => {
@@ -321,6 +330,12 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
       return;
     }
 
+    const missingShortAnswer = validQuestions.find(q => q.type === 'short' && !q.correctAnswer.trim());
+    if (missingShortAnswer) {
+      setErrorMessage('يرجى كتابة الإجابة النموذجية للسؤال القصير.');
+      return;
+    }
+
     setIsSaving(true);
     setErrorMessage(null);
     try {
@@ -335,8 +350,8 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
         questions: validQuestions.map(q => ({
           type: q.type,
           text: q.text,
-          options: q.options.filter(opt => opt.trim()),
-          correctAnswer: q.correctAnswer || q.options[0] || 'صح',
+          options: q.type === 'short' ? [] : q.options.filter(opt => opt.trim()),
+          correctAnswer: q.type === 'short' ? q.correctAnswer.trim() : q.correctAnswer || q.options[0] || 'صح',
           points: q.points || 1,
         })),
       });
@@ -346,7 +361,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
       setSuccessMessage('تم إعداد التقييم الأكاديمي بنجاح');
       setTimeout(() => setSuccessMessage(null), 2000);
     } catch (err: any) {
-      setErrorMessage(err?.message || 'فشل إعداد التقييم.');
+      setErrorMessage(resolveErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -1058,17 +1073,24 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setQuestions([...questions, { id: Date.now().toString(), type: 'mcq', text: '', options: ['', '', '', ''], correctAnswer: '', points: 1 }])}
+                          onClick={() => setQuestions([...questions, createQuestion('mcq')])}
                           className="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 px-3 py-1.5 rounded-xl font-bold border border-purple-200 transition-colors"
                         >
                           <Plus className="w-3.5 h-3.5 inline ml-1" /> إضافة سؤال اختيار متعدد
                         </button>
                         <button
                           type="button"
-                          onClick={() => setQuestions([...questions, { id: Date.now().toString(), type: 'truefalse', text: '', options: ['صح', 'خطأ'], correctAnswer: 'صح', points: 1 }])}
+                          onClick={() => setQuestions([...questions, createQuestion('truefalse')])}
                           className="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 px-3 py-1.5 rounded-xl font-bold border border-purple-200 transition-colors"
                         >
                           <Plus className="w-3.5 h-3.5 inline ml-1" /> إضافة سؤال (صح / خطأ)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQuestions([...questions, createQuestion('short')])}
+                          className="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 px-3 py-1.5 rounded-xl font-bold border border-purple-200 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5 inline ml-1" /> إضافة سؤال إجابة قصيرة
                         </button>
                       </div>
                     </div>
@@ -1076,7 +1098,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                     {questions.map((q, qIdx) => (
                       <div key={qIdx} className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
                         <div className="flex items-center justify-between">
-                          <span className="font-extrabold text-xs text-purple-800">السؤال {qIdx + 1} ({q.type === 'mcq' ? 'اختيار متعدد' : 'صح / خطأ'})</span>
+                          <span className="font-extrabold text-xs text-purple-800">السؤال {qIdx + 1} ({QUESTION_TYPE_LABELS[q.type]})</span>
                           {questions.length > 1 && (
                             <button
                               type="button"
@@ -1133,6 +1155,21 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                                   />
                                 </div>
                               ))}
+                            </div>
+                          ) : q.type === 'short' ? (
+                            <div className="space-y-2">
+                              <label className="block text-xs font-bold text-slate-600">الإجابة النموذجية</label>
+                              <input
+                                type="text"
+                                value={q.correctAnswer}
+                                onChange={e => {
+                                  const next = [...questions];
+                                  next[qIdx].correctAnswer = e.target.value;
+                                  setQuestions(next);
+                                }}
+                                placeholder="اكتب الإجابة القصيرة المعتمدة..."
+                                className="flex-1 px-3 py-2.5 border rounded-lg text-xs font-medium bg-white outline-none focus:border-purple-500"
+                              />
                             </div>
                           ) : (
                             <div className="flex gap-4 text-xs font-bold">

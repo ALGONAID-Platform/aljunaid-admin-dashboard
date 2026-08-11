@@ -324,7 +324,7 @@ export function LessonsPage() {
     .sort((a, b) => a.order - b.order)
     .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  if (isLoading && lessons.length === 0) return <Loader fullPage />;
+  if (isLoading && lessons.length === 0 && !showModal) return <Loader fullPage />;
 
   return (
     <div className="font-sans antialiased text-slate-800" style={{ fontFamily: "'Cairo', sans-serif" }}>

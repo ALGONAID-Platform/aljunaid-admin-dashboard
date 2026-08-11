@@ -10,6 +10,7 @@ import { Loader } from '../../../components/feedback/Loader';
 import { QuestionImageUpload } from '../components/QuestionImageUpload';
 import { MarkdownQuestionEditor } from '../components/MarkdownQuestionEditor';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
+import { resolveErrorMessage } from '../../../lib/errors';
 import type { BackendModule } from '../../../types/api';
 import type { Question, QuestionType } from '../../../types';
 
@@ -196,7 +197,7 @@ export function QuizPage() {
           return;
         }
       }
-      setQErrors(prev => ({ ...prev, submit: 'فشل حفظ الاختبار. يرجى مراجعة اتصالك بالشبكة والمحاولة مرة أخرى.' }));
+      setQErrors(prev => ({ ...prev, submit: resolveErrorMessage(err) }));
     }
   };
 
@@ -236,7 +237,7 @@ export function QuizPage() {
         || Boolean(row.quiz?.title.toLowerCase().includes(query));
     });
 
-  if (isLoading && quizzes.length === 0) return <Loader fullPage />;
+  if (isLoading && quizzes.length === 0 && !showModal) return <Loader fullPage />;
 
   return (
     <div className="font-sans antialiased text-slate-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
@@ -578,13 +579,7 @@ export function QuizPage() {
 
                 </div>
               ) : (
-                <div className="p-8 max-w-4xl mx-auto space-y-6">
-                  {saveStatus === 'error' && (
-                    <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 shadow-sm">
-                      <AlertCircle className="w-5 h-5 shrink-0" />
-                      <span className="text-sm font-bold">فشل عملية الحفظ. يرجى التأكد من تعبئة جميع الحقول بشكل صحيح.</span>
-                    </div>
-                  )}
+              <div className="p-8 max-w-4xl mx-auto space-y-6">
                   {qErrors.submit && (
                     <div className="flex items-center gap-3 p-4 bg-red-50 text-red-700 border border-red-200 rounded-2xl shadow-sm">
                       <AlertCircle className="w-5 h-5 shrink-0" />
@@ -614,6 +609,13 @@ export function QuizPage() {
                             </button>
                           ))}
                         </div>
+                        {qErrors[`q_${idx}_type`] && (
+                          <div className="w-full -mt-1">
+                            <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                              {qErrors[`q_${idx}_type`]}
+                            </p>
+                          </div>
+                        )}
                         
                         <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl shadow-sm p-1">
                           <button onClick={() => moveQuestion(idx, 'up')} disabled={idx === 0} className="p-1.5 text-slate-400 hover:text-slate-800 disabled:opacity-30 disabled:hover:text-slate-400 transition-colors" title="نقل لأعلى"><ChevronUp className="w-4 h-4" /></button>

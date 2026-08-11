@@ -30,11 +30,11 @@ import type { Quiz, CreateQuizPayload, UpdateQuizPayload, Question } from '../..
 function adaptExamToQuiz(exam: any): Quiz {
   const questions: Question[] = (exam.questions ?? []).map((q: any) => ({
     id: String(q.id ?? Math.random()),
-    type: q.type === 'TRUE_FALSE' ? 'truefalse' : 'mcq',
+    type: q.type === 'TRUE_FALSE' ? 'truefalse' : q.type === 'SHORT_ANSWER' ? 'short' : 'mcq',
     text: q.text,
-    imageUrl: q.questionImageUrl,
+    imageUrl: q.imageUrl ?? q.questionImageUrl,
     options: (q.options ?? []).map((o: any) => o.text),
-    correctAnswer: (q.options ?? []).find((o: any) => o.isCorrect)?.text ?? '',
+    correctAnswer: q.type === 'SHORT_ANSWER' ? (q.answerText ?? '') : (q.options ?? []).find((o: any) => o.isCorrect)?.text ?? '',
     points: q.points,
   }));
 
@@ -63,12 +63,14 @@ function adaptQuizToCreateExamDto(payload: CreateQuizPayload): CreateExamDto {
     lessonId: Number(payload.lessonId),
     questions: payload.questions.map((q) => ({
       text: q.text?.trim() ?? '',
-      type: q.type === 'truefalse' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
+      type: q.type === 'truefalse' ? 'TRUE_FALSE' : q.type === 'short' ? 'SHORT_ANSWER' : 'MULTIPLE_CHOICE',
       points: q.points ?? 1,
-      options: q.options.map((opt, idx) => ({
+      imageUrl: q.imageUrl?.trim() || undefined,
+      options: q.type === 'short' ? [] : q.options.map((opt) => ({
         text: opt,
         isCorrect: opt === q.correctAnswer,
       })),
+      answerText: q.type === 'short' ? (q.correctAnswer ?? '').trim() : undefined,
     })),
   };
 }
@@ -112,12 +114,14 @@ export const quizService = {
     if (rest.questions) {
       dto.questions = rest.questions.map((q) => ({
         text: q.text?.trim() ?? '',
-        type: q.type === 'truefalse' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
+        type: q.type === 'truefalse' ? 'TRUE_FALSE' : q.type === 'short' ? 'SHORT_ANSWER' : 'MULTIPLE_CHOICE',
         points: q.points ?? 1,
-        options: (q.options ?? []).map((opt) => ({
+        imageUrl: q.imageUrl?.trim() || undefined,
+        options: q.type === 'short' ? [] : (q.options ?? []).map((opt) => ({
           text: opt,
           isCorrect: opt === q.correctAnswer,
         })),
+        answerText: q.type === 'short' ? (q.correctAnswer ?? '').trim() : undefined,
       }));
     }
 
