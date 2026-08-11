@@ -80,13 +80,7 @@ export function DashboardHome() {
               </p>
             </div>
           </div>
-          <button 
-            onClick={() => setIsBuilderOpen(true)}
-            className="w-full sm:w-auto px-5 py-3 bg-white hover:bg-emerald-50 text-emerald-800 rounded-xl font-extrabold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-xs sm:text-sm shrink-0 border border-white/40 group active:scale-95 cursor-pointer touch-target"
-          >
-            <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span>منشئ المقررات السريع</span>
-          </button>
+
         </div>
       </div>
 
