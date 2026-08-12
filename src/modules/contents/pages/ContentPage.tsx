@@ -104,6 +104,9 @@ export function ContentPage() {
 
       const finalPdfUrl = form.pdfUrl.trim() ? form.pdfUrl.trim() : null;
 
+      // Derive isReading automatically — video = not reading, all other types = reading
+      const isReading = form.type !== 'video';
+
       const payload = {
         lessonId: form.lessonId,
         lessonTitle: lesson.title,
@@ -112,6 +115,7 @@ export function ContentPage() {
         videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,
         content: form.type === 'markdown' ? form.content.trim() : undefined,
         pdfUrl: finalPdfUrl,
+        isReading,
       };
 
       if (editingId) {
@@ -341,9 +345,6 @@ export function ContentPage() {
                   <input value={form.title} onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setErrors(p => { const x = { ...p }; delete x.title; return x; }); }} placeholder="مثال: مذكرة شرح مبادئ التفاضل" className={inputCls(!!errors.title, 'font-bold')} />
                 </Field>
 
-                <Field label="نبذة وصفية (اختياري)">
-                  <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="أضف أية تعليمات إضافية بخصوص هذا الملف..." rows={2} className={`${inputCls(false)} resize-none text-sm leading-relaxed`} />
-                </Field>
 
               </div>
 

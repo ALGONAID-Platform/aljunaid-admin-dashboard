@@ -1,5 +1,6 @@
 import { api } from '../../lib/api';
 import type { ExamModel, CreateExamModelPayload, UpdateExamModelPayload, ExamModelFilterOptions } from '../../types/examModel.types';
+import { uploadService } from './upload.api';
 
 class ExamModelsService {
   private readonly BASE_URL = '/practice-exams';
@@ -46,26 +47,43 @@ class ExamModelsService {
     return data;
   }
 
-  async create(payload: CreateExamModelPayload): Promise<ExamModel> {
+  async create(payload: CreateExamModelPayload, onUploadProgress?: (p: any) => void): Promise<ExamModel> {
+    let finalPdfUrl = payload.pdfUrl;
+    
+    if (payload.pdfFile) {
+      finalPdfUrl = await uploadService.uploadPdf(payload.pdfFile, onUploadProgress);
+    }
+
     const requestData: Record<string, any> = {
       title: payload.title.trim(),
       description: payload.description?.trim(),
-      pdfUrl: payload.pdfUrl,
+      pdfUrl: finalPdfUrl,
       grade: payload.grade,
-      courseId: payload.courseId ? Number(payload.courseId) : undefined,
+      courseId: payload.courseId && !isNaN(Number(payload.courseId)) && Number(payload.courseId) !== 0
+        ? Number(payload.courseId)
+        : undefined,
     };
 
     const { data } = await api.post<ExamModel>(this.BASE_URL, requestData);
     return data;
   }
 
-  async update(payload: UpdateExamModelPayload): Promise<ExamModel> {
+  async update(payload: UpdateExamModelPayload, onUploadProgress?: (p: any) => void): Promise<ExamModel> {
+    let finalPdfUrl = payload.pdfUrl;
+    
+    if (payload.pdfFile) {
+      finalPdfUrl = await uploadService.uploadPdf(payload.pdfFile, onUploadProgress);
+    }
+
     const requestData: Record<string, any> = {};
     if (payload.title) requestData.title = payload.title.trim();
     if (payload.description !== undefined) requestData.description = payload.description?.trim();
-    if (payload.pdfUrl !== undefined) requestData.pdfUrl = payload.pdfUrl;
+    if (finalPdfUrl !== undefined) requestData.pdfUrl = finalPdfUrl;
     if (payload.grade !== undefined) requestData.grade = payload.grade;
-    if (payload.courseId !== undefined) requestData.courseId = payload.courseId ? Number(payload.courseId) : null;
+    if (payload.courseId !== undefined) {
+      const parsed = Number(payload.courseId);
+      requestData.courseId = payload.courseId && !isNaN(parsed) && parsed !== 0 ? parsed : null;
+    }
 
     const { data } = await api.patch<ExamModel>(`${this.BASE_URL}/${payload.id}`, requestData);
     return data;

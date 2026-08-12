@@ -3,6 +3,7 @@ import {
   Plus, BookOpen, X, CheckCircle, AlertCircle, Image as ImageIcon, Link as LinkIcon,
   Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi, CheckSquare, Square, Copy
 } from 'lucide-react';
+import { getImageUrl } from '../../../utils/helpers';
 import { useCoursesStore, useLessonsStore, useModulesStore, useExamModelsStore } from '../../../store';
 import { validateImageFile, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
 import { Loader } from '../../../components/feedback/Loader';
@@ -20,7 +21,7 @@ import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import type { Course } from '../../../types';
 
 interface FormState {
-  name: string;
+  title: string;
   description: string;
   thumbnailUrl: string;
   thumbnailFile: File | null;
@@ -100,18 +101,18 @@ export function CoursesPage() {
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeView, setActiveView] = useState('all');
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(9);
-  
+
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setCurrentPage(1); setSelectedCourses([]); }, [searchQuery, activeView, itemsPerPage]);
 
-  useEffect(() => { 
-    void fetchCourses(); 
+  useEffect(() => {
+    void fetchCourses();
     void fetchModules();
     void fetchLessons();
     void fetchExamModels();
@@ -128,7 +129,7 @@ export function CoursesPage() {
     };
   }, [courses, modules, lessons]);
 
-  const [form, setForm] = useState<FormState>({ name: '', description: '', thumbnailUrl: '', thumbnailFile: null });
+  const [form, setForm] = useState<FormState>({ title: '', description: '', thumbnailUrl: '', thumbnailFile: null });
   const [errors, setErrors] = useState<FormError>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [uploadError, setUploadError] = useState<UploadError | null>(null);
@@ -145,7 +146,7 @@ export function CoursesPage() {
   }, [previewUrl]);
 
   const resetModal = useCallback(() => {
-    setForm({ name: '', description: '', thumbnailUrl: '', thumbnailFile: null });
+    setForm({ title: '', description: '', thumbnailUrl: '', thumbnailFile: null });
     setErrors({});
     setSaveStatus('idle');
     setUploadError(null);
@@ -156,37 +157,37 @@ export function CoursesPage() {
   }, []);
 
   const openCreate = () => { resetModal(); setShowModal(true); };
-  
+
   const openEdit = (course: Course) => {
     resetModal();
     setEditingId(course.id);
-    setForm({ 
-      name: course.name, 
-      description: course.description, 
-      thumbnailUrl: course.imagePreview || '', 
-      thumbnailFile: null 
+    setForm({
+      title: course.title,
+      description: course.description,
+      thumbnailUrl: course.thumbnail || '',
+      thumbnailFile: null
     });
-    if (course.imagePreview) setPreviewUrl(course.imagePreview);
+    if (course.thumbnail) setPreviewUrl(course.thumbnail);
     setShowModal(true);
   };
 
   const closeModal = () => {
-    const isDirty = form.name || form.description || form.thumbnailFile || form.thumbnailUrl;
+    const isDirty = form.title || form.description || form.thumbnailFile || form.thumbnailUrl;
     if (isDirty && saveStatus !== 'success' && !confirm('لديك تغييرات غير محفوظة. هل أنت متأكد من الإلغاء؟')) {
       return;
     }
-    setShowModal(false); 
-    resetModal(); 
+    setShowModal(false);
+    resetModal();
   };
 
   const validate = (): boolean => {
     const e: FormError = {};
-    const nameStr = form.name.trim();
-    if (!nameStr) e.name = 'اسم المقرر مطلوب';
-    else if (nameStr.length < 3) e.name = 'يجب أن يكون عنوان المقرر 3 أحرف على الأقل';
-    else if (nameStr.length > 100) e.name = 'لا يمكن أن يتجاوز عنوان المقرر 100 حرف';
-    else if (!/^(?!\s*$).+/.test(form.name)) e.name = 'لا يمكن أن يكون عنوان المقرر مسافات فارغة فقط';
-    else if (!editingId && courses.some(c => c.name.toLowerCase() === nameStr.toLowerCase())) e.name = 'اسم المقرر موجود مسبقاً في النظام';
+    const titleStr = form.title.trim();
+    if (!titleStr) e.title = 'اسم المقرر مطلوب';
+    else if (titleStr.length < 3) e.title = 'يجب أن يكون عنوان المقرر 3 أحرف على الأقل';
+    else if (titleStr.length > 100) e.title = 'لا يمكن أن يتجاوز عنوان المقرر 100 حرف';
+    else if (!/^(?!\s*$).+/.test(form.title)) e.title = 'لا يمكن أن يكون عنوان المقرر مسافات فارغة فقط';
+    else if (!editingId && courses.some(c => c.title.toLowerCase() === titleStr.toLowerCase())) e.title = 'اسم المقرر موجود مسبقاً في النظام';
     if (!form.thumbnailFile && form.thumbnailUrl && !form.thumbnailUrl.startsWith('http')) {
       e.thumbnailUrl = 'الرابط غير صالح. تأكد من أنه يبدأ بـ http:// أو https://';
     }
@@ -201,14 +202,20 @@ export function CoursesPage() {
     setUploadError(null);
     setUploadProgress(null);
     setErrors({});
-    
+
     try {
-      const payload = {
-        name: form.name.trim(),
+      // بناء الـ Payload بحسب ما إذا كان هناك ملف مرفق أم رابط نصي
+      const payload: any = {
+        title: form.title.trim(),
         description: form.description.trim(),
-        imagePreview: form.thumbnailUrl.trim().startsWith('http') ? form.thumbnailUrl.trim() : undefined,
-        imageFile: form.thumbnailFile ?? undefined,
       };
+
+      // إذا كان هناك ملف تم اختياره من الجهاز، نرسله بالمفتاح الصحيح
+      if (form.thumbnailFile) {
+        payload.imageFile = form.thumbnailFile; // ← التصحيح هنا: استخدام imageFile بدل file
+      } else if (form.thumbnailUrl.trim().startsWith('http')) {
+        payload.thumbnail = form.thumbnailUrl.trim();
+      }
 
       const onProgress = (evt: any) => {
         if (evt.total) {
@@ -225,11 +232,12 @@ export function CoursesPage() {
       } else {
         await addCourse(payload, form.thumbnailFile ? onProgress : undefined);
       }
-      
+
       setSaveStatus('success');
       setTimeout(() => {
         setShowModal(false);
         resetModal();
+        void fetchCourses(); // تحديث القائمة فوراً
       }, 1000);
     } catch (err) {
       setSaveStatus('error');
@@ -241,7 +249,7 @@ export function CoursesPage() {
         setErrors(prev => ({ ...prev, submit: Array.isArray(msg) ? msg[0] : msg }));
       }
     }
-  }, [form, editingId, validate, updateCourse, addCourse, resetModal]);
+  }, [form, editingId, validate, updateCourse, addCourse, resetModal, fetchCourses]);
 
   const handleFileSelect = (file: File) => {
     const validationErr = validateImageFile(file);
@@ -267,12 +275,12 @@ export function CoursesPage() {
     }
   };
 
-  const isFormValid = form.name.trim() && form.description.trim();
-  
+  const isFormValid = form.title.trim() && form.description.trim();
+
   const filteredCourses = courses.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase());
     let matchesView = true;
-    if (activeView === 'no_image') matchesView = !c.imagePreview;
+    if (activeView === 'no_image') matchesView = !c.thumbnail;
     if (activeView === 'no_desc') matchesView = !c.description?.trim();
     if (activeView === 'empty') matchesView = c.lessonsCount === 0;
     return matchesSearch && matchesView;
@@ -295,14 +303,14 @@ export function CoursesPage() {
   const handleBulkAction = async (action: 'delete' | 'duplicate') => {
     if (selectedCourses.length === 0) return;
     if (action === 'delete' && !confirm(`تأكيد حذف ${selectedCourses.length} مقرر نهائياً؟ لا يمكن التراجع.`)) return;
-    
+
     setBulkActionLoading(true);
     try {
       for (const id of selectedCourses) {
         if (action === 'delete') await deleteCourse(id);
         else if (action === 'duplicate') {
           const c = courses.find(x => x.id === id);
-          if (c) await addCourse({ name: c.name + ' (نسخة)', description: c.description, imagePreview: c.imagePreview } as any);
+          if (c) await addCourse({ title: c.title + ' (نسخة)', description: c.description, thumbnail: c.thumbnail } as any);
         }
       }
       setSelectedCourses([]);
@@ -328,7 +336,7 @@ export function CoursesPage() {
             نظرة شاملة على {courses.length} مقرر مسجّل في المنصة. تحكم، أضف، ونظم المحتوى.
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3 w-full md:w-auto">
           <button
             onClick={openCreate}
@@ -354,7 +362,7 @@ export function CoursesPage() {
               className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
             />
           </div>
-          <SavedViews 
+          <SavedViews
             activeView={activeView}
             onChange={setActiveView}
             views={[
@@ -376,7 +384,7 @@ export function CoursesPage() {
         <StatWidget title="اكتمال المحتوى" value={`${stats.completionRate}%`} icon={PlayCircle} color="#EC4899" bg="#FDF2F8" />
       </div>
 
-      <BulkActionBar 
+      <BulkActionBar
         selectedCount={selectedCourses.length}
         onClear={() => setSelectedCourses([])}
         onDuplicate={() => handleBulkAction('duplicate')}
@@ -415,83 +423,88 @@ export function CoursesPage() {
           <p className="text-slate-400">لم يتم العثور على مقررات تطابق بحثك "{searchQuery}"</p>
           <button onClick={() => setSearchQuery('')} className="mt-4 text-emerald-600 hover:text-emerald-700 font-semibold text-sm underline underline-offset-4">مسح البحث</button>
         </div>
-) : (
+      ) : (
         <div className="space-y-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-bold text-slate-500 flex items-center gap-2">
-                <button onClick={() => setSelectedCourses(p => p.length === paginatedCourses.length ? [] : paginatedCourses.map(c => c.id))} className="text-slate-400 hover:text-emerald-500 transition-colors" title="تحديد الكل في هذه الصفحة">
-                  {selectedCourses.length > 0 && selectedCourses.length === paginatedCourses.length ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
-                </button>
-                <span>المقررات التعليمية ({filteredCourses.length})</span>
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {paginatedCourses.map(course => {
-                const cLessons = lessons.filter(l => l.courseId === course.id);
-                const publishedCLessons = cLessons.filter(l => l.isPublished);
-                const isSelected = selectedCourses.includes(course.id);
-                const toggleSelect = () => setSelectedCourses(p => p.includes(course.id) ? p.filter(id => id !== course.id) : [...p, course.id]);
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-bold text-slate-500 flex items-center gap-2">
+              <button onClick={() => setSelectedCourses(p => p.length === paginatedCourses.length ? [] : paginatedCourses.map(c => c.id))} className="text-slate-400 hover:text-emerald-500 transition-colors" title="تحديد الكل في هذه الصفحة">
+                {selectedCourses.length > 0 && selectedCourses.length === paginatedCourses.length ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
+              </button>
+              <span>المقررات التعليمية ({filteredCourses.length})</span>
+            </span>
+          </div>
 
-                return (
-                  <div key={course.id} className={`bg-white rounded-2xl sm:rounded-[2rem] border overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col ${isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-100 hover:-translate-y-1'}`}>
-                    <div className="h-36 sm:h-40 bg-slate-100 relative group-hover:brightness-105 transition-all overflow-hidden flex items-center justify-center">
-                      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
-                        <button onClick={toggleSelect} className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm shadow-sm flex items-center justify-center text-slate-500 hover:text-emerald-600 transition-colors touch-target">
-                          {isSelected ? <CheckSquare className="w-5 h-5 text-emerald-600" /> : <Square className="w-5 h-5" />}
-                        </button>
-                      </div>
-                      
-                      {/* Mobile Visible Action Buttons */}
-                      <div className="absolute top-3 left-3 z-10 flex items-center gap-2 md:hidden">
-                        <button onClick={() => openEdit(course)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-700 shadow-sm touch-target">
-                          <Edit3 className="w-4 h-4 text-blue-600" />
-                        </button>
-                        <button onClick={() => setDeleteConfirm(course.id)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-700 shadow-sm touch-target">
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </button>
-                      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedCourses.map(course => {
+              const cLessons = lessons.filter(l => l.courseId === course.id);
+              const publishedCLessons = cLessons.filter(l => l.isPublished);
+              const isSelected = selectedCourses.includes(course.id);
+              const toggleSelect = () => setSelectedCourses(p => p.includes(course.id) ? p.filter(id => id !== course.id) : [...p, course.id]);
 
-                      {course.imagePreview ? (
-                        <img src={course.imagePreview} alt={course.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <BookOpen className="w-12 h-12 text-emerald-200" />
-                      )}
-
-                      {/* Desktop Hover Action Buttons */}
-                      <div className="hidden md:flex absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 items-center justify-center gap-3 backdrop-blur-[1px]">
-                        <button onClick={() => openEdit(course)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-blue-600 hover:scale-110 transition-all shadow-lg" title="تعديل المقرر">
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setDeleteConfirm(course.id)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-red-600 hover:scale-110 transition-all shadow-lg" title="حذف المقرر">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+              return (
+                <div key={course.id} className={`bg-white rounded-2xl sm:rounded-[2rem] border overflow-hidden hover:shadow-xl transition-all duration-300 group flex flex-col ${isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-100 hover:-translate-y-1'}`}>
+                  <div className="h-36 sm:h-40 bg-slate-100 relative group-hover:brightness-105 transition-all overflow-hidden flex items-center justify-center">
+                    <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                      <button onClick={toggleSelect} className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm shadow-sm flex items-center justify-center text-slate-500 hover:text-emerald-600 transition-colors touch-target">
+                        {isSelected ? <CheckSquare className="w-5 h-5 text-emerald-600" /> : <Square className="w-5 h-5" />}
+                      </button>
                     </div>
-                    
-                    <div className="p-4 sm:p-5 flex flex-col flex-1">
-                      <h3 className="text-slate-800 font-bold text-sm sm:text-base mb-1.5 line-clamp-1 leading-tight group-hover:text-emerald-600 transition-colors">{course.name}</h3>
-                      <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 min-h-[2.2rem] sm:min-h-[2.5rem] leading-relaxed mb-3 sm:mb-4">{course.description}</p>
-                      
-                      <div className="mb-3 sm:mb-4">
-                        <ProgressBar percent={cLessons.length ? Math.round((publishedCLessons.length / cLessons.length) * 100) : 0} label="نسبة النشر" />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2 mt-auto">
-                        <div className="flex items-center gap-1.5 text-slate-500 font-medium text-xs border border-slate-100 rounded-lg p-1.5 sm:p-2 bg-slate-50/50">
-                           <BookOpenCheck className="w-3.5 h-3.5 text-emerald-500" />
-                           <span>{course.lessonsCount} درس</span>
-                        </div>
-                        <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md flex items-center justify-center">
-                          {new Date(course.createdAt).toLocaleDateString('ar-SA')}
-                        </span>
-                      </div>
+
+                    {/* Mobile Visible Action Buttons */}
+                    <div className="absolute top-3 left-3 z-10 flex items-center gap-2 md:hidden">
+                      <button onClick={() => openEdit(course)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-700 shadow-sm touch-target">
+                        <Edit3 className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button onClick={() => setDeleteConfirm(course.id)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-700 shadow-sm touch-target">
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+
+                    {course.thumbnail ? (
+                      <img
+                        src={getImageUrl(course.thumbnail)}
+                        alt={course.title}
+                        className="w-full h-full object-cover"
+                        onError={e => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found'; }}
+                      />
+                    ) : (
+                      <BookOpen className="w-12 h-12 text-emerald-200" />
+                    )}
+
+                    {/* Desktop Hover Action Buttons */}
+                    <div className="hidden md:flex absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 items-center justify-center gap-3 backdrop-blur-[1px]">
+                      <button onClick={() => openEdit(course)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-blue-600 hover:scale-110 transition-all shadow-lg" title="تعديل المقرر">
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setDeleteConfirm(course.id)} className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-700 hover:text-red-600 hover:scale-110 transition-all shadow-lg" title="حذف المقرر">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-            
+
+                  <div className="p-4 sm:p-5 flex flex-col flex-1">
+                    <h3 className="text-slate-800 font-bold text-sm sm:text-base mb-1.5 line-clamp-1 leading-tight group-hover:text-emerald-600 transition-colors">{course.title}</h3>
+                    <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 min-h-[2.2rem] sm:min-h-[2.5rem] leading-relaxed mb-3 sm:mb-4">{course.description}</p>
+
+                    <div className="mb-3 sm:mb-4">
+                      <ProgressBar percent={cLessons.length ? Math.round((publishedCLessons.length / cLessons.length) * 100) : 0} label="نسبة النشر" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                      <div className="flex items-center gap-1.5 text-slate-500 font-medium text-xs border border-slate-100 rounded-lg p-1.5 sm:p-2 bg-slate-50/50">
+                        <BookOpenCheck className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>{course.lessonsCount} درس</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md flex items-center justify-center">
+                        {new Date(course.createdAt).toLocaleDateString('ar-SA')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           <Pagination
             currentPage={currentPage}
             totalItems={filteredCourses.length}
@@ -552,12 +565,12 @@ export function CoursesPage() {
                     المعلومات الأساسية (إلزامية)
                   </div>
 
-                  <Field label="اسم المقرر الدراسي" required error={errors.name} helperText="يجب أن يكون الاسم فريداً ومعبراً ومكوناً من 5 أحرف على الأقل.">
+                  <Field label="اسم المقرر الدراسي" required error={errors.title} helperText="يجب أن يكون الاسم فريداً ومعبراً ومكوناً من 5 أحرف على الأقل.">
                     <input
-                      value={form.name}
-                      onChange={e => { setForm(p => ({ ...p, name: e.target.value })); setErrors(p => { const x = { ...p }; delete x.name; return x; }); }}
+                      value={form.title}
+                      onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setErrors(p => { const x = { ...p }; delete x.title; return x; }); }}
                       placeholder="مثال: الرياضيات المتقدمة للمرحلة الثانوية"
-                      className={inputCls(!!errors.name, 'text-base font-semibold placeholder:font-normal')}
+                      className={inputCls(!!errors.title, 'text-base font-semibold placeholder:font-normal')}
                       maxLength={100}
                     />
                   </Field>
@@ -577,7 +590,7 @@ export function CoursesPage() {
                   <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
                     الوسائط المرئية (اختياري)
                   </div>
-                  
+
                   <Field label="غلاف المقرر (الصورة المصغرة)" error={errors.thumbnailUrl} helperText="سيتم عرض هذه الصورة كواجهة للمقرر في لوحة الطلاب والمشرفين.">
                     {(previewUrl || (form.thumbnailUrl && form.thumbnailUrl.startsWith('http'))) ? (
                       <div className="mb-4 rounded-2xl overflow-hidden border-2 border-emerald-100 shadow-sm relative group bg-slate-50" style={{ height: 180 }}>
@@ -589,11 +602,11 @@ export function CoursesPage() {
                             <Trash2 className="w-4 h-4" /> إزالة
                           </button>
                         </div>
-                        <img 
-                          src={previewUrl || form.thumbnailUrl} 
-                          alt="معاينة الغلاف" 
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                          onError={e => { (e.target as HTMLImageElement).src = 'https://placehold.co/800x400/F8FAFC/94A3B8?text=Image+Not+Found'; }} 
+                        <img
+                          src={previewUrl ? previewUrl : getImageUrl(form.thumbnailUrl)}
+                          alt="معاينة الغلاف"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          onError={e => { (e.target as HTMLImageElement).src = 'https://placehold.co/800x400/F8FAFC/94A3B8?text=Image+Not+Found'; }}
                         />
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3 pt-10">
                           <p className="text-white text-xs font-medium truncate flex items-center gap-1.5">
@@ -668,7 +681,7 @@ function Field({ label, required, error, helperText, children }: { label: string
     <div className="flex flex-col gap-1.5 w-full">
       <div className="flex items-center justify-between">
         <label className="text-sm font-bold text-slate-700 flex items-center gap-1">
-          {label} 
+          {label}
           {required && <span className="text-red-500 text-lg leading-none mt-1">*</span>}
         </label>
         {error && <span className="text-[11px] font-bold text-red-500 animate-pulse bg-red-50 px-2 py-0.5 rounded-md">{error}</span>}
@@ -682,11 +695,10 @@ function Field({ label, required, error, helperText, children }: { label: string
 }
 
 function inputCls(hasError: boolean, extra = '') {
-  return `w-full px-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 ${
-    hasError 
-      ? 'border-red-300 bg-red-50/50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:bg-white' 
-      : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
-  } ${extra}`;
+  return `w-full px-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 ${hasError
+    ? 'border-red-300 bg-red-50/50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:bg-white'
+    : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+    } ${extra}`;
 }
 
 // ─── Component Helpers ────────────────────────────────────────────────────────

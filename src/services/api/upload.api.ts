@@ -114,6 +114,10 @@ export const uploadService = {
     file: File,
     onProgress?: (p: UploadProgress) => void
   ): Promise<string> {
+    if (!file) {
+      throw new Error('لم يتم تحديد ملف صالح للرفع.');
+    }
+
     const validationError = validateImageFile(file);
     if (validationError) {
       throw Object.assign(new Error(validationError.message), { uploadError: validationError });
@@ -124,6 +128,9 @@ export const uploadService = {
 
     try {
       const { data } = await api.post<UploadResponse>('/upload/image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
         onUploadProgress: (evt) => {
           if (onProgress && evt.total) {
             onProgress({
@@ -134,6 +141,62 @@ export const uploadService = {
           }
         },
       });
+
+      if (data.url.startsWith('http://') || data.url.startsWith('https://')) {
+        return data.url;
+      }
+
+      const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://algonaid-api.onrender.com/api/v1';
+      const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
+      return `${baseUrl}${data.url}`;
+    } catch (err) {
+      const classified = classifyUploadError(err);
+      throw Object.assign(new Error(classified.message), { uploadError: classified });
+    }
+  },
+
+  /**
+   * Upload a PDF file with progress tracking.
+   * Returns a permanent server URL.
+   */
+  async uploadPdf(
+    file: File,
+    onProgress?: (p: UploadProgress) => void
+  ): Promise<string> {
+    if (!file) {
+      throw new Error('لم يتم تحديد ملف صالح للرفع.');
+    }
+
+    const validationError = validatePdfFile(file);
+    if (validationError) {
+      throw Object.assign(new Error(validationError.message), { uploadError: validationError });
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // Backend uses the same endpoint for all uploadcare uploads
+      const { data } = await api.post<UploadResponse>('/upload/image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (evt) => {
+          if (onProgress && evt.total) {
+            onProgress({
+              percent: Math.round((evt.loaded * 100) / evt.total),
+              loaded: evt.loaded,
+              total: evt.total,
+            });
+          }
+        },
+      });
+
+      // If the server returns an already-absolute URL (e.g. Uploadcare CDN),
+      // return it directly — do NOT prepend the API base URL.
+      if (data.url.startsWith('http://') || data.url.startsWith('https://')) {
+        return data.url;
+      }
 
       const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://algonaid-api.onrender.com/api/v1';
       const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
@@ -153,10 +216,21 @@ export const uploadService = {
     description: string;
     thumbnail?: string;
     imageFile?: File;
+    pdfUrl?: string;
+    grade?: string | number;
+    courseId?: string | number;
   }): FormData {
     const fd = new FormData();
-    fd.append('title', payload.title);
-    fd.append('description', payload.description);
+    fd.append('title', payload.title.trim());
+    fd.append('description', payload.description?.trim());
+    if (payload.pdfUrl) fd.append('pdfUrl', payload.pdfUrl);
+    if (payload.grade) fd.append('grade', String(payload.grade));
+    
+    const courseId = payload.courseId && !isNaN(Number(payload.courseId)) && Number(payload.courseId) !== 0
+      ? Number(payload.courseId)
+      : undefined;
+    if (courseId) fd.append('courseId', String(courseId));
+
     if (payload.imageFile) {
       fd.append('thumbnail', payload.imageFile);
     } else if (payload.thumbnail) {

@@ -2,17 +2,17 @@ import type { ID } from './common.types';
 
 export interface Course {
   id: ID;
-  name: string;
+  title: string;
   description: string;
-  imagePreview?: string;
+  thumbnail?: string;
   lessonsCount: number;
   createdAt: string;
 }
 
 export interface CreateCoursePayload {
-  name: string;
+  title: string;
   description: string;
-  imagePreview?: string;
+  thumbnail?: string;
 }
 
 export interface UpdateCoursePayload extends Partial<CreateCoursePayload> {
@@ -20,7 +20,7 @@ export interface UpdateCoursePayload extends Partial<CreateCoursePayload> {
 }
 
 export interface CourseFormValues {
-  name: string;
+  title: string;
   description: string;
-  imagePreview?: string;
+  thumbnail?: string;
 }

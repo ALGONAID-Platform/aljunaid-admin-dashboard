@@ -52,3 +52,33 @@ export function truncate(text: string, maxLength = 50): string {
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+
+/** Get a proper image URL (handles absolute and relative paths) */
+export function getImageUrl(path?: string | null): string {
+  if (!path || path.trim() === '') {
+    return 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found';
+  }
+
+  const trimmedPath = path.trim();
+
+  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+    // Fix corrupted URLs if base URL was mistakenly prepended to an absolute URL
+    const httpIndex = trimmedPath.lastIndexOf('http');
+    return httpIndex > 0 ? trimmedPath.substring(httpIndex) : trimmedPath;
+  }
+
+  if (trimmedPath.startsWith('blob:')) {
+    return trimmedPath;
+  }
+
+  if (trimmedPath.startsWith('/')) {
+    const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://algonaid-api.onrender.com/api/v1';
+    const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
+    return `${baseUrl}${trimmedPath}`;
+  }
+
+  // Treat as Uploadcare UUID/hash
+  const cleanPath = trimmedPath.replace(/^\/+|\/+$/g, '');
+  return `https://ucarecdn.com/${cleanPath}/`;
+}
+

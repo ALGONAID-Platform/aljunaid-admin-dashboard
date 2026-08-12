@@ -14,9 +14,9 @@ import { resolveErrorMessage } from '../../../lib/errors';
 import type { BackendModule } from '../../../types/api';
 import type { Question, QuestionType } from '../../../types';
 
-const Q_TYPE_LABELS: Record<string, string> = { mcq: 'اختيار متعدد', truefalse: 'صح / خطأ', short: 'إجابة قصيرة' };
+const Q_TYPE_LABELS: Record<string, string> = { mcq: 'اختيار متعدد', truefalse: 'صح / خطأ' };
 
-function newQuestion(type: 'mcq' | 'truefalse' | 'short' = 'mcq'): Question {
+function newQuestion(type: 'mcq' | 'truefalse' = 'mcq'): Question {
   return {
     id: Date.now().toString() + Math.random(),
     type,
@@ -141,7 +141,7 @@ export function QuizPage() {
         if (q.options.some(o => !o.trim())) e[`q_${i}_opts`] = 'يجب تعبئة جميع خيارات الإجابة';
         if (!q.correctAnswer) e[`q_${i}_ans`] = 'يرجى تحديد الإجابة الصحيحة';
       }
-      if (q.type === 'short' && (!q.correctAnswer || !q.correctAnswer.trim())) e[`q_${i}_ans`] = 'يرجى كتابة الإجابة النموذجية';
+
     });
     setQErrors(e);
     return Object.keys(e).length === 0;
@@ -599,7 +599,7 @@ export function QuizPage() {
                         </div>
                         
                         <div className="flex gap-1.5 flex-wrap mx-auto sm:mr-auto sm:ml-0">
-                          {(['mcq', 'truefalse', 'short'] as const).map(t => (
+                          {(['mcq', 'truefalse'] as const).map(t => (
                             <button 
                               key={t} 
                               onClick={() => changeQuestionType(idx, t)} 
@@ -697,21 +697,7 @@ export function QuizPage() {
                             </div>
                           )}
 
-                          {q.type === 'short' && (
-                            <div className="space-y-4">
-                              <p className="text-slate-700 font-bold text-sm flex items-center gap-2">
-                                <FileEdit className="w-4 h-4 text-emerald-500" />
-                                الإجابة النموذجية المعتمدة
-                              </p>
-                              {qErrors[`q_${idx}_ans`] && <p className="text-red-500 text-xs font-bold">{qErrors[`q_${idx}_ans`]}</p>}
-                              <input 
-                                value={q.correctAnswer} 
-                                onChange={e => updateQuestion(idx, { correctAnswer: e.target.value })} 
-                                placeholder="اكتب الإجابة القصيرة التي ستعتمد كإجابة صحيحة..." 
-                                className={`w-full px-4 py-3.5 rounded-xl border-2 outline-none transition-all text-sm font-semibold ${qErrors[`q_${idx}_ans`] ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-slate-200 bg-white focus:border-emerald-400 focus:shadow-sm'}`} 
-                              />
-                            </div>
-                          )}
+
                         </div>
                       </div>
                     </div>

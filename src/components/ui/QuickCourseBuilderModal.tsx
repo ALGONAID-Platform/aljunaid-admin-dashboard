@@ -33,7 +33,6 @@ const STEPS: StepDefinition[] = [
 const QUESTION_TYPE_LABELS: Record<Question['type'], string> = {
   mcq: 'اختيار متعدد',
   truefalse: 'صح / خطأ',
-  short: 'إجابة قصيرة',
 };
 
 function createQuestion(type: Question['type'] = 'mcq'): Question {
@@ -176,17 +175,19 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
       if (activeCourseId && !activeCourseId.startsWith('draft-')) {
         await updateCourse({
           id: activeCourseId,
-          name: courseTitle.trim(),
+          title: courseTitle.trim(),
           description: courseDesc.trim(),
-          imagePreview: finalThumbnail,
-        });
+          thumbnail: imageInputMode === 'url' && courseImageUrl.trim() ? finalThumbnail : undefined,
+          imageFile: imageInputMode === 'upload' ? (courseImageFile || undefined) : undefined,
+        } as any);
         setSuccessMessage('تم تحديث بيانات المقرر بنجاح');
       } else {
         const created = await addCourse({
-          name: courseTitle.trim(),
+          title: courseTitle.trim(),
           description: courseDesc.trim(),
-          imagePreview: finalThumbnail,
-        });
+          thumbnail: imageInputMode === 'url' && courseImageUrl.trim() ? finalThumbnail : undefined,
+          imageFile: imageInputMode === 'upload' ? (courseImageFile || undefined) : undefined,
+        } as any);
         setActiveCourseId(String(created.id));
         setSuccessMessage('تم تأسيس المقرر وإتاحة مرحلة الوحدات التعليمية');
       }
@@ -330,12 +331,6 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
       return;
     }
 
-    const missingShortAnswer = validQuestions.find(q => q.type === 'short' && !q.correctAnswer.trim());
-    if (missingShortAnswer) {
-      setErrorMessage('يرجى كتابة الإجابة النموذجية للسؤال القصير.');
-      return;
-    }
-
     setIsSaving(true);
     setErrorMessage(null);
     try {
@@ -350,8 +345,8 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
         questions: validQuestions.map(q => ({
           type: q.type,
           text: q.text,
-          options: q.type === 'short' ? [] : q.options.filter(opt => opt.trim()),
-          correctAnswer: q.type === 'short' ? q.correctAnswer.trim() : q.correctAnswer || q.options[0] || 'صح',
+          options: q.options.filter(opt => opt.trim()),
+          correctAnswer: q.correctAnswer || q.options[0] || 'صح',
           points: q.points || 1,
         })),
       });
@@ -1085,13 +1080,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                         >
                           <Plus className="w-3.5 h-3.5 inline ml-1" /> إضافة سؤال (صح / خطأ)
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setQuestions([...questions, createQuestion('short')])}
-                          className="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 px-3 py-1.5 rounded-xl font-bold border border-purple-200 transition-colors"
-                        >
-                          <Plus className="w-3.5 h-3.5 inline ml-1" /> إضافة سؤال إجابة قصيرة
-                        </button>
+
                       </div>
                     </div>
 
@@ -1155,21 +1144,6 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                                   />
                                 </div>
                               ))}
-                            </div>
-                          ) : q.type === 'short' ? (
-                            <div className="space-y-2">
-                              <label className="block text-xs font-bold text-slate-600">الإجابة النموذجية</label>
-                              <input
-                                type="text"
-                                value={q.correctAnswer}
-                                onChange={e => {
-                                  const next = [...questions];
-                                  next[qIdx].correctAnswer = e.target.value;
-                                  setQuestions(next);
-                                }}
-                                placeholder="اكتب الإجابة القصيرة المعتمدة..."
-                                className="flex-1 px-3 py-2.5 border rounded-lg text-xs font-medium bg-white outline-none focus:border-purple-500"
-                              />
                             </div>
                           ) : (
                             <div className="flex gap-4 text-xs font-bold">

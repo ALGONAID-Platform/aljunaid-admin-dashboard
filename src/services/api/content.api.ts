@@ -110,46 +110,75 @@ export const contentService = {
 
   /**
    * Create content = update the lesson with video/pdf/link data.
-   * POST /lessons (multipart) or PATCH /lessons/{id}
+   *
+   * Strategy:
+   *   - NO physical file → send plain JSON so booleans (isReading) are preserved.
+   *   - PDF file attached → send multipart/form-data; omit isReading to avoid the
+   *     "must be a boolean" 400 error caused by FormData string coercion.
    */
   async create(
-    payload: CreateContentPayload & { lessonTitle: string; pdfUrl?: string | null; videoUrl?: string; content?: string },
+    payload: CreateContentPayload & { lessonTitle: string; pdfUrl?: string | null; videoUrl?: string; content?: string; isReading?: boolean },
     onUploadProgress?: (progressEvent: any) => void
   ): Promise<ContentItem> {
-    const fd = new FormData();
+    const hasPdfFile = payload.type === 'pdf' && payload.file instanceof File;
 
-    if (payload.videoUrl) {
-      fd.append('videoUrl', payload.videoUrl);
-    } else if (payload.type === 'video' && payload.url) {
-      fd.append('videoUrl', payload.url);
+    let data: BackendLesson | { data: BackendLesson };
+
+    if (hasPdfFile) {
+      // ── FILE PATH: multipart/form-data ────────────────────────────────────
+      // FormData coerces booleans to strings, so we OMIT isReading here to
+      // avoid the @IsBoolean() validation error on the backend.
+      const fd = new FormData();
+      fd.append('pdf', payload.file as File);
+      if (payload.pdfUrl) fd.append('pdfUrl', payload.pdfUrl);
+
+      ({ data } = await api.patch<BackendLesson | { data: BackendLesson }>(
+        `/lessons/${payload.lessonId}`,
+        fd,
+        { onUploadProgress }
+      ));
+    } else {
+      // ── JSON PATH: plain object (boolean types preserved) ─────────────────
+      const body: Record<string, unknown> = {};
+
+      if (payload.videoUrl) {
+        body.videoUrl = payload.videoUrl;
+      } else if (payload.type === 'video' && payload.url) {
+        body.videoUrl = payload.url;
+      }
+
+      if (payload.pdfUrl) {
+        body.pdfUrl = payload.pdfUrl;
+      }
+
+      if (payload.content) {
+        body.content = payload.content;
+      } else if (['link', 'word', 'image', 'markdown'].includes(payload.type) && payload.url) {
+        body.content = payload.url;
+      }
+
+      // isReading stays as a real boolean — no string coercion ✅
+      if (payload.isReading !== undefined) {
+        body.isReading = payload.isReading;
+      }
+
+      ({ data } = await api.patch<BackendLesson | { data: BackendLesson }>(
+        `/lessons/${payload.lessonId}`,
+        body
+      ));
     }
-
-    if (payload.pdfUrl) {
-      fd.append('pdfUrl', payload.pdfUrl);
-    } else if (payload.type === 'pdf' && payload.file) {
-      fd.append('pdf', payload.file);
-    }
-
-    if (payload.content) {
-      fd.append('content', payload.content);
-    } else if (['link', 'word', 'image', 'markdown'].includes(payload.type) && payload.url) {
-      fd.append('content', payload.url);
-    }
-
-    const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(
-      `/lessons/${payload.lessonId}`,
-      fd,
-      { onUploadProgress }
-    );
 
     const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
     const items = extractContentItems(lesson);
 
-    // Return the first new item that matches the type or field
-    const newItem = items.find((i) => i.type === payload.type || (['link', 'word', 'image'].includes(payload.type) && ['link', 'word', 'image'].includes(i.type)));
-    
+    // Return the first item that matches the type, or synthesise a fallback
+    const newItem = items.find(
+      (i) => i.type === payload.type ||
+        (['link', 'word', 'image'].includes(payload.type) && ['link', 'word', 'image'].includes(i.type))
+    );
+
     const fieldType = payload.type === 'video' ? 'video' : payload.type === 'pdf' ? 'pdf' : 'content';
-    
+
     return newItem ?? {
       id: `lesson-${payload.lessonId}-${fieldType}`,
       lessonId: payload.lessonId,
@@ -162,26 +191,20 @@ export const contentService = {
     };
   },
 
+
   /**
-   * Delete content item — clears the relevant field on the lesson via PATCH.
+   * Delete content item — deletes the entire underlying lesson.
    * id format: lesson-{lessonId}-{type}
    */
   async delete(id: string): Promise<void> {
     const parts = id.split('-');
     // id pattern: lesson-{lessonId}-video|pdf|content
     const lessonId = parts[1];
-    const contentType = parts[2];
 
     if (!lessonId) return;
 
-    const fd = new FormData();
-    if (contentType === 'video') fd.append('videoUrl', '');
-    else if (contentType === 'content') fd.append('content', '');
-    // PDF deletion not supported by backend
-
-    if (fd.has('videoUrl') || fd.has('content')) {
-      await api.patch(`/lessons/${lessonId}`, fd);
-    }
+    // Call the delete API service method directly instead of using a PATCH request
+    await api.delete(`/lessons/${lessonId}`);
   },
 
   /** Retry is a no-op for real backend (no upload queue) */

@@ -27,9 +27,9 @@ import { uploadService } from './upload.api';
 function adaptCourse(bc: BackendCourse): Course {
   return {
     id: String(bc.id),
-    name: bc.title,
+    title: bc.title,
     description: bc.description ?? '',
-    imagePreview: bc.thumbnail ?? undefined,
+    thumbnail: bc.thumbnail ?? undefined,
     lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? bc._count?.modules ?? 0,
     createdAt: bc.createdAt ?? new Date().toISOString(),
   };
@@ -73,14 +73,14 @@ export const courseService = {
 
   /** POST /courses — uses upload service for file then sends JSON */
   async create(payload: CreateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {
-    let thumbnailUrl = payload.imagePreview;
+    let thumbnailUrl = payload.thumbnail;
 
     if (payload.imageFile) {
       thumbnailUrl = await uploadService.uploadImage(payload.imageFile, onUploadProgress);
     }
 
     const body = {
-      title: payload.name,
+      title: payload.title,
       description: payload.description,
       thumbnail: thumbnailUrl,
     };
@@ -93,14 +93,14 @@ export const courseService = {
   /** PATCH /courses/{id} — uses upload service for file then sends JSON */
   async update(payload: UpdateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {
     const { id, ...rest } = payload;
-    let thumbnailUrl = rest.imagePreview;
+    let thumbnailUrl = rest.thumbnail;
 
     if (rest.imageFile) {
       thumbnailUrl = await uploadService.uploadImage(rest.imageFile, onUploadProgress);
     }
 
     const body = {
-      title: rest.name,
+      title: rest.title,
       description: rest.description,
       thumbnail: thumbnailUrl,
     };
