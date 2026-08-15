@@ -14,6 +14,7 @@ import { ExamModelCard } from '../components/ExamModelCard';
 import { ExamModelTable } from '../components/ExamModelTable';
 import { ExamModelFormModal } from '../components/ExamModelFormModal';
 import { ExamModelPreviewModal } from '../components/ExamModelPreviewModal';
+import { PageGuide } from '../../../components/ui/PageGuide';
 import { ExamModelFilters } from '../components/ExamModelFilters';
 import { ExamModelToolbar } from '../components/ExamModelToolbar';
 
@@ -188,6 +189,24 @@ export function ExamModelsPage() {
         </div>
       </div>
 
+      <PageGuide
+        title="دليل نماذج الامتحانات"
+        description="كيفية إدارة النماذج الامتحانية والمراجع"
+        steps={[
+          {
+            title: "إضافة نموذج جديد",
+            description: "استخدم زر الإضافة لرفع ملف جديد (مثل ملفات الـ PDF أو الصور) وربطه بمقرر معين ليكون مرجعاً للطلاب."
+          },
+          {
+            title: "المعاينة والحذف",
+            description: "يمكنك معاينة النموذج مباشرة أو حذفه بسهولة من الأزرار الجانبية في الجدول."
+          }
+        ]}
+        tips={[
+          "يفضل أن تكون عناوين النماذج واضحة ومحددة بالسنة أو الفصل الدراسي لتسهيل البحث."
+        ]}
+      />
+
       {error && (
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-bold animate-in fade-in">
           <AlertCircle className="w-5 h-5 shrink-0" />
@@ -195,10 +214,26 @@ export function ExamModelsPage() {
         </div>
       )}
 
-      {/* Stats Area */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatWidget title="إجمالي النماذج" value={stats.total} icon={FileSpreadsheet} color="blue" />
-        <StatWidget title="ملفات PDF" value={stats.pdfs} icon={FileSpreadsheet} color="emerald" />
+      {/* Compact Stats Area */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3 bg-white border border-slate-200 shadow-sm px-4 py-2.5 rounded-2xl">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+            <FileSpreadsheet className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400">إجمالي النماذج</p>
+            <p className="text-base font-black text-slate-800">{stats.total}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 bg-white border border-slate-200 shadow-sm px-4 py-2.5 rounded-2xl">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+            <FileSpreadsheet className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400">ملفات PDF</p>
+            <p className="text-base font-black text-slate-800">{stats.pdfs}</p>
+          </div>
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -210,7 +245,6 @@ export function ExamModelsPage() {
           onViewModeChange={setViewMode}
           showFilters={showFilters}
           onToggleFilters={() => setShowFilters(!showFilters)}
-          itemCount={filteredModels.length}
         />
 
         {showFilters && (

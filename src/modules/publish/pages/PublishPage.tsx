@@ -81,7 +81,7 @@ export function PublishPage() {
       // 1. If parent course is draft, publish it
       if (parentModule && String(parentModule.courseId).startsWith('draft-')) {
         if (!parentCourse) {
-          const existingCourse = courses.find(c => c.name === lesson.courseName && !String(c.id).startsWith('draft-'));
+          const existingCourse = courses.find(c => c.title === lesson.courseName && !String(c.id).startsWith('draft-'));
           if (existingCourse) {
             realCourseId = existingCourse.id;
           } else {
@@ -108,10 +108,10 @@ export function PublishPage() {
         if (!parentModule) {
            let fallbackCourseId = realCourseId;
            if (!fallbackCourseId) {
-             const existingCourse = courses.find(c => c.name === lesson.courseName && !String(c.id).startsWith('draft-'));
+             const existingCourse = courses.find(c => c.title === lesson.courseName && !String(c.id).startsWith('draft-'));
              if (existingCourse) fallbackCourseId = existingCourse.id;
              else {
-               const createdCourse = await courseService.create({ name: lesson.courseName || 'مقرر جديد', description: lesson.courseName || '' });
+               const createdCourse = await courseService.create({ title: lesson.courseName || 'مقرر جديد', description: lesson.courseName || '' });
                fallbackCourseId = createdCourse.id;
              }
            }

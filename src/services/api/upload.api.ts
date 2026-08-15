@@ -142,19 +142,33 @@ export const uploadService = {
         },
       });
 
-      if (data.url.startsWith('http://') || data.url.startsWith('https://')) {
-        return data.url;
+      // ✂️ === التعديل المعماري الصارم يبدأ هنا === ✂️
+      const rawUrl = data.url.trim();
+      // هذا السطر يستخرج الـ UUID بذكاء سواء كان مجرداً، أو في آخره شرطة مائلة، أو مدمجاً برابط خبيث
+      const uuidMatch = rawUrl.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+
+      if (uuidMatch) {
+        // تم القبض على المعرف! نغلفه برابط السحابة النقي ونعيده فوراً
+        return `https://ucarecdn.com/${uuidMatch[0]}/`;
       }
 
-      const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://algonaid-api.onrender.com/api/v1';
+      if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+        return rawUrl;
+      }
+
+      // مسار الطوارئ للملفات المحلية الحقيقية (مع تجاوز TypeScript)
+      const meta = import.meta as any;
+      const configuredBaseUrl = (meta.env?.VITE_API_URL as string) || 'https://api.exchangesmangement.online/api/v1';
       const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
-      return `${baseUrl}${data.url}`;
+      return `${baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+      // ✂️ === انتهى التعديل المعماري === ✂️
+
     } catch (err) {
       const classified = classifyUploadError(err);
       throw Object.assign(new Error(classified.message), { uploadError: classified });
     }
-  },
-
+  }
+  ,
   /**
    * Upload a PDF file with progress tracking.
    * Returns a permanent server URL.
@@ -198,8 +212,8 @@ export const uploadService = {
         return data.url;
       }
 
-      const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://algonaid-api.onrender.com/api/v1';
-      const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
+      // السطر الصحيح الذي يتجاوز فحص TypeScript:
+      const configuredBaseUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'https://api.exchangesmangement.online/api/v1'; const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
       return `${baseUrl}${data.url}`;
     } catch (err) {
       const classified = classifyUploadError(err);
@@ -225,7 +239,7 @@ export const uploadService = {
     fd.append('description', payload.description?.trim());
     if (payload.pdfUrl) fd.append('pdfUrl', payload.pdfUrl);
     if (payload.grade) fd.append('grade', String(payload.grade));
-    
+
     const courseId = payload.courseId && !isNaN(Number(payload.courseId)) && Number(payload.courseId) !== 0
       ? Number(payload.courseId)
       : undefined;

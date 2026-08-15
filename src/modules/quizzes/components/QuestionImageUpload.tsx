@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { UploadCloud, Image as ImageIcon, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { quizService } from '../../../services/quiz.service';
-import { classifyUploadError, validateImageFile } from '../../../services/api/upload.api';
+import { uploadService, classifyUploadError, validateImageFile } from '../../../services/api/upload.api';
 
 interface Props {
   imageUrl?: string;
@@ -37,7 +36,7 @@ export function QuestionImageUpload({ imageUrl, onImageUploaded, onImageRemoved 
     setProgress(0);
 
     try {
-      const url = await quizService.uploadImage(file, (uploadProgress) => setProgress(uploadProgress.percent));
+      const url = await uploadService.uploadImage(file, (p) => setProgress(p.percent));
       setProgress(100);
       setTimeout(() => {
         setIsUploading(false);

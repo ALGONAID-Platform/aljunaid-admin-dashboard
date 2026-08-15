@@ -396,15 +396,6 @@ export function ContentPage() {
                   </Field>
                 )}
 
-                <Field label="رابط مستند PDF (Google Drive) - اختياري" error={errors.pdfUrl}>
-                  <input 
-                    value={form.pdfUrl} 
-                    onChange={e => { setForm(p => ({ ...p, pdfUrl: e.target.value })); setErrors(p => { const x = { ...p }; delete x.pdfUrl; return x; }); }} 
-                    placeholder="https://drive.google.com/..." 
-                    className={inputCls(!!errors.pdfUrl, 'font-mono text-left')} 
-                    dir="ltr" 
-                  />
-                </Field>
 
               </div>
             </div>
@@ -416,11 +407,18 @@ export function ContentPage() {
               <button 
                 onClick={handleSave} 
                 disabled={uploadStatus === 'uploading' || uploadStatus === 'success'} 
+                className={`flex items-center justify-center gap-2 px-8 py-3 w-full sm:w-auto text-white font-bold rounded-xl transition-all shadow-md order-1 sm:order-2 min-h-[44px] ${
+                  uploadStatus === 'uploading' || uploadStatus === 'success' 
+                    ? 'opacity-80 cursor-not-allowed' 
+                    : 'hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
+                }`}
                 style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
               >
                 {uploadStatus === 'uploading' && <Loader2 className="w-5 h-5 animate-spin" />}
                 {uploadStatus === 'success' && <CheckCircle className="w-5 h-5 animate-bounce" />}
-                {uploadStatus === 'uploading' ? 'جارٍ المعالجة والرفع...' : uploadStatus === 'success' ? 'تم الحفظ بنجاح!' : editingId ? 'تحديث وتوثيق المحتوى' : 'توثيق واعتماد المحتوى'}
+                <span>
+                  {uploadStatus === 'uploading' ? 'جارٍ المعالجة والرفع...' : uploadStatus === 'success' ? 'تم الحفظ بنجاح!' : editingId ? 'تحديث وتوثيق المحتوى' : 'توثيق واعتماد المحتوى'}
+                </span>
               </button>
             </div>
           </div>

@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { uploadService, validateImageFile, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
 import {
   Plus, BookOpen, X, CheckCircle, AlertCircle, Image as ImageIcon, Link as LinkIcon,
   Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi, CheckSquare, Square, Copy
 } from 'lucide-react';
 import { getImageUrl } from '../../../utils/helpers';
 import { useCoursesStore, useLessonsStore, useModulesStore, useExamModelsStore } from '../../../store';
-import { validateImageFile, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
 import { Loader } from '../../../components/feedback/Loader';
 import { useKeyboardShortcut } from '../../../hooks/useKeyboardShortcuts';
 import { BulkActionBar } from '../../../components/ui/BulkActionBar';
@@ -18,8 +18,26 @@ import { StickyToolbar } from '../../../components/ui/StickyToolbar';
 import { GlobalSearch } from '../../../components/ui/GlobalSearch';
 import { SavedViews } from '../../../components/ui/SavedViews';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
+import { PageGuide } from '../../../components/ui/PageGuide';
 import type { Course } from '../../../types';
 
+// 🚀 دالة فولاذية قسرية موضوعة هنا لضمان قراءتها متجاوزة أي كاش
+const getCloudUrl = (img?: string | null) => {
+  if (!img || img.trim() === '') {
+    return 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found';
+  }
+  const clean = img.trim();
+  if (clean.startsWith('http') || clean.startsWith('blob:')) return clean;
+
+  // استخراج المعرف النقي فقط
+  const uuidMatch = clean.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (uuidMatch) {
+    // بناء الرابط القياسي المعتمد لعرض الصور في Uploadcare بدون شرطة مائلة نهائية قد تسبب 404
+    return `https://ucarecdn.com/${uuidMatch[0]}/-/preview/`;
+  }
+
+  return clean;
+};
 interface FormState {
   title: string;
   description: string;
@@ -204,40 +222,32 @@ export function CoursesPage() {
     setErrors({});
 
     try {
-      // بناء الـ Payload بحسب ما إذا كان هناك ملف مرفق أم رابط نصي
-      const payload: any = {
-        title: form.title.trim(),
-        description: form.description.trim(),
-      };
+      let finalThumbnailUrl = form.thumbnailUrl.trim().startsWith('http') ? form.thumbnailUrl.trim() : undefined;
 
-      // إذا كان هناك ملف تم اختياره من الجهاز، نرسله بالمفتاح الصحيح
+      // 🚀 الضربة القاضية: نرفع الصورة هنا مباشرة ونأخذ الرابط، لضمان عدم ضياع الملف في المتجر
       if (form.thumbnailFile) {
-        payload.imageFile = form.thumbnailFile; // ← التصحيح هنا: استخدام imageFile بدل file
-      } else if (form.thumbnailUrl.trim().startsWith('http')) {
-        payload.thumbnail = form.thumbnailUrl.trim();
+        const onProgress = (evt: UploadProgress) => setUploadProgress(evt);
+        finalThumbnailUrl = await uploadService.uploadImage(form.thumbnailFile, onProgress);
       }
 
-      const onProgress = (evt: any) => {
-        if (evt.total) {
-          setUploadProgress({
-            loaded: evt.loaded,
-            total: evt.total,
-            percent: Math.round((evt.loaded * 100) / evt.total)
-          });
-        }
+      // الآن الـ Payload نظيف تماماً ومفهوم للمتجر بنسبة 100% (نصوص فقط)
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        thumbnail: finalThumbnailUrl,
       };
 
       if (editingId) {
-        await updateCourse({ id: editingId, ...payload }, form.thumbnailFile ? onProgress : undefined);
+        await updateCourse({ id: editingId, ...payload });
       } else {
-        await addCourse(payload, form.thumbnailFile ? onProgress : undefined);
+        await addCourse(payload);
       }
 
       setSaveStatus('success');
       setTimeout(() => {
         setShowModal(false);
         resetModal();
-        void fetchCourses(); // تحديث القائمة فوراً
+        void fetchCourses();
       }, 1000);
     } catch (err) {
       setSaveStatus('error');
@@ -344,10 +354,33 @@ export function CoursesPage() {
             style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 600 }}
           >
             <Plus className="w-4 h-4" strokeWidth={3} />
-            إنشاء مقرر جديد
+            تأسيس مقرر جديد
           </button>
         </div>
       </div>
+
+      <PageGuide
+        title="دليل استخدام المقررات"
+        description="تعلم كيف تدير مقرراتك الدراسية بكفاءة عالية"
+        steps={[
+          {
+            title: "إضافة مقرر",
+            description: "انقر على 'تأسيس مقرر جديد' لإنشاء مقرر فارغ، يمكنك لاحقاً إضافة الدروس والاختبارات إليه."
+          },
+          {
+            title: "التحرير والحذف",
+            description: "يمكنك تعديل اسم ووصف وصورة المقرر أو حذفه بالكامل من خلال الأزرار المتوفرة بجوار كل مقرر."
+          },
+          {
+            title: "العمليات المجمعة",
+            description: "حدد عدة مقررات باستخدام مربعات التحديد لتتمكن من حذفها دفعة واحدة لتوفير الوقت."
+          }
+        ]}
+        tips={[
+          "استخدم اختصار Ctrl+F للوصول السريع لشريط البحث.",
+          "تأكد من استخدام صور مصغرة واضحة لزيادة تفاعل الطلاب مع المقررات."
+        ]}
+      />
 
       <StickyToolbar position="top">
         <div className="flex flex-col md:flex-row gap-4 w-full">
@@ -375,13 +408,31 @@ export function CoursesPage() {
         </div>
       </StickyToolbar>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <StatWidget title="إجمالي المقررات" value={stats.totalCourses} icon={BookOpen} color="#3B82F6" bg="#EFF6FF" />
-        <StatWidget title="الوحدات الدراسية" value={stats.totalModules} icon={FolderOpen} color="#8B5CF6" bg="#F5F3FF" />
-        <StatWidget title="إجمالي الدروس" value={stats.totalLessons} icon={BookMarked} color="#F59E0B" bg="#FEF3C7" />
-        <StatWidget title="الدروس المنشورة" value={stats.publishedLessons} icon={CheckCircle} color="#10B981" bg="#ECFDF5" />
-        <StatWidget title="دروس المسودة" value={stats.draftLessons} icon={Clock} color="#64748B" bg="#F8FAFC" />
-        <StatWidget title="اكتمال المحتوى" value={`${stats.completionRate}%`} icon={PlayCircle} color="#EC4899" bg="#FDF2F8" />
+      <div className="flex overflow-x-auto sm:flex-wrap items-center gap-2 sm:gap-3 mb-6 pb-2 sm:pb-0 hide-scrollbar">
+        <div className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-sm whitespace-nowrap">
+          <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center text-blue-500"><BookOpen className="w-3.5 h-3.5" /></div>
+          <div className="flex flex-col"><span className="text-[10px] font-bold text-slate-400 leading-none mb-1">المقررات</span><span className="text-sm font-black text-slate-700 leading-none">{stats.totalCourses}</span></div>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-sm whitespace-nowrap">
+          <div className="w-6 h-6 rounded-md bg-purple-50 flex items-center justify-center text-purple-500"><FolderOpen className="w-3.5 h-3.5" /></div>
+          <div className="flex flex-col"><span className="text-[10px] font-bold text-slate-400 leading-none mb-1">الوحدات</span><span className="text-sm font-black text-slate-700 leading-none">{stats.totalModules}</span></div>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-sm whitespace-nowrap">
+          <div className="w-6 h-6 rounded-md bg-amber-50 flex items-center justify-center text-amber-500"><BookMarked className="w-3.5 h-3.5" /></div>
+          <div className="flex flex-col"><span className="text-[10px] font-bold text-slate-400 leading-none mb-1">الدروس</span><span className="text-sm font-black text-slate-700 leading-none">{stats.totalLessons}</span></div>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-sm whitespace-nowrap">
+          <div className="w-6 h-6 rounded-md bg-emerald-50 flex items-center justify-center text-emerald-500"><CheckCircle className="w-3.5 h-3.5" /></div>
+          <div className="flex flex-col"><span className="text-[10px] font-bold text-slate-400 leading-none mb-1">منشورة</span><span className="text-sm font-black text-slate-700 leading-none">{stats.publishedLessons}</span></div>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-sm whitespace-nowrap">
+          <div className="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-slate-500"><Clock className="w-3.5 h-3.5" /></div>
+          <div className="flex flex-col"><span className="text-[10px] font-bold text-slate-400 leading-none mb-1">مسودات</span><span className="text-sm font-black text-slate-700 leading-none">{stats.draftLessons}</span></div>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-sm whitespace-nowrap">
+          <div className="w-6 h-6 rounded-md bg-pink-50 flex items-center justify-center text-pink-500"><PlayCircle className="w-3.5 h-3.5" /></div>
+          <div className="flex flex-col"><span className="text-[10px] font-bold text-slate-400 leading-none mb-1">الاكتمال</span><span className="text-sm font-black text-slate-700 leading-none">{stats.completionRate}%</span></div>
+        </div>
       </div>
 
       <BulkActionBar
@@ -436,7 +487,7 @@ export function CoursesPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paginatedCourses.map(course => {
-              const cLessons = lessons.filter(l => l.courseId === course.id);
+              const cLessons = lessons.filter(l => String(l.courseId) === String(course.id) || String(modules.find(m => String(m.id) === String(l.courseId))?.courseId) === String(course.id));
               const publishedCLessons = cLessons.filter(l => l.isPublished);
               const isSelected = selectedCourses.includes(course.id);
               const toggleSelect = () => setSelectedCourses(p => p.includes(course.id) ? p.filter(id => id !== course.id) : [...p, course.id]);
@@ -459,13 +510,17 @@ export function CoursesPage() {
                         <Trash2 className="w-4 h-4 text-red-600" />
                       </button>
                     </div>
-
                     {course.thumbnail ? (
                       <img
-                        src={getImageUrl(course.thumbnail)}
+                        src={getCloudUrl(course.thumbnail)}
                         alt={course.title}
                         className="w-full h-full object-cover"
-                        onError={e => { (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found'; }}
+                        onError={e => {
+                          // 🔍 أداة التجسس الهندسية لمعرفة ما يدور في الخفاء
+                          console.error('[THUMB DEBUG] raw value:', course.thumbnail, '| type:', typeof course.thumbnail, '| resolved URL:', getCloudUrl(course.thumbnail));
+
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found';
+                        }}
                       />
                     ) : (
                       <BookOpen className="w-12 h-12 text-emerald-200" />
@@ -493,7 +548,7 @@ export function CoursesPage() {
                     <div className="grid grid-cols-2 gap-2 mt-auto">
                       <div className="flex items-center gap-1.5 text-slate-500 font-medium text-xs border border-slate-100 rounded-lg p-1.5 sm:p-2 bg-slate-50/50">
                         <BookOpenCheck className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>{course.lessonsCount} درس</span>
+                        <span>{cLessons.length} درس</span>
                       </div>
                       <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded-md flex items-center justify-center">
                         {new Date(course.createdAt).toLocaleDateString('ar-SA')}
@@ -603,7 +658,7 @@ export function CoursesPage() {
                           </button>
                         </div>
                         <img
-                          src={previewUrl ? previewUrl : getImageUrl(form.thumbnailUrl)}
+                          src={previewUrl ? previewUrl : form.thumbnailUrl}
                           alt="معاينة الغلاف"
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           onError={e => { (e.target as HTMLImageElement).src = 'https://placehold.co/800x400/F8FAFC/94A3B8?text=Image+Not+Found'; }}

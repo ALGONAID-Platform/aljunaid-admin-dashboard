@@ -25,11 +25,24 @@ import { uploadService } from './upload.api';
 // ─── Adapter: Backend Course → Frontend Course ────────────────────────────────
 
 function adaptCourse(bc: BackendCourse): Course {
+  let cleanThumbnail = bc.thumbnail ?? undefined;
+
+  // 🛡️ تعقيم صارم بالاعتماد على النمط القياسي للـ UUID
+  if (cleanThumbnail && typeof cleanThumbnail === 'string') {
+    // هذا الـ Regex سيستخرج المعرف المكون من 36 حرفاً من أي مكان في النص
+    const uuidMatch = cleanThumbnail.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+
+    if (uuidMatch) {
+      // تم العثور على المعرف! نقوم بتنظيفه فوراً وتجاهل أي روابط سيرفر ملوثة سابقة
+      cleanThumbnail = `https://ucarecdn.com/${uuidMatch[0]}/`;
+    }
+  }
+
   return {
     id: String(bc.id),
     title: bc.title,
     description: bc.description ?? '',
-    thumbnail: bc.thumbnail ?? undefined,
+    thumbnail: cleanThumbnail,
     lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? bc._count?.modules ?? 0,
     createdAt: bc.createdAt ?? new Date().toISOString(),
   };

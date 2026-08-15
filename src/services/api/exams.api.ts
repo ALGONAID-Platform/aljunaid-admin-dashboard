@@ -112,6 +112,7 @@ export const quizService = {
     if (rest.lessonId !== undefined) dto.lessonId = Number(rest.lessonId);
     if (rest.questions) {
       dto.questions = rest.questions.map((q) => ({
+        ...(q.id && !isNaN(Number(q.id)) && Number(q.id) > 1000000000 ? {} : q.id && !isNaN(Number(q.id)) ? { id: Number(q.id) } : {}),
         text: q.text?.trim() ?? '',
         type: q.type === 'truefalse' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
         points: q.points ?? 1,
