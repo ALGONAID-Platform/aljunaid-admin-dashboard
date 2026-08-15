@@ -25,11 +25,24 @@ import { uploadService } from './upload.api';
 // ─── Adapter: Backend Course → Frontend Course ────────────────────────────────
 
 function adaptCourse(bc: BackendCourse): Course {
+  let cleanThumbnail = bc.thumbnail ?? undefined;
+
+  // 🛡️ تعقيم صارم بالاعتماد على النمط القياسي للـ UUID
+  if (cleanThumbnail && typeof cleanThumbnail === 'string') {
+    // هذا الـ Regex سيستخرج المعرف المكون من 36 حرفاً من أي مكان في النص
+    const uuidMatch = cleanThumbnail.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+
+    if (uuidMatch) {
+      // تم العثور على المعرف! نقوم بتنظيفه فوراً وتجاهل أي روابط سيرفر ملوثة سابقة
+      cleanThumbnail = `https://ucarecdn.com/${uuidMatch[0]}/`;
+    }
+  }
+
   return {
     id: String(bc.id),
-    name: bc.title,
+    title: bc.title,
     description: bc.description ?? '',
-    imagePreview: bc.thumbnail ?? undefined,
+    thumbnail: cleanThumbnail,
     lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? bc._count?.modules ?? 0,
     createdAt: bc.createdAt ?? new Date().toISOString(),
   };
@@ -73,14 +86,14 @@ export const courseService = {
 
   /** POST /courses — uses upload service for file then sends JSON */
   async create(payload: CreateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {
-    let thumbnailUrl = payload.imagePreview;
+    let thumbnailUrl = payload.thumbnail;
 
     if (payload.imageFile) {
       thumbnailUrl = await uploadService.uploadImage(payload.imageFile, onUploadProgress);
     }
 
     const body = {
-      title: payload.name,
+      title: payload.title,
       description: payload.description,
       thumbnail: thumbnailUrl,
     };
@@ -93,14 +106,14 @@ export const courseService = {
   /** PATCH /courses/{id} — uses upload service for file then sends JSON */
   async update(payload: UpdateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {
     const { id, ...rest } = payload;
-    let thumbnailUrl = rest.imagePreview;
+    let thumbnailUrl = rest.thumbnail;
 
     if (rest.imageFile) {
       thumbnailUrl = await uploadService.uploadImage(rest.imageFile, onUploadProgress);
     }
 
     const body = {
-      title: rest.name,
+      title: rest.title,
       description: rest.description,
       thumbnail: thumbnailUrl,
     };

@@ -37,18 +37,27 @@ export async function executeCascadeDelete(
 
     // 1. Backend Deletion (Only if not a draft)
     if (!isDraft) {
-      if (type === 'course') {
-        await courseService.delete(id);
-      } else if (type === 'module') {
-        await modulesService.delete(id);
-      } else if (type === 'lesson') {
-        await lessonService.delete(id);
-      } else if (type === 'quiz') {
-        await quizService.delete(id);
-      } else if (type === 'content') {
-        await contentService.delete(id);
-      } else if (type === 'examModel') {
-        await examModelsService.delete(id);
+      try {
+        if (type === 'course') {
+          await courseService.delete(id);
+        } else if (type === 'module') {
+          await modulesService.delete(id);
+        } else if (type === 'lesson') {
+          await lessonService.delete(id);
+        } else if (type === 'quiz') {
+          await quizService.delete(id);
+        } else if (type === 'content') {
+          await contentService.delete(id);
+        } else if (type === 'examModel') {
+          await examModelsService.delete(id);
+        }
+      } catch (err: any) {
+        // If the item is already gone, treat it as a success
+        if (err?.response?.status === 404) {
+          console.warn(`[CascadeDeleteEngine] Target ${type} (${id}) not found (404). Treating as success.`);
+        } else {
+          throw err; // Re-throw other errors
+        }
       }
     }
 

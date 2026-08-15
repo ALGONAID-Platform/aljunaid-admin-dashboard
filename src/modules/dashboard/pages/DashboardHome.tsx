@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
-import { 
-  BookOpen, BookMarked, ClipboardList, CheckCircle2, Clock, 
+import {
+  BookOpen, BookMarked, ClipboardList, CheckCircle2, Clock,
   AlertCircle, TrendingUp, Sparkles, GraduationCap, ArrowUpRight
 } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useQuizzesStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
-import { QuickCourseBuilderModal } from '../../../components/ui/QuickCourseBuilderModal';
-
+import { PageGuide } from '../../../components/ui/PageGuide';
 export function DashboardHome() {
-  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const courses = useCoursesStore((s) => s.courses);
   const fetchCourses = useCoursesStore((s) => s.fetchCourses);
   const lessons = useLessonsStore((s) => s.lessons);
@@ -29,7 +27,7 @@ export function DashboardHome() {
   const completionPercentage = lessons.length > 0 ? Math.round((publishedLessons.length / lessons.length) * 100) : 0;
 
   const recentActivity = [
-    ...courses.map((c) => ({ type: 'course' as const, label: `تم تأسيس المقرر: ${c.name}`, date: c.createdAt, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' })),
+    ...courses.map((c) => ({ type: 'course' as const, label: `تم تأسيس المقرر: ${c.title}`, date: c.createdAt, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' })),
     ...lessons.map((l) => ({ type: 'lesson' as const, label: `تمت صياغة الدرس: ${l.title}`, date: l.createdAt, icon: BookMarked, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' })),
     ...quizzes.map((q) => ({ type: 'quiz' as const, label: `تم إعداد الاختبار: ${q.title}`, date: q.createdAt, icon: ClipboardList, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-100' })),
   ]
@@ -37,7 +35,7 @@ export function DashboardHome() {
     .slice(0, 7);
 
   if (isLoading && courses.length === 0) return <Loader fullPage />;
-  
+
   if (error && courses.length === 0) return (
     <div className="flex items-center justify-center min-h-[60vh] p-4">
       <div className="bg-white rounded-[2rem] border border-red-100 p-12 text-center shadow-xl shadow-red-500/5 flex flex-col items-center max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
@@ -55,66 +53,96 @@ export function DashboardHome() {
 
   return (
     <div className="font-sans antialiased space-y-4 sm:space-y-6" style={{ fontFamily: "'Cairo', sans-serif" }}>
-      
+
       {/* Dynamic Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl sm:rounded-[2rem] p-5 sm:p-10 shadow-lg" style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 60%, #047857 100%)' }}>
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-emerald-600/20 p-5 sm:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4" style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 60%, #047857 100%)' }}>
         {/* Abstract Background Elements */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-900/20 rounded-full blur-2xl translate-y-1/3 -translate-x-1/4" />
         
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
-          <div className="flex items-start sm:items-center gap-3.5 sm:gap-5">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/30 shrink-0">
-              <GraduationCap className="w-6 h-6 sm:w-8 sm:h-8 text-white drop-shadow-md" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 mb-1">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
-                <span className="text-emerald-100 font-bold tracking-wider text-[11px] uppercase">النظام النشط</span>
-              </div>
-              <h2 className="text-xl sm:text-3xl text-white font-extrabold tracking-tight drop-shadow-xs mb-1">
-                أهلاً بك، مشرف المنصة
-              </h2>
-              <p className="text-emerald-50 text-xs sm:text-base font-medium opacity-90">
-                أنت الآن تتصفح وتدير منصة الجنيد التعليمية. إليك ملخص الإحصائيات.
-              </p>
-            </div>
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-md rounded-xl sm:rounded-2xl flex items-center justify-center shadow-inner border border-white/30 shrink-0">
+            <GraduationCap className="w-6 h-6 sm:w-8 sm:h-8 text-white drop-shadow-md" />
           </div>
+          <div>
+            <div className="flex items-center gap-1.5 mb-1 sm:mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
+              <span className="text-emerald-100 font-bold tracking-wider text-[11px] sm:text-xs uppercase">النظام النشط</span>
+            </div>
+            <h2 className="text-xl sm:text-3xl text-white font-extrabold tracking-tight drop-shadow-xs">
+              أهلاً بك، مشرف المنصة
+            </h2>
+            <p className="text-emerald-50 text-[11px] sm:text-sm font-medium opacity-90 mt-1">
+              أنت الآن تتصفح وتدير منصة الجنيد التعليمية. إليك ملخص الإحصائيات والأداء.
+            </p>
+          </div>
+        </div>
 
+        {/* Floating Quick Stats in Banner */}
+        <div className="relative z-10 hidden lg:flex items-center gap-6 bg-black/10 backdrop-blur-md border border-white/20 rounded-2xl px-6 py-4 shadow-inner">
+          <div className="text-center border-l border-white/20 pl-6">
+            <p className="text-white/80 text-xs font-bold mb-1">معدل الإنجاز</p>
+            <p className="text-2xl font-black text-white">{completionPercentage}%</p>
+          </div>
+          <div className="text-center">
+            <p className="text-white/80 text-xs font-bold mb-1">الدروس المتاحة</p>
+            <p className="text-2xl font-black text-white">{publishedLessons.length}</p>
+          </div>
         </div>
       </div>
 
-      {/* Quick Course Builder Modal Integration */}
-      <QuickCourseBuilderModal
-        isOpen={isBuilderOpen}
-        onClose={() => setIsBuilderOpen(false)}
+      <PageGuide
+        title="دليل مسار العمل الشامل للمنصة"
+        description="دليلك خطوة بخطوة للبدء في بناء المحتوى التعليمي والانتقال بين أقسام المنصة بتسلسل منطقي وصحيح."
+        steps={[
+          {
+            title: "الخطوة الأولى: المقررات الدراسية",
+            description: "انتقل إلى قسم 'المقررات' من الشريط الجانبي. قم بتأسيس المقررات الرئيسية أولاً، فهي الحاضن الأساسي. تأكد من وضع صورة توضيحية ووصف دقيق لكل مقرر."
+          },
+          {
+            title: "الخطوة الثانية: إدارة الدروس والمحتوى",
+            description: "توجه لقسم 'الدروس'. ابدأ أولاً بـ 'إدارة الوحدات التعليمية' لترتيب الفصول، ثم أنشئ الدروس وحدد نوع المحتوى (فيديو، نص، مستند) واربطه بالمقرر والوحدة المناسبة."
+          },
+          {
+            title: "الخطوة الثالثة: الاختبارات والتقييم",
+            description: "من قسم 'الاختبارات'، يمكنك إضافة تقييم واحد لكل درس تم إنشاؤه. لن تستطيع إنشاء اختبار إذا لم تكن هناك دروس متاحة. اتبع خطوات إضافة الأسئلة وحدد الإجابة الصحيحة."
+          },
+          {
+            title: "الخطوة الرابعة: النماذج الامتحانية",
+            description: "لإثراء المادة، توجه لقسم 'نماذج الامتحانات' لرفع نماذج واختبارات سابقة بصيغة PDF وربطها بالمقرر ككل كمرجع إضافي للطلاب."
+          }
+        ]}
+        tips={[
+          "التسلسل المنطقي ضروري: لا تنشئ درساً قبل تأسيس مقره، ولا اختباراً قبل وجود درسه.",
+          "لا تنسَ النقر على حالة الدرس وتغييرها إلى 'منشور' لكي يظهر للطلاب بعد الانتهاء من إعداده."
+        ]}
       />
-
+      
       {/* Primary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <StatCard 
-          icon={BookOpen} 
-          label="المقررات الدراسية" 
-          value={courses.length} 
-          color="#2563EB" 
-          lightBg="#EFF6FF" 
-          sub="إجمالي المقررات المعتمدة" 
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+        <StatCard
+          icon={BookOpen}
+          label="المقررات الدراسية"
+          value={courses.length}
+          color="#2563EB"
+          lightBg="#EFF6FF"
+          sub="إجمالي المقررات المعتمدة"
         />
-        <StatCard 
-          icon={BookMarked} 
-          label="الدروس المضافة" 
-          value={lessons.length} 
-          color="#059669" 
-          lightBg="#ECFDF5" 
-          sub={`${publishedLessons.length} متاح للطلاب`} 
+        <StatCard
+          icon={BookMarked}
+          label="الدروس المضافة"
+          value={lessons.length}
+          color="#059669"
+          lightBg="#ECFDF5"
+          sub={`${publishedLessons.length} متاح للطلاب`}
         />
-        <StatCard 
-          icon={ClipboardList} 
-          label="الاختبارات والتقييمات" 
-          value={quizzes.length} 
-          color="#7C3AED" 
-          lightBg="#F5F3FF" 
-          sub={`بإجمالي ${quizzes.reduce((s, q) => s + q.questions.length, 0)} سؤال`} 
+        <StatCard
+          icon={ClipboardList}
+          label="الاختبارات والتقييمات"
+          value={quizzes.length}
+          color="#7C3AED"
+          lightBg="#F5F3FF"
+          sub={`بإجمالي ${quizzes.reduce((s, q) => s + q.questions.length, 0)} سؤال`}
         />
       </div>
 
@@ -130,7 +158,7 @@ export function DashboardHome() {
               <p className="text-xs font-medium text-slate-400 mt-0.5">أحدث التغييرات التي تمت على المنصة</p>
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto max-h-[450px] custom-scrollbar p-2">
             {recentActivity.length === 0 ? (
               <div className="p-12 text-center h-full flex flex-col items-center justify-center">
@@ -185,19 +213,19 @@ export function DashboardHome() {
                     <span className="text-slate-800 text-2xl font-black">{completionPercentage}%</span>
                   </div>
                   <div className="w-12 h-12 rounded-full border-4 flex items-center justify-center border-slate-100 relative">
-                     <svg viewBox="0 0 36 36" className="w-full h-full absolute -rotate-90">
+                    <svg viewBox="0 0 36 36" className="w-full h-full absolute -rotate-90">
                       <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#10B981" strokeWidth="4" strokeDasharray={`${completionPercentage}, 100`} />
                     </svg>
                   </div>
                 </div>
-                
+
                 <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-4 shadow-inner">
                   <div
                     className="h-full rounded-full transition-all duration-1000 ease-out"
                     style={{ width: `${completionPercentage}%`, background: 'linear-gradient(90deg, #10B981, #059669)' }}
                   />
                 </div>
-                
+
                 <div className="flex gap-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div className="flex-1 flex flex-col gap-1">
                     <div className="flex items-center gap-1.5">
@@ -254,16 +282,16 @@ function StatCard({ icon: Icon, label, value, color, lightBg, sub }: {
   icon: React.ElementType; label: string; value: number; color: string; lightBg: string; sub: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl sm:rounded-[2rem] border border-slate-100 p-4 sm:p-6 flex items-start gap-3 sm:gap-4 shadow-xs hover:shadow-md transition-all group">
-      <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 duration-300 shadow-inner" style={{ background: lightBg, border: `1px solid ${color}20` }}>
-        <Icon className="w-5 h-5 sm:w-7 sm:h-7" style={{ color }} />
+    <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-5 flex items-center gap-3 sm:gap-4 shadow-sm hover:shadow-md transition-all group">
+      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 duration-300" style={{ background: lightBg, border: `1px solid ${color}20` }}>
+        <Icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color }} />
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="text-slate-500 font-bold text-xs sm:text-sm mb-1 truncate">{label}</h3>
-        <div className="text-slate-800 text-2xl sm:text-3xl font-black tracking-tight mb-1 flex items-baseline gap-2">
+        <h3 className="text-slate-500 font-bold text-[11px] sm:text-xs mb-0.5 truncate">{label}</h3>
+        <div className="text-slate-800 text-lg sm:text-xl font-black tracking-tight flex items-baseline gap-2">
           {value}
         </div>
-        <p className="text-slate-400 text-[11px] sm:text-xs font-semibold truncate">{sub}</p>
+        <p className="text-slate-400 text-[10px] sm:text-[11px] font-semibold truncate mt-0.5">{sub}</p>
       </div>
     </div>
   );

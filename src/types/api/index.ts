@@ -253,7 +253,9 @@ export interface CreateExamDto {
   questions: Omit<BackendQuestion, 'id'>[];
 }
 
-export interface UpdateExamDto extends Partial<CreateExamDto> { }
+export interface UpdateExamDto extends Omit<Partial<CreateExamDto>, 'questions'> {
+  questions?: (Omit<BackendQuestion, 'id'> & { id?: number })[];
+}
 
 export interface AnswerDto {
   questionId: number;

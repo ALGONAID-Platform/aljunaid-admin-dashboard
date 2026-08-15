@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown
 } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
@@ -22,8 +22,87 @@ import { AdvancedFilters } from '../../../components/ui/AdvancedFilters';
 import { SavedViews } from '../../../components/ui/SavedViews';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import { ModuleManagerModal } from '../../../components/ui/ModuleManagerModal';
+import { PageGuide } from '../../../components/ui/PageGuide';
 import { Layers } from 'lucide-react';
 import type { BackendModule } from '../../../types/api';
+import { createPortal } from 'react-dom';
+
+function PortalSelect({ value, onChange, options, placeholder, className, disabled }: any) {
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+
+  const updateCoords = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      let top = rect.bottom + window.scrollY;
+      if (spaceBelow < 240 && rect.top > spaceBelow) {
+        top = rect.top + window.scrollY - Math.min(240, options.length * 40) - 8;
+      }
+      setCoords({ top, left: rect.left + window.scrollX, width: rect.width });
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updateCoords();
+      window.addEventListener('scroll', updateCoords, true);
+      window.addEventListener('resize', updateCoords);
+      return () => {
+        window.removeEventListener('scroll', updateCoords, true);
+        window.removeEventListener('resize', updateCoords);
+      };
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        triggerRef.current && !triggerRef.current.contains(e.target as Node) &&
+        (!popupRef.current || !popupRef.current.contains(e.target as Node))
+      ) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside, true);
+    return () => document.removeEventListener('mousedown', handleClickOutside, true);
+  }, [isOpen]);
+
+  const selectedOpt = options.find((o: any) => o.value === value);
+
+  return (
+    <div ref={triggerRef} className="relative w-full">
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`${className} flex items-center justify-between cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <span className="truncate">{selectedOpt ? selectedOpt.label : placeholder}</span>
+        <ChevronDown className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popupRef}
+          style={{ position: 'absolute', top: coords.top + 4, left: coords.left, width: coords.width, zIndex: 999999 }}
+          className="bg-white border border-slate-200 shadow-xl rounded-xl max-h-60 overflow-y-auto custom-scrollbar"
+        >
+          {options.map((opt: any) => (
+            <div
+              key={opt.value}
+              className={`px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm transition-colors ${value === opt.value ? 'bg-emerald-50 text-emerald-700 font-bold' : ''}`}
+              onClick={() => { onChange(opt.value); setIsOpen(false); }}
+            >
+              {opt.label}
+            </div>
+          ))}
+          {options.length === 0 && <div className="px-4 py-3 text-sm text-slate-500 text-center">لا توجد خيارات</div>}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 interface FormState {
   courseId: string;
@@ -40,25 +119,25 @@ export function LessonsPage() {
   const { courses, fetchCourses } = useCoursesStore();
   const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, error, isLoading } = useLessonsStore();
   const { modules: allModules, fetchModules, addModule: createModule, updateModule: editModule, deleteModule: removeModule } = useModulesStore();
-  
+
   const [showModal, setShowModal] = useState(false);
   const [showModuleManager, setShowModuleManager] = useState(false);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'lesson' | 'module'; id: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
+
   const [courseFilter, setCourseFilter] = useState<string>('all');
   const [activeView, setActiveView] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  
+
   const [selectedLessons, setSelectedLessons] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<any>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setCurrentPage(1); setSelectedLessons([]); }, [searchQuery, statusFilter, courseFilter, activeView, itemsPerPage]);
+  useEffect(() => { setCurrentPage(1); setSelectedLessons([]); }, [searchQuery, courseFilter, activeView, itemsPerPage]);
 
   useEffect(() => {
     void fetchCourses();
@@ -95,7 +174,7 @@ export function LessonsPage() {
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const [moduleCreateLoading, setModuleCreateLoading] = useState(false);
 
-  const [aiLoading, setAiLoading] = useState<'title'|'desc'|null>(null);
+  const [aiLoading, setAiLoading] = useState<'title' | 'desc' | null>(null);
 
   const handleGenerateTitle = () => {
     setAiLoading('title');
@@ -157,8 +236,8 @@ export function LessonsPage() {
     if (isDirty && saveStatus !== 'success' && !confirm('لديك تغييرات غير محفوظة. هل أنت متأكد من الإلغاء؟')) {
       return;
     }
-    setShowModal(false); 
-    resetModal(); 
+    setShowModal(false);
+    resetModal();
   };
 
   useEffect(() => {
@@ -226,7 +305,7 @@ export function LessonsPage() {
     try {
       const payload = {
         courseId: form.moduleId,
-        courseName: course.name,
+        courseName: course.title,
         title: form.title.trim(),
         description: form.description.trim(),
         order: Number(form.order),
@@ -257,7 +336,7 @@ export function LessonsPage() {
   const handleBulkAction = async (action: 'publish' | 'archive' | 'delete' | 'duplicate') => {
     if (selectedLessons.length === 0) return;
     if (action === 'delete' && !confirm(`تأكيد حذف ${selectedLessons.length} درس نهائياً؟ لا يمكن التراجع.`)) return;
-    
+
     setBulkActionLoading(true);
     try {
       for (const id of selectedLessons) {
@@ -278,11 +357,11 @@ export function LessonsPage() {
   };
 
   const filteredLessons = lessons.filter(l => {
-    const matchesSearch = l.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (l.courseName && l.courseName.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === 'all' || (statusFilter === 'published' && l.isPublished) || (statusFilter === 'draft' && !l.isPublished);
+    const matchesSearch = l.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (l.courseName && l.courseName.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesStatus = true;
     const matchesCourse = courseFilter === 'all' || String(l.courseId) === courseFilter || String(allModules.find(m => String(m.id) === String(l.courseId))?.courseId) === courseFilter;
-    
+
     let matchesView = true;
     if (activeView === 'published') matchesView = !!l.isPublished;
     if (activeView === 'draft') matchesView = !l.isPublished;
@@ -310,7 +389,7 @@ export function LessonsPage() {
     e.currentTarget.classList.remove('bg-emerald-50/50', 'border-emerald-200');
     const sourceId = e.dataTransfer.getData('text/plain');
     if (sourceId === targetId) return;
-    
+
     const src = lessons.find(l => l.id === sourceId);
     const tgt = lessons.find(l => l.id === targetId);
     if (src && tgt) {
@@ -328,7 +407,7 @@ export function LessonsPage() {
 
   return (
     <div className="font-sans antialiased text-slate-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
-      
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
@@ -339,7 +418,7 @@ export function LessonsPage() {
             تصفح، أضف، ونظّم {lessons.length} درس مسجّل. قم ببناء الهيكل التعليمي لمقرراتك.
           </p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
           <button
             onClick={() => setShowModuleManager(true)}
@@ -359,6 +438,29 @@ export function LessonsPage() {
         </div>
       </div>
 
+      <PageGuide
+        title="دليل إدارة الدروس"
+        description="خطوات إدارة الدروس والوحدات التعليمية الخاصة بكل مقرر"
+        steps={[
+          {
+            title: "إدارة الوحدات التعليمية",
+            description: "استخدم زر 'إدارة الوحدات' لإنشاء وترتيب فصول/وحدات المقرر قبل إضافة الدروس إليها."
+          },
+          {
+            title: "إضافة درس جديد",
+            description: "انقر على 'إنشاء درس جديد' لتحديد نوع المحتوى (فيديو، مستند، نص) وربطه بمقرر ووحدة معينة."
+          },
+          {
+            title: "تصفية متقدمة",
+            description: "استخدم شريط الفلاتر للوصول السريع إلى الدروس المنشورة، المسودات، أو الدروس بدون محتوى."
+          }
+        ]}
+        tips={[
+          "لا تنس تحديد حالة الدرس كـ 'منشور' عندما يكون جاهزاً ليظهر للطلاب.",
+          "يمكنك النقر على زر 'توليد بالذكاء الاصطناعي' أثناء كتابة الدرس للحصول على أفكار ونصوص سريعة."
+        ]}
+      />
+
       {/* Sticky Advanced Filters */}
       <StickyToolbar position="top">
         <div className="flex flex-col lg:flex-row gap-4 w-full">
@@ -373,32 +475,22 @@ export function LessonsPage() {
               className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
             />
           </div>
-          <AdvancedFilters 
+          <AdvancedFilters
             filters={[
-              {
-                id: 'status',
-                value: statusFilter,
-                onChange: (v) => setStatusFilter(v as any),
-                options: [
-                  { label: 'حالة الظهور: الكل', value: 'all' },
-                  { label: 'منشور فقط', value: 'published' },
-                  { label: 'مسودة فقط', value: 'draft' }
-                ]
-              },
               {
                 id: 'course',
                 value: courseFilter,
                 onChange: setCourseFilter,
                 options: [
                   { label: 'جميع المقررات', value: 'all' },
-                  ...courses.map(c => ({ label: c.name, value: String(c.id) }))
+                  ...courses.map(c => ({ label: c.title, value: String(c.id) }))
                 ]
               }
-            ]} 
+            ]}
           />
         </div>
-        
-        <SavedViews 
+
+        <SavedViews
           activeView={activeView}
           onChange={setActiveView}
           views={[
@@ -413,23 +505,11 @@ export function LessonsPage() {
       </StickyToolbar>
 
       {/* Performance Monitoring Widgets */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <HealthScore score={stats.healthScore} />
         <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold flex items-center gap-2 mb-1"><Layers className="w-4 h-4 text-indigo-500" /> إجمالي الدروس</div>
           <div className="text-2xl font-black text-slate-800">{stats.total}</div>
-        </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
-          <div className="text-slate-500 text-xs font-bold flex items-center gap-2 mb-1"><CheckCircle className="w-4 h-4 text-emerald-500" /> الدروس المنشورة</div>
-          <div className="text-2xl font-black text-slate-800">{stats.published}</div>
-        </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
-          <div className="text-slate-500 text-xs font-bold flex items-center gap-2 mb-1"><PlayCircle className="w-4 h-4 text-blue-500" /> نسبة الاكتمال</div>
-          <div className="text-2xl font-black text-slate-800">{stats.total ? Math.round((stats.withContent / stats.total) * 100) : 0}%</div>
-        </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
-          <div className="text-slate-500 text-xs font-bold flex items-center gap-2 mb-1"><Timer className="w-4 h-4 text-amber-500" /> مسودات مجدولة</div>
-          <div className="text-2xl font-black text-slate-800">{stats.drafts}</div>
         </div>
       </div>
 
@@ -446,9 +526,9 @@ export function LessonsPage() {
         </div>
       ) : lessons.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-2">
-          <EmptyState 
-            icon={BookMarked} 
-            title="لا توجد دروس حالياً" 
+          <EmptyState
+            icon={BookMarked}
+            title="لا توجد دروس حالياً"
             description="قم ببناء المنهج الدراسي عن طريق إضافة دروس تفصيلية داخل الوحدات."
             action={
               <button onClick={openModal} className="px-6 py-3 mt-2 text-white rounded-xl transition-all shadow-md hover:shadow-lg" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 700 }}>
@@ -487,17 +567,16 @@ export function LessonsPage() {
             {paginatedLessons.map(lesson => {
               const moduleObj = allModules.find(m => String(m.id) === String(lesson.courseId));
               return (
-                <div 
-                  key={lesson.id} 
-                  className={`p-4 space-y-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-sm hover:shadow-md transition-all ${
-                    selectedLessons.includes(lesson.id) ? 'bg-emerald-50/40 border-emerald-300' : ''
-                  }`}
+                <div
+                  key={lesson.id}
+                  className={`p-4 space-y-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-sm hover:shadow-md transition-all ${selectedLessons.includes(lesson.id) ? 'bg-emerald-50/40 border-emerald-300' : ''
+                    }`}
                 >
                   {/* Header with Lesson order & course badge */}
                   <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <button 
-                        onClick={() => setSelectedLessons(p => p.includes(lesson.id) ? p.filter(id => id !== lesson.id) : [...p, lesson.id])} 
+                      <button
+                        onClick={() => setSelectedLessons(p => p.includes(lesson.id) ? p.filter(id => id !== lesson.id) : [...p, lesson.id])}
                         className="text-slate-400 hover:text-emerald-500 transition-colors shrink-0"
                       >
                         {selectedLessons.includes(lesson.id) ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
@@ -550,7 +629,7 @@ export function LessonsPage() {
                         </span>
                       )}
                     </div>
-                    
+
                     <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
                       <button onClick={() => setPreviewLesson(lesson)} className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-all" title="معاينة">
                         <Eye className="w-4 h-4" />
@@ -588,13 +667,13 @@ export function LessonsPage() {
               </thead>
               <tbody className="divide-y divide-slate-50/80">
                 {paginatedLessons.map(lesson => (
-                  <tr 
-                    key={lesson.id} 
-                    draggable 
-                    onDragStart={e => handleDragStart(e, lesson.id)} 
-                    onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('bg-emerald-50/50', 'border-emerald-200'); }} 
-                    onDragLeave={e => e.currentTarget.classList.remove('bg-emerald-50/50', 'border-emerald-200')} 
-                    onDrop={e => handleDrop(e, lesson.id)} 
+                  <tr
+                    key={lesson.id}
+                    draggable
+                    onDragStart={e => handleDragStart(e, lesson.id)}
+                    onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('bg-emerald-50/50', 'border-emerald-200'); }}
+                    onDragLeave={e => e.currentTarget.classList.remove('bg-emerald-50/50', 'border-emerald-200')}
+                    onDrop={e => handleDrop(e, lesson.id)}
                     className={`hover:bg-slate-50/80 transition-colors group ${selectedLessons.includes(lesson.id) ? 'bg-emerald-50/30' : ''}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap w-12">
@@ -694,7 +773,7 @@ export function LessonsPage() {
       )}
 
       {/* Bulk Action Bar */}
-      <BulkActionBar 
+      <BulkActionBar
         selectedCount={selectedLessons.length}
         onClear={() => setSelectedLessons([])}
         onPublish={() => handleBulkAction('publish')}
@@ -706,9 +785,9 @@ export function LessonsPage() {
 
       {/* Preview Modal */}
       {previewLesson && (
-        <LessonPreviewModal 
-          lesson={previewLesson} 
-          onClose={() => setPreviewLesson(null)} 
+        <LessonPreviewModal
+          lesson={previewLesson}
+          onClose={() => setPreviewLesson(null)}
         />
       )}
 
@@ -716,7 +795,7 @@ export function LessonsPage() {
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all">
           <div className="bg-white w-full h-full sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300 overflow-hidden">
-            
+
             {/* Modal Header */}
             <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
               <div className="flex items-center gap-3">
@@ -756,16 +835,14 @@ export function LessonsPage() {
                     </div>
                   ) : (
                     <div className="relative">
-                      <Filter className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                      <select
+                      <Filter className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none z-10" />
+                      <PortalSelect
                         value={form.courseId}
-                        onChange={e => { setForm(p => ({ ...p, courseId: e.target.value })); setErrors(p => { const x = { ...p }; delete x.courseId; return x; }); }}
-                        className={`${inputCls(!!errors.courseId)} pr-11 font-medium appearance-none`}
-                        style={{ backgroundPosition: 'left 1rem center', backgroundSize: '1.5em 1.5em', backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat' }}
-                      >
-                        <option value="" disabled>الرجاء اختيار المقرر...</option>
-                        {courses.map(c => <option key={c.id} value={c.id} className="text-slate-800">{c.name}</option>)}
-                      </select>
+                        onChange={(val: string) => { setForm(p => ({ ...p, courseId: val })); setErrors(p => { const x = { ...p }; delete x.courseId; return x; }); }}
+                        className={`${inputCls(!!errors.courseId)} pr-11 font-medium bg-white`}
+                        placeholder="الرجاء اختيار المقرر..."
+                        options={courses.map(c => ({ value: c.id, label: c.title }))}
+                      />
                     </div>
                   )}
                 </Field>
@@ -870,24 +947,24 @@ export function LessonsPage() {
                   تفاصيل المادة المعرفية
                 </div>
 
-                <Field 
-                  label="عنوان الدرس" 
-                  required 
+                <Field
+                  label="عنوان الدرس"
+                  required
                   error={errors.title}
                   action={<AIMagicButton onClick={handleGenerateTitle} loading={aiLoading === 'title'} label="اقتراح عنوان" />}
                 >
                   <input value={form.title} onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setErrors(p => { const x = { ...p }; delete x.title; return x; }); }} placeholder="مثال: حل المعادلات من الدرجة الأولى" className={inputCls(!!errors.title, 'font-semibold')} />
                 </Field>
-                
-                <Field 
-                  label="وصف الدرس" 
-                  required 
+
+                <Field
+                  label="وصف الدرس"
+                  required
                   error={errors.description}
                   action={<AIMagicButton onClick={handleGenerateDesc} loading={aiLoading === 'desc'} label="توليد ملخص" />}
                 >
                   <textarea value={form.description} onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }} placeholder="يغطي هذا الدرس المحاور التالية..." rows={3} className={`${inputCls(!!errors.description)} resize-none leading-relaxed text-sm`} />
                 </Field>
-                
+
                 <Field label="ترتيب التشغيل" required error={errors.order} helperText="تُعرض الدروس للمتعلم تصاعدياً بناءً على هذا الرقم.">
                   <div className="flex gap-3 items-stretch">
                     <input type="number" min={1} value={form.order} onChange={e => { setForm(p => ({ ...p, order: e.target.value })); setErrors(p => { const x = { ...p }; delete x.order; return x; }); }} placeholder="مثال: 1" className={`w-32 ${inputCls(!!errors.order, 'font-mono text-center text-lg')}`} dir="ltr" />
@@ -940,7 +1017,7 @@ function Field({ label, required, error, helperText, action, children }: { label
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <label className="text-sm font-bold text-slate-700 flex items-center gap-1">
-            {label} 
+            {label}
             {required && <span className="text-red-500 text-lg leading-none mt-1">*</span>}
           </label>
           {action}
@@ -956,9 +1033,8 @@ function Field({ label, required, error, helperText, action, children }: { label
 }
 
 function inputCls(hasError: boolean, extra = '') {
-  return `w-full px-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 ${
-    hasError 
-      ? 'border-red-300 bg-red-50/50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:bg-white' 
+  return `w-full px-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 ${hasError
+      ? 'border-red-300 bg-red-50/50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:bg-white'
       : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
-  } ${extra}`;
+    } ${extra}`;
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { courseService } from '../services/course.service';
+import { courseService } from '../services/api/courses.api';
 import { resolveErrorMessage } from '../lib/errors';
 import type { Course, CreateCoursePayload, UpdateCoursePayload } from '../types';
 

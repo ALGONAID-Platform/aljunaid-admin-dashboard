@@ -1,22 +1,23 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Plus, ClipboardList, X, Loader2, CheckCircle, AlertCircle, Trash2, 
   ChevronUp, ChevronDown, GripVertical, Search, Filter, HelpCircle, 
-  Settings2, FileEdit
+  Settings2, FileEdit, Image as ImageIcon
 } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useQuizzesStore, useModulesStore } from '../../../store';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { Loader } from '../../../components/feedback/Loader';
 import { QuestionImageUpload } from '../components/QuestionImageUpload';
 import { MarkdownQuestionEditor } from '../components/MarkdownQuestionEditor';
+import { PageGuide } from '../../../components/ui/PageGuide';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import { resolveErrorMessage } from '../../../lib/errors';
 import type { BackendModule } from '../../../types/api';
 import type { Question, QuestionType } from '../../../types';
 
-const Q_TYPE_LABELS: Record<string, string> = { mcq: 'اختيار متعدد', truefalse: 'صح / خطأ', short: 'إجابة قصيرة' };
+const Q_TYPE_LABELS: Record<string, string> = { mcq: 'اختيار متعدد', truefalse: 'صح / خطأ' };
 
-function newQuestion(type: 'mcq' | 'truefalse' | 'short' = 'mcq'): Question {
+function newQuestion(type: 'mcq' | 'truefalse' = 'mcq'): Question {
   return {
     id: Date.now().toString() + Math.random(),
     type,
@@ -24,6 +25,85 @@ function newQuestion(type: 'mcq' | 'truefalse' | 'short' = 'mcq'): Question {
     options: type === 'mcq' ? ['', '', '', ''] : type === 'truefalse' ? ['صح', 'خطأ'] : [],
     correctAnswer: type === 'truefalse' ? 'صح' : '',
   };
+}
+
+import { createPortal } from 'react-dom';
+
+function PortalSelect({ value, onChange, options, placeholder, className, disabled }: any) {
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+
+  const updateCoords = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      let top = rect.bottom + window.scrollY;
+      if (spaceBelow < 240 && rect.top > spaceBelow) {
+        top = rect.top + window.scrollY - Math.min(240, options.length * 40) - 8;
+      }
+      setCoords({ top, left: rect.left + window.scrollX, width: rect.width });
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updateCoords();
+      window.addEventListener('scroll', updateCoords, true);
+      window.addEventListener('resize', updateCoords);
+      return () => {
+        window.removeEventListener('scroll', updateCoords, true);
+        window.removeEventListener('resize', updateCoords);
+      };
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        triggerRef.current && !triggerRef.current.contains(e.target as Node) &&
+        (!popupRef.current || !popupRef.current.contains(e.target as Node))
+      ) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside, true);
+    return () => document.removeEventListener('mousedown', handleClickOutside, true);
+  }, [isOpen]);
+
+  const selectedOpt = options.find((o: any) => o.value === value);
+
+  return (
+    <div ref={triggerRef} className="relative w-full">
+      <div 
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`${className} flex items-center justify-between cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <span className="truncate">{selectedOpt ? selectedOpt.label : placeholder}</span>
+        <ChevronDown className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        <div 
+          ref={popupRef}
+          style={{ position: 'absolute', top: coords.top + 4, left: coords.left, width: coords.width, zIndex: 999999 }}
+          className="bg-white border border-slate-200 shadow-xl rounded-xl max-h-60 overflow-y-auto custom-scrollbar"
+        >
+          {options.map((opt: any) => (
+            <div 
+              key={opt.value} 
+              className={`px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm transition-colors ${value === opt.value ? 'bg-emerald-50 text-emerald-700 font-bold' : ''}`}
+              onClick={() => { onChange(opt.value); setIsOpen(false); }}
+            >
+              {opt.label}
+            </div>
+          ))}
+          {options.length === 0 && <div className="px-4 py-3 text-sm text-slate-500 text-center">لا توجد خيارات</div>}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
 }
 
 type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -141,7 +221,7 @@ export function QuizPage() {
         if (q.options.some(o => !o.trim())) e[`q_${i}_opts`] = 'يجب تعبئة جميع خيارات الإجابة';
         if (!q.correctAnswer) e[`q_${i}_ans`] = 'يرجى تحديد الإجابة الصحيحة';
       }
-      if (q.type === 'short' && (!q.correctAnswer || !q.correctAnswer.trim())) e[`q_${i}_ans`] = 'يرجى كتابة الإجابة النموذجية';
+
     });
     setQErrors(e);
     return Object.keys(e).length === 0;
@@ -237,6 +317,11 @@ export function QuizPage() {
         || Boolean(row.quiz?.title.toLowerCase().includes(query));
     });
 
+  const hasLessons = lessons.length > 0;
+  const allLessonsHaveQuizzes = hasLessons && lessons.every(l => examByLessonId.has(l.id));
+  const isCreateDisabled = !hasLessons || allLessonsHaveQuizzes;
+  const createDisabledMessage = !hasLessons ? "يجب إضافة دروس أولاً" : "جميع الدروس تمتلك اختبارات";
+
   if (isLoading && quizzes.length === 0 && !showModal) return <Loader fullPage />;
 
   return (
@@ -266,15 +351,44 @@ export function QuizPage() {
           </div>
           
           <button
-            onClick={openModal}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
-            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 600 }}
+            onClick={isCreateDisabled ? undefined : openModal}
+            disabled={isCreateDisabled}
+            className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl transition-all shadow-md ${isCreateDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200' : 'text-white hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'}`}
+            style={isCreateDisabled ? { fontWeight: 700 } : { background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 600 }}
+            title={isCreateDisabled ? createDisabledMessage : "إنشاء اختبار جديد"}
           >
-            <Plus className="w-4 h-4" strokeWidth={3} />
-            إنشاء اختبار جديد
+            {isCreateDisabled ? (
+              <CheckCircle className="w-4 h-4" strokeWidth={2.5} />
+            ) : (
+              <Plus className="w-4 h-4" strokeWidth={3} />
+            )}
+            {isCreateDisabled ? createDisabledMessage : 'إنشاء اختبار جديد'}
           </button>
         </div>
       </div>
+
+      <PageGuide
+        title="دليل إضافة الاختبارات"
+        description="تعلم كيف تنشئ اختبارات تفاعلية وربطها بالدروس"
+        steps={[
+          {
+            title: "تحديد الدرس المستهدف",
+            description: "يتم ربط كل اختبار بدرس محدد. لا يمكنك إضافة أكثر من اختبار واحد لنفس الدرس."
+          },
+          {
+            title: "بناء الأسئلة",
+            description: "استخدم محرر المارك داون الذكي لكتابة نصوص الأسئلة، ويمكنك إضافة معادلات رياضية أو أسطر برمجية وحتى صور توضيحية بسهولة."
+          },
+          {
+            title: "تحديد الإجابات الصحيحة",
+            description: "اختر نوع السؤال (اختيار متعدد أو صح/خطأ) وحدد الإجابة الصحيحة بالضغط على الدائرة بجوارها ليتم تصحيحها آلياً للطلاب."
+          }
+        ]}
+        tips={[
+          "عندما تكتمل اختبارات جميع الدروس، سيصبح زر الإضافة غير مفعل تلقائياً.",
+          "يمكنك معاينة شكل السؤال بالانتقال إلى تبويب (معاينة حية) في المحرر لتتأكد من تنسيقه."
+        ]}
+      />
 
       {lessons.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
@@ -413,8 +527,14 @@ export function QuizPage() {
             title="لا توجد اختبارات مسجلة بعد" 
             description="ابدأ بإعداد أول اختبار تفاعلي لتقييم فهم الطلاب للدروس المعروضة."
             action={
-              <button onClick={openModal} className="px-6 py-3 mt-2 text-white rounded-xl transition-all shadow-md hover:shadow-lg" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 700 }}>
-                إعداد أول اختبار
+              <button 
+                onClick={isCreateDisabled ? undefined : openModal} 
+                disabled={isCreateDisabled}
+                className={`px-6 py-3 mt-2 rounded-xl transition-all shadow-md ${isCreateDisabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200' : 'text-white hover:shadow-lg'}`} 
+                style={isCreateDisabled ? { fontWeight: 700 } : { background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 700 }}
+                title={isCreateDisabled ? createDisabledMessage : "إعداد أول اختبار"}
+              >
+                {isCreateDisabled ? createDisabledMessage : 'إعداد أول اختبار'}
               </button>
             }
           />
@@ -449,11 +569,11 @@ export function QuizPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0 bg-slate-50 p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity border border-slate-100">
-                    <button onClick={() => openEditModal(quiz)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-white rounded-lg transition-all shadow-sm" title="تعديل الاختبار">
+                  <div className="flex gap-2 flex-shrink-0 bg-slate-50 p-1 rounded-xl opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity border border-slate-100">
+                    <button onClick={() => openEditModal(quiz)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-white rounded-lg transition-all shadow-sm touch-target" title="تعديل الاختبار">
                       <FileEdit className="w-4 h-4" />
                     </button>
-                    <button onClick={() => setDeleteQuizTarget(quiz.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-white rounded-lg transition-all shadow-sm" title="حذف الاختبار">
+                    <button onClick={() => setDeleteQuizTarget(quiz.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-white rounded-lg transition-all shadow-sm touch-target" title="حذف الاختبار">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -516,29 +636,35 @@ export function QuizPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
                       <Field label="المقرر" required error={infoErrors.courseId}>
                         <div className="relative">
-                          <Filter className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                          <select value={courseId} onChange={e => { setCourseId(e.target.value); setLessonId(''); setInfoErrors(p => { const x = { ...p }; delete x.courseId; return x; }); }} className={`${inputCls(!!infoErrors.courseId)} pr-11`}>
-                            <option value="" disabled>الرجاء اختيار المقرر...</option>
-                            {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
+                          <Filter className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none z-10" />
+                          <PortalSelect
+                            value={courseId}
+                            onChange={(val: string) => { setCourseId(val); setLessonId(''); setInfoErrors(p => { const x = { ...p }; delete x.courseId; return x; }); }}
+                            placeholder="الرجاء اختيار المقرر..."
+                            className={`${inputCls(!!infoErrors.courseId)} pr-11 bg-white`}
+                            options={courses.map(c => ({ value: c.id, label: c.title }))}
+                          />
                         </div>
                       </Field>
                       
                       <Field label="الدرس المستهدف" required error={infoErrors.lessonId}>
                         <div className="relative">
-                          <Filter className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                          <select value={lessonId} onChange={e => { setLessonId(e.target.value); setInfoErrors(p => { const x = { ...p }; delete x.lessonId; return x; }); }} className={`${inputCls(!!infoErrors.lessonId)} pr-11`} disabled={!courseId}>
-                            <option value="" disabled>{courseId ? 'الرجاء اختيار الدرس...' : 'اختر المقرر أولاً'}</option>
-                            {availableLessons.map(l => {
+                          <Filter className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none z-10" />
+                          <PortalSelect
+                            value={lessonId}
+                            onChange={(val: string) => { setLessonId(val); setInfoErrors(p => { const x = { ...p }; delete x.lessonId; return x; }); }}
+                            placeholder={courseId ? 'الرجاء اختيار الدرس...' : 'اختر المقرر أولاً'}
+                            className={`${inputCls(!!infoErrors.lessonId)} pr-11 bg-white`}
+                            disabled={!courseId}
+                            options={availableLessons.map(l => {
                               const existingQuiz = examByLessonId.get(l.id);
                               const locked = Boolean(existingQuiz && existingQuiz.id !== editingQuizId);
-                              return (
-                                <option key={l.id} value={l.id} disabled={locked}>
-                                  {l.title}{locked ? ' - Exam Already Created' : ''}
-                                </option>
-                              );
-                            })}
-                          </select>
+                              return {
+                                value: locked ? '' : l.id,
+                                label: l.title + (locked ? ' - Exam Already Created' : '')
+                              };
+                            }).filter(opt => opt.value !== '')}
+                          />
                         </div>
                       </Field>
                     </div>
@@ -599,7 +725,7 @@ export function QuizPage() {
                         </div>
                         
                         <div className="flex gap-1.5 flex-wrap mx-auto sm:mr-auto sm:ml-0">
-                          {(['mcq', 'truefalse', 'short'] as const).map(t => (
+                          {(['mcq', 'truefalse'] as const).map(t => (
                             <button 
                               key={t} 
                               onClick={() => changeQuestionType(idx, t)} 
@@ -635,7 +761,18 @@ export function QuizPage() {
                           placeholder="اكتب نص السؤال باستخدام Markdown... يدعم المعادلات الرياضية والأكواد وصور السحب والإفلات."
                         />
 
-
+                        {/* Optional Image Upload */}
+                        <div className="pt-2">
+                          <label className="text-slate-700 font-bold text-sm flex items-center gap-2 mb-3">
+                            <ImageIcon className="w-4 h-4 text-emerald-500" />
+                            صورة توضيحية للسؤال (اختياري)
+                          </label>
+                          <QuestionImageUpload
+                            imageUrl={q.imageUrl}
+                            onImageUploaded={(url) => updateQuestion(idx, { imageUrl: url })}
+                            onImageRemoved={() => updateQuestion(idx, { imageUrl: undefined, imageFile: undefined })}
+                          />
+                        </div>
                         {/* Answers Section */}
                         <div className="pt-2 border-t border-slate-100">
                           {q.type === 'mcq' && (
@@ -697,21 +834,7 @@ export function QuizPage() {
                             </div>
                           )}
 
-                          {q.type === 'short' && (
-                            <div className="space-y-4">
-                              <p className="text-slate-700 font-bold text-sm flex items-center gap-2">
-                                <FileEdit className="w-4 h-4 text-emerald-500" />
-                                الإجابة النموذجية المعتمدة
-                              </p>
-                              {qErrors[`q_${idx}_ans`] && <p className="text-red-500 text-xs font-bold">{qErrors[`q_${idx}_ans`]}</p>}
-                              <input 
-                                value={q.correctAnswer} 
-                                onChange={e => updateQuestion(idx, { correctAnswer: e.target.value })} 
-                                placeholder="اكتب الإجابة القصيرة التي ستعتمد كإجابة صحيحة..." 
-                                className={`w-full px-4 py-3.5 rounded-xl border-2 outline-none transition-all text-sm font-semibold ${qErrors[`q_${idx}_ans`] ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-slate-200 bg-white focus:border-emerald-400 focus:shadow-sm'}`} 
-                              />
-                            </div>
-                          )}
+
                         </div>
                       </div>
                     </div>

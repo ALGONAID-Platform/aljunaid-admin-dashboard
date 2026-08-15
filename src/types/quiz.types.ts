@@ -1,6 +1,6 @@
 import type { ID } from './common.types';
 
-export type QuestionType = 'mcq' | 'truefalse' | 'short';
+export type QuestionType = 'mcq' | 'truefalse';
 
 export interface Question {
   id: ID;

@@ -41,7 +41,7 @@ export function ExamModelFilters({ filters, onChange, onReset }: ExamModelFilter
             <option value="ALL">كافة المقررات</option>
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {c.title}
               </option>
             ))}
           </select>

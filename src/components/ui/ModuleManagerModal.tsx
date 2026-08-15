@@ -201,7 +201,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                 >
                   <option value="" disabled>اختر المقرر...</option>
                   {courses.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{c.title}</option>
                   ))}
                 </select>
               </div>
@@ -278,7 +278,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                 >
                   <option value="all">كل المقررات ({modules.length})</option>
                   {courses.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{c.title}</option>
                   ))}
                 </select>
               </div>

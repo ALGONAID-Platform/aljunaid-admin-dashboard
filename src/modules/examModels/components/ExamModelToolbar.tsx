@@ -7,7 +7,6 @@ interface ExamModelToolbarProps {
   onViewModeChange: (mode: 'grid' | 'table') => void;
   showFilters: boolean;
   onToggleFilters: () => void;
-  onCreateOpen: () => void;
 }
 
 export function ExamModelToolbar({
@@ -17,7 +16,6 @@ export function ExamModelToolbar({
   onViewModeChange,
   showFilters,
   onToggleFilters,
-  onCreateOpen,
 }: ExamModelToolbarProps) {
   return (
     <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
@@ -72,16 +70,6 @@ export function ExamModelToolbar({
           </button>
         </div>
 
-        {/* Create Button */}
-        <button
-          type="button"
-          onClick={onCreateOpen}
-          className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 sm:px-5 py-2.5 text-white rounded-2xl text-xs font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 shrink-0"
-          style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
-        >
-          <Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />
-          <span className="whitespace-nowrap">إضافة نموذج</span>
-        </button>
       </div>
     </div>
   );

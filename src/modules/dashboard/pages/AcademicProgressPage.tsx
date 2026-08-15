@@ -200,7 +200,7 @@ export function AcademicProgressPage() {
             
             <ProgressList 
               title="مقررات بدون وحدات تنظيمية" 
-              items={coursesWithoutModules.map(c => ({ id: c.id, title: c.name, type: 'course', error: 'تفتقر للهيكل. أضف وحدات.' }))} 
+              items={coursesWithoutModules.map(c => ({ id: c.id, title: c.title, type: 'course', error: 'تفتقر للهيكل. أضف وحدات.' }))} 
               icon={BookOpen} 
               searchQuery={searchQuery}
               sortOption={sortOption}
@@ -210,7 +210,7 @@ export function AcademicProgressPage() {
 
             <ProgressList
               title="مقررات غير مكتملة"
-              items={incompleteCourses.map(c => ({ id: c.id, title: c.name, type: 'course', warning: 'ينقصها جزء من المسار الأكاديمي.' }))}
+              items={incompleteCourses.map(c => ({ id: c.id, title: c.title, type: 'course', warning: 'ينقصها جزء من المسار الأكاديمي.' }))}
               icon={AlertCircle}
               searchQuery={searchQuery}
               sortOption={sortOption}

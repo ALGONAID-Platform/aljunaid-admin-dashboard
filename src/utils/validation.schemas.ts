@@ -13,7 +13,7 @@ export const loginSchema = z.object({
 // ─── Course ──────────────────────────────────────────────────────────────────
 
 export const courseSchema = z.object({
-  name: z.string().min(3, 'اسم المقرر مطلوب (حد أدنى 3 أحرف)').max(100),
+  title: z.string().min(3, 'اسم المقرر مطلوب (حد أدنى 3 أحرف)').max(100),
   description: z.string().max(500).optional().or(z.literal('')),
 });
 
@@ -66,7 +66,7 @@ export const quizMetaSchema = z.object({
 
 
 export const questionSchema = z.object({
-  type: z.enum(['mcq', 'truefalse', 'short']),
+  type: z.enum(['mcq', 'truefalse']),
   text: z.string().min(5, 'نص السؤال مطلوب'),
   options: z.array(z.string()).optional(),
   correctAnswer: z.string().min(1, 'الإجابة الصحيحة مطلوبة'),
