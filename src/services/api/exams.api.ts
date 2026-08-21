@@ -66,10 +66,15 @@ function adaptQuizToCreateExamDto(payload: CreateQuizPayload): CreateExamDto {
       type: q.type === 'truefalse' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
       points: q.points ?? 1,
       imageUrl: q.imageUrl?.trim() || undefined,
-      options: q.options.map((opt) => ({
-        text: opt,
-        isCorrect: opt === q.correctAnswer,
-      })),
+      options: (() => {
+        let opts = q.type === 'truefalse' ? ['صح', 'خطأ'] : (q.options ?? []);
+        if (opts.length === 0) opts = ['خيار 1', 'خيار 2'];
+        if (opts.length === 1) opts = [...opts, 'خيار إضافي'];
+        return opts.map((opt) => ({
+          text: opt || 'خيار',
+          isCorrect: opt === q.correctAnswer,
+        }));
+      })(),
     })),
   };
 }
@@ -112,21 +117,31 @@ export const quizService = {
     if (rest.lessonId !== undefined) dto.lessonId = Number(rest.lessonId);
     if (rest.questions) {
       dto.questions = rest.questions.map((q) => ({
-        ...(q.id && !isNaN(Number(q.id)) && Number(q.id) > 1000000000 ? {} : q.id && !isNaN(Number(q.id)) ? { id: Number(q.id) } : {}),
         text: q.text?.trim() ?? '',
         type: q.type === 'truefalse' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
         points: q.points ?? 1,
         imageUrl: q.imageUrl?.trim() || undefined,
-        options: (q.options ?? []).map((opt) => ({
-          text: opt,
-          isCorrect: opt === q.correctAnswer,
-        })),
+        options: (() => {
+          let opts = q.type === 'truefalse' ? ['صح', 'خطأ'] : (q.options ?? []);
+          if (opts.length === 0) opts = ['خيار 1', 'خيار 2'];
+          if (opts.length === 1) opts = [...opts, 'خيار إضافي'];
+          return opts.map((opt) => ({
+            text: opt || 'خيار',
+            isCorrect: opt === q.correctAnswer,
+          }));
+        })(),
       }));
     }
 
-    const { data } = await api.patch<BackendExam | { data: BackendExam }>(`/exams/${id}`, dto);
-    const exam = (data as { data?: BackendExam }).data ?? (data as BackendExam);
-    return adaptExamToQuiz(exam);
+    try {
+      const { data } = await api.patch<BackendExam | { data: BackendExam }>(`/exams/${id}`, dto);
+      const exam = (data as { data?: BackendExam }).data ?? (data as BackendExam);
+      return adaptExamToQuiz(exam);
+    } catch (err: any) {
+      console.error('BACKEND VALIDATION ERROR:', err.response?.data);
+      alert('تفاصيل الخطأ من الباك اند: ' + JSON.stringify(err.response?.data?.message || err.message));
+      throw err;
+    }
   },
 
   /** DELETE /exams/{id} */

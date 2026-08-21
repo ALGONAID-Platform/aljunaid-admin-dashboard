@@ -34,7 +34,7 @@ export type UploadError =
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ALLOWED_IMAGE_EXTS = ['JPG', 'PNG', 'WEBP'];
 const MAX_IMAGE_MB = 5;
-const MAX_PDF_MB = 50;
+const MAX_PDF_MB = 10;
 
 /** Classify upload errors into human-readable Arabic messages */
 export function classifyUploadError(err: unknown): UploadError {
@@ -54,7 +54,7 @@ export function classifyUploadError(err: unknown): UploadError {
     return { type: 'network', message: 'انتهت مهلة الرفع. الملف قد يكون كبيراً جداً أو الاتصال بطيء.' };
   }
   if (e.status === 413 || e.message?.includes('too large') || e.message?.includes('file size')) {
-    return { type: 'size', message: `حجم الملف يتجاوز الحد المسموح به (${MAX_PDF_MB} MB).`, maxMB: MAX_PDF_MB };
+    return { type: 'size', message: `حجم الصورة يتجاوز الحد المسموح به (${MAX_IMAGE_MB} MB).`, maxMB: MAX_IMAGE_MB };
   }
   if (e.status === 415 || e.message?.includes('unsupported') || e.message?.includes('mime')) {
     return { type: 'format', message: 'نوع الملف غير مدعوم.', allowed: ALLOWED_IMAGE_EXTS };
@@ -129,7 +129,7 @@ export const uploadService = {
     try {
       const { data } = await api.post<UploadResponse>('/upload/image', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          Accept: 'application/json',
         },
         onUploadProgress: (evt) => {
           if (onProgress && evt.total) {
@@ -142,33 +142,39 @@ export const uploadService = {
         },
       });
 
-      // ✂️ === التعديل المعماري الصارم يبدأ هنا === ✂️
-      const rawUrl = data.url.trim();
-      // هذا السطر يستخرج الـ UUID بذكاء سواء كان مجرداً، أو في آخره شرطة مائلة، أو مدمجاً برابط خبيث
-      const uuidMatch = rawUrl.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-
-      if (uuidMatch) {
-        // تم القبض على المعرف! نغلفه برابط السحابة النقي ونعيده فوراً
-        return `https://ucarecdn.com/${uuidMatch[0]}/`;
+      let rawUrl = '';
+      if (typeof data === 'string') {
+        rawUrl = data;
+      } else if (data && typeof data === 'object') {
+        if ('url' in data && typeof (data as any).url === 'string') {
+          rawUrl = (data as any).url;
+        } else if ('data' in data && (data as any).data && typeof (data as any).data === 'object' && 'url' in (data as any).data) {
+          rawUrl = (data as any).data.url;
+        } else if ('imageUrl' in data && typeof (data as any).imageUrl === 'string') {
+          rawUrl = (data as any).imageUrl;
+        }
       }
 
-      if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      if (!rawUrl) {
+        console.error('Invalid server response format:', data);
+        throw new Error('لم يقم الخادم بإرجاع رابط صالح للصورة.');
+      }
+      rawUrl = rawUrl.trim();
+
+      if (/^https?:\/\//i.test(rawUrl)) {
         return rawUrl;
       }
 
-      // مسار الطوارئ للملفات المحلية الحقيقية (مع تجاوز TypeScript)
-      const meta = import.meta as any;
-      const configuredBaseUrl = (meta.env?.VITE_API_URL as string) || 'https://api.exchangesmangement.online/api/v1';
+      const configuredBaseUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'https://api.exchangesmangement.online/api/v1';
       const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
       return `${baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
-      // ✂️ === انتهى التعديل المعماري === ✂️
-
     } catch (err) {
+      console.error('Upload Error:', err);
       const classified = classifyUploadError(err);
       throw Object.assign(new Error(classified.message), { uploadError: classified });
     }
-  }
-  ,
+  },
+
   /**
    * Upload a PDF file with progress tracking.
    * Returns a permanent server URL.
@@ -193,7 +199,7 @@ export const uploadService = {
       // Backend uses the same endpoint for all uploadcare uploads
       const { data } = await api.post<UploadResponse>('/upload/image', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          Accept: 'application/json',
         },
         onUploadProgress: (evt) => {
           if (onProgress && evt.total) {
@@ -206,16 +212,34 @@ export const uploadService = {
         },
       });
 
-      // If the server returns an already-absolute URL (e.g. Uploadcare CDN),
-      // return it directly — do NOT prepend the API base URL.
-      if (data.url.startsWith('http://') || data.url.startsWith('https://')) {
-        return data.url;
+      let rawUrl = '';
+      if (typeof data === 'string') {
+        rawUrl = data;
+      } else if (data && typeof data === 'object') {
+        if ('url' in data && typeof (data as any).url === 'string') {
+          rawUrl = (data as any).url;
+        } else if ('data' in data && (data as any).data && typeof (data as any).data === 'object' && 'url' in (data as any).data) {
+          rawUrl = (data as any).data.url;
+        } else if ('pdfUrl' in data && typeof (data as any).pdfUrl === 'string') {
+          rawUrl = (data as any).pdfUrl;
+        }
       }
 
-      // السطر الصحيح الذي يتجاوز فحص TypeScript:
-      const configuredBaseUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'https://api.exchangesmangement.online/api/v1'; const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
-      return `${baseUrl}${data.url}`;
+      if (!rawUrl) {
+        console.error('Invalid server response format for PDF:', data);
+        throw new Error('لم يقم الخادم بإرجاع رابط صالح للملف.');
+      }
+      rawUrl = rawUrl.trim();
+
+      if (/^https?:\/\//i.test(rawUrl)) {
+        return rawUrl;
+      }
+
+      const configuredBaseUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'https://api.exchangesmangement.online/api/v1'; 
+      const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
+      return `${baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
     } catch (err) {
+      console.error('Upload PDF Error:', err);
       const classified = classifyUploadError(err);
       throw Object.assign(new Error(classified.message), { uploadError: classified });
     }

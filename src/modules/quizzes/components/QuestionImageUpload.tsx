@@ -10,7 +10,7 @@ interface Props {
 
 function resolveImageSrc(url: string): string {
   if (/^(https?:|blob:|data:)/i.test(url)) return url;
-  const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3000/api/v1';
+  const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api.exchangesmangement.online/api/v1';
   const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
   return `${baseUrl}/${url.replace(/^\/+/, '')}`;
 }

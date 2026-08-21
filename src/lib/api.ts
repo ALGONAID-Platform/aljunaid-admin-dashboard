@@ -38,6 +38,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Let browser & Axios set multipart/form-data with boundary for FormData
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
     return config;
   },
   (error: unknown) => Promise.reject(error)

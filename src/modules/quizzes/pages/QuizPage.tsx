@@ -219,8 +219,8 @@ export function QuizPage() {
       if (!q.text.trim() && !q.imageUrl) e[`q_${i}_text`] = 'أضف نص السؤال أو صورة توضيحية واحدة على الأقل';
       if (q.type === 'mcq') {
         if (q.options.some(o => !o.trim())) e[`q_${i}_opts`] = 'يجب تعبئة جميع خيارات الإجابة';
-        if (!q.correctAnswer) e[`q_${i}_ans`] = 'يرجى تحديد الإجابة الصحيحة';
       }
+      if (!q.correctAnswer) e[`q_${i}_ans`] = 'يرجى تحديد الإجابة الصحيحة';
 
     });
     setQErrors(e);
@@ -609,9 +609,9 @@ export function QuizPage() {
                   <h3 className="text-base sm:text-xl font-bold text-slate-800 mb-1 truncate">
                     {editingQuizId ? 'تحديث وتعديل الاختبار' : 'إعداد اختبار جديد'}
                   </h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <StepDot active={step === 'info'} done={step === 'questions'} label="1. إعدادات الاختبار" onClick={() => setStep('info')} />
-                    <div className="w-6 sm:w-10 h-0.5 bg-slate-200 rounded-full" />
+                    <div className="w-3 sm:w-10 h-0.5 bg-slate-200 rounded-full shrink-0" />
                     <StepDot active={step === 'questions'} done={false} label="2. بنك الأسئلة" onClick={() => { if(validateInfo()) setStep('questions'); }} />
                   </div>
                 </div>
@@ -849,26 +849,26 @@ export function QuizPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2rem] flex items-center justify-between shrink-0">
+            <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 sm:rounded-b-[2rem] flex flex-col-reverse sm:flex-row items-center justify-between gap-3 shrink-0">
               {step === 'info' ? (
                 <>
-                  <button onClick={closeModal} className="px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all focus:ring-2 focus:ring-slate-200">
+                  <button onClick={closeModal} className="w-full sm:w-auto px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all focus:ring-2 focus:ring-slate-200">
                     إلغاء الأمر
                   </button>
-                  <button onClick={() => { if (validateInfo()) setStep('questions'); }} className="px-8 py-3 text-white rounded-xl shadow-md hover:shadow-lg transition-all font-bold flex items-center gap-2" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                  <button onClick={() => { if (validateInfo()) setStep('questions'); }} className="w-full sm:w-auto px-8 py-3 text-white rounded-xl shadow-md hover:shadow-lg transition-all font-bold flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                     التالي: كتابة الأسئلة 
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="rotate-180"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                   </button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => setStep('info')} className="px-6 py-3 text-slate-700 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all flex items-center gap-2">
+                  <button onClick={() => setStep('info')} className="w-full sm:w-auto px-6 py-3 text-slate-700 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                     العودة للإعدادات
                   </button>
-                  <div className="flex items-center gap-3">
-                    <button onClick={closeModal} className="px-6 py-3 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all">إلغاء</button>
-                    <button onClick={handleSave} disabled={saveStatus === 'loading' || saveStatus === 'success'} className="px-8 py-3 text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                  <div className="flex flex-col-reverse sm:flex-row items-center gap-3 w-full sm:w-auto">
+                    <button onClick={closeModal} className="w-full sm:w-auto px-6 py-3 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all">إلغاء</button>
+                    <button onClick={handleSave} disabled={saveStatus === 'loading' || saveStatus === 'success'} className="w-full sm:w-auto px-8 py-3 text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
                       {saveStatus === 'loading' && <Loader2 className="w-5 h-5 animate-spin" />}
                       {saveStatus === 'success' && <CheckCircle className="w-5 h-5 animate-bounce" />}
                       {saveStatus === 'loading' ? 'جاري الاعتماد...' : saveStatus === 'success' ? 'تم الحفظ والاعتماد!' : `حفظ وتوثيق الاختبار (${questions.length} سؤال)`}
@@ -902,11 +902,11 @@ function InfoPill({ label, color, bg, icon }: { label: string; color: string; bg
 
 function StepDot({ active, done, label, onClick }: { active: boolean; done: boolean; label: string; onClick?: () => void }) {
   return (
-    <button onClick={onClick} className={`flex items-center gap-2 px-2 py-1 rounded-lg transition-all ${onClick ? 'hover:bg-slate-100 cursor-pointer' : 'cursor-default'}`}>
-      <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-sm transition-all" style={active ? { background: '#10B981', color: 'white', boxShadow: '0 0 0 4px #ECFDF5' } : done ? { background: '#D1FAE5', color: '#059669' } : { background: '#F1F5F9', color: '#94A3B8' }}>
+    <button onClick={onClick} className={`flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-1 sm:px-2 py-1 rounded-lg transition-all ${onClick ? 'hover:bg-slate-100 cursor-pointer' : 'cursor-default'}`}>
+      <div className="w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-sm shadow-sm transition-all" style={active ? { background: '#10B981', color: 'white', boxShadow: '0 0 0 4px #ECFDF5' } : done ? { background: '#D1FAE5', color: '#059669' } : { background: '#F1F5F9', color: '#94A3B8' }}>
         {done ? '✓' : active ? '●' : '○'}
       </div>
-      <span className="transition-colors" style={{ fontSize: 13, color: active ? '#059669' : done ? '#059669' : '#94A3B8', fontWeight: active || done ? 700 : 500 }}>{label}</span>
+      <span className="transition-colors whitespace-nowrap text-[10px] sm:text-[13px]" style={{ color: active ? '#059669' : done ? '#059669' : '#94A3B8', fontWeight: active || done ? 700 : 500 }}>{label}</span>
     </button>
   );
 }

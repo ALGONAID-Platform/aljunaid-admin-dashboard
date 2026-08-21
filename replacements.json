@@ -1,0 +1,315 @@
+[
+  {
+    "Description": "Update imports and types in LessonsPage.tsx to support content integration.",
+    "Instruction": "Add useContentStore, lucide-react icons, and upload/content types.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 7,
+        "ReplacementContent": "import {\n  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, Video, FileText, Image, Link, FileType2, Upload, Wifi, RefreshCw, Settings2\n} from 'lucide-react';\nimport { useCoursesStore, useLessonsStore, useModulesStore, useContentStore } from '../../../store';\nimport { classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';\nimport { MediaIndicator } from '../../../components/ui/MediaIndicator';\nimport { Loader } from '../../../components/feedback/Loader';\nimport { useKeyboardShortcut } from '../../../hooks/useKeyboardShortcuts';",
+        "StartLine": 2,
+        "TargetContent": "import {\n  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown\n} from 'lucide-react';\nimport { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';\nimport { Loader } from '../../../components/feedback/Loader';\nimport { useKeyboardShortcut } from '../../../hooks/useKeyboardShortcuts';"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Updating imports in LessonsPage.tsx",
+    "toolSummary": "Update imports in LessonsPage"
+  },
+  {
+    "Description": "Add TYPE_CONFIG and LocalContentType to LessonsPage.tsx",
+    "Instruction": "Insert type configurations for content above FormState",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 115,
+        "ReplacementContent": "type LocalContentType = 'video' | 'markdown';\n\nconst TYPE_CONFIG: Record<LocalContentType, { label: string; icon: React.ElementType; color: string; bg: string }> = {\n  video: { label: '\u0645\u0642\u0637\u0639 \u0641\u064a\u062f\u064a\u0648', icon: Video, color: '#3B82F6', bg: '#EFF6FF' },\n  markdown: { label: '\u0645\u062d\u062a\u0648\u0649 \u0646\u0635\u064a (Markdown)', icon: FileText, color: '#6366F1', bg: '#EEF2FF' },\n};\n\ninterface FormState {\n  courseId: string;\n  moduleId: string;\n  title: string;\n  description: string;\n  order: string;\n  type: LocalContentType;\n  videoUrl: string;\n  pdfUrl: string;\n  content: string;\n}",
+        "StartLine": 109,
+        "TargetContent": "interface FormState {\n  courseId: string;\n  moduleId: string;\n  title: string;\n  description: string;\n  order: string;\n}"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Updating FormState in LessonsPage.tsx",
+    "toolSummary": "Update FormState in LessonsPage"
+  },
+  {
+    "Description": "Update store hooks, modal reset, and data loading in LessonsPage.tsx",
+    "Instruction": "Add useContentStore hooks, update initial form states and populate content when opening edit mode.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 131,
+        "ReplacementContent": "  const { courses, fetchCourses } = useCoursesStore();\n  const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, error, isLoading } = useLessonsStore();\n  const { modules: allModules, fetchModules, addModule: createModule, updateModule: editModule, deleteModule: removeModule } = useModulesStore();\n  const { content: allContent, fetchContent, addContent, updateContent } = useContentStore();\n\n  const [activeTab, setActiveTab] = useState<'details' | 'content'>('details');\n  const [editingContentId, setEditingContentId] = useState<string | null>(null);\n\n  const [showModal, setShowModal] = useState(false);",
+        "StartLine": 129,
+        "TargetContent": "  const { courses, fetchCourses } = useCoursesStore();\n  const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, error, isLoading } = useLessonsStore();\n  const { modules: allModules, fetchModules, addModule: createModule, updateModule: editModule, deleteModule: removeModule } = useModulesStore();\n\n  const [showModal, setShowModal] = useState(false);"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 157,
+        "ReplacementContent": "  useEffect(() => {\n    void fetchCourses();\n    void fetchLessons();\n    void fetchModules();\n    void fetchContent();\n  }, [fetchCourses, fetchLessons, fetchModules, fetchContent]);\n\n  const [form, setForm] = useState<FormState>({ courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' });",
+        "StartLine": 153,
+        "TargetContent": "  useEffect(() => {\n    void fetchCourses();\n    void fetchLessons();\n    void fetchModules();\n  }, [fetchCourses, fetchLessons, fetchModules]);\n\n  const [form, setForm] = useState<FormState>({ courseId: '', moduleId: '', title: '', description: '', order: '' });"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 208,
+        "ReplacementContent": "  const resetModal = useCallback(() => {\n    setForm({ courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' });\n    setErrors({});\n    setSaveStatus('idle');\n    setModulesError(null);\n    setIsCreatingModule(false);\n    setNewModuleTitle('');\n    setNewModuleDesc('');\n    setEditingModuleId(null);\n    setEditingLessonId(null);\n    setEditingContentId(null);\n    setActiveTab('details');\n  }, []);",
+        "StartLine": 206,
+        "TargetContent": "  const resetModal = useCallback(() => {\n    setForm({ courseId: '', moduleId: '', title: '', description: '', order: '' });\n    setErrors({});\n    setSaveStatus('idle');\n    setModulesError(null);\n    setIsCreatingModule(false);\n    setNewModuleTitle('');\n    setNewModuleDesc('');\n    setEditingModuleId(null);\n    setEditingLessonId(null);\n  }, []);"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 244,
+        "ReplacementContent": "  const openEdit = (lesson: { id: string; courseId: string; title: string; description: string; order: number }) => {\n    resetModal();\n    setEditingLessonId(lesson.id);\n    \n    // Find associated content\n    const existingContent = allContent.find(c => c.lessonId === lesson.id);\n    if (existingContent) {\n      setEditingContentId(String(existingContent.id));\n    }\n    \n    setShowModal(true);\n    const parentModule = allModules.find(m => String(m.id) === String(lesson.courseId));\n    \n    const formData: FormState = {\n      courseId: parentModule ? String(parentModule.courseId) : '',\n      moduleId: lesson.courseId,\n      title: lesson.title,\n      description: lesson.description,\n      order: String(lesson.order),\n      type: existingContent?.type === 'markdown' ? 'markdown' : 'video',\n      videoUrl: existingContent?.videoUrl || '',\n      pdfUrl: (existingContent as any)?.pdfUrl || '',\n      content: existingContent?.content || '',\n    };\n    \n    if (!parentModule) {\n      setModulesError('\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0645\u0631\u062a\u0628\u0637\u0629 \u0628\u0647\u0630\u0627 \u0627\u0644\u062f\u0631\u0633.');\n    }\n    \n    setForm(formData);\n  };",
+        "StartLine": 220,
+        "TargetContent": "  const openEdit = (lesson: { id: string; courseId: string; title: string; description: string; order: number }) => {\n    resetModal();\n    setEditingLessonId(lesson.id);\n    setShowModal(true);\n    const parentModule = allModules.find(m => String(m.id) === String(lesson.courseId));\n    if (parentModule) {\n      setForm({\n        courseId: String(parentModule.courseId),\n        moduleId: lesson.courseId,\n        title: lesson.title,\n        description: lesson.description,\n        order: String(lesson.order),\n      });\n    } else {\n      setModulesError('\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0645\u0631\u062a\u0628\u0637\u0629 \u0628\u0647\u0630\u0627 \u0627\u0644\u062f\u0631\u0633.');\n      setForm({\n        courseId: '',\n        moduleId: lesson.courseId,\n        title: lesson.title,\n        description: lesson.description,\n        order: String(lesson.order),\n      });\n    }\n  };"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 310,
+        "ReplacementContent": "  const validate = (): boolean => {\n    const e: FormError = {};\n    if (!form.courseId) e.courseId = '\u064a\u0631\u062c\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0627\u0644\u0645\u0642\u0631\u0631 \u0627\u0644\u0645\u0631\u062c\u0639\u064a';\n    if (!form.moduleId) e.moduleId = '\u064a\u0631\u062c\u0649 \u062a\u062d\u062f\u064a\u062f \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u062a\u064a \u064a\u0646\u062a\u0645\u064a \u0644\u0647\u0627 \u0627\u0644\u062f\u0631\u0633';\n    if (!form.title.trim()) e.title = '\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u062f\u0631\u0633 \u0645\u0637\u0644\u0648\u0628';\n    else if (form.title.trim().length < 2) e.title = '\u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u062f\u0631\u0633 \u062d\u0631\u0641\u064a\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644';\n    if (!form.order.trim()) e.order = '\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062f\u0631\u0633 \u0645\u0637\u0644\u0648\u0628 \u062f\u0627\u062e\u0644 \u0627\u0644\u0648\u062d\u062f\u0629';\n    else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = '\u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u0631\u0642\u0645\u0627\u064b \u0645\u0648\u062c\u0628\u0627\u064b';\n    \n    // Content Validation\n    if (form.type === 'video') {\n      if (!form.videoUrl.trim()) e.submit = '\u0631\u0627\u0628\u0637 \u0627\u0644\u0641\u064a\u062f\u064a\u0648 \u0645\u0637\u0644\u0648\u0628 \u0641\u064a \u062a\u0628\u0648\u064a\u0628 \u0627\u0644\u0645\u062d\u062a\u0648\u0649';\n      else if (!form.videoUrl.startsWith('http')) e.submit = '\u0631\u0627\u0628\u0637 \u0627\u0644\u0641\u064a\u062f\u064a\u0648 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d';\n    } else if (form.type === 'markdown') {\n      if (!form.content.trim()) e.submit = '\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a \u0645\u0637\u0644\u0648\u0628 \u0641\u064a \u062a\u0628\u0648\u064a\u0628 \u0627\u0644\u0645\u062d\u062a\u0648\u0649';\n    }\n    if (form.pdfUrl.trim() && !form.pdfUrl.startsWith('http')) {\n      e.submit = '\u0631\u0627\u0628\u0637 \u0627\u0644\u0645\u0644\u0641 (PDF) \u063a\u064a\u0631 \u0635\u0627\u0644\u062d';\n    }\n\n    setErrors(e);\n    if (Object.keys(e).length > 0 && e.submit) {\n      setActiveTab('content'); // switch to content tab if errors are there\n    }\n    return Object.keys(e).length === 0;\n  };",
+        "StartLine": 300,
+        "TargetContent": "  const validate = (): boolean => {\n    const e: FormError = {};\n    if (!form.courseId) e.courseId = '\u064a\u0631\u062c\u0649 \u0627\u062e\u062a\u064a\u0627\u0631 \u0627\u0644\u0645\u0642\u0631\u0631 \u0627\u0644\u0645\u0631\u062c\u0639\u064a';\n    if (!form.moduleId) e.moduleId = '\u064a\u0631\u062c\u0649 \u062a\u062d\u062f\u064a\u062f \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u062a\u064a \u064a\u0646\u062a\u0645\u064a \u0644\u0647\u0627 \u0627\u0644\u062f\u0631\u0633';\n    if (!form.title.trim()) e.title = '\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u062f\u0631\u0633 \u0645\u0637\u0644\u0648\u0628';\n    else if (form.title.trim().length < 2) e.title = '\u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u062f\u0631\u0633 \u062d\u0631\u0641\u064a\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644';\n    if (!form.order.trim()) e.order = '\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062f\u0631\u0633 \u0645\u0637\u0644\u0648\u0628 \u062f\u0627\u062e\u0644 \u0627\u0644\u0648\u062d\u062f\u0629';\n    else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = '\u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u0631\u0642\u0645\u0627\u064b \u0645\u0648\u062c\u0628\u0627\u064b';\n    setErrors(e);\n    return Object.keys(e).length === 0;\n  };"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Updating state and functions",
+    "toolSummary": "Update state and functions"
+  },
+  {
+    "Description": "Update handleSave to save content",
+    "Instruction": "Modify handleSave to first save the lesson, then save the associated content using the lesson ID.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 349,
+        "ReplacementContent": "  const handleSave = async () => {\n    if (!validate()) return;\n    setSaveStatus('loading');\n    const course = courses.find(c => c.id === form.courseId)!;\n    try {\n      const payload = {\n        courseId: form.moduleId,\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n      };\n\n      let lessonIdToUse = editingLessonId;\n      let newLessonId: any = null;\n\n      if (editingLessonId) {\n        await updateLesson({ id: editingLessonId, ...payload });\n      } else {\n        const addedLesson = await addLesson(payload);\n        newLessonId = addedLesson?.id || '';\n        lessonIdToUse = newLessonId;\n      }\n\n      if (lessonIdToUse) {\n        // Save content\n        const contentPayload = {\n          lessonId: lessonIdToUse,\n          lessonTitle: form.title.trim(),\n          title: form.title.trim(), // use lesson title for content title\n          type: form.type as any,\n          videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n          content: form.type === 'markdown' ? form.content.trim() : undefined,\n          pdfUrl: form.pdfUrl.trim() || null,\n          isReading: form.type !== 'video',\n        };\n\n        if (editingContentId) {\n          await updateContent(editingContentId, contentPayload, () => {});\n        } else {\n          await addContent(contentPayload as any, () => {});\n        }\n      }\n\n      setSaveStatus('success');\n      setTimeout(() => {\n        setShowModal(false);\n        resetModal();\n      }, 1000);\n    } catch {\n      setSaveStatus('error');\n      setErrors(prev => ({ ...prev, submit: '\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u062f\u0631\u0633 \u0623\u0648 \u0627\u0644\u0645\u062d\u062a\u0648\u0649. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u062c\u062f\u062f\u0627\u064b' }));\n    }\n  };",
+        "StartLine": 320,
+        "TargetContent": "  const handleSave = async () => {\n    if (!validate()) return;\n    setSaveStatus('loading');\n    const course = courses.find(c => c.id === form.courseId)!;\n    try {\n      const payload = {\n        courseId: form.moduleId,\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n      };\n\n      if (editingLessonId) {\n        await updateLesson({ id: editingLessonId, ...payload });\n      } else {\n        await addLesson(payload);\n      }\n      setSaveStatus('success');\n      setTimeout(() => {\n        setShowModal(false);\n        resetModal();\n      }, 1000);\n    } catch {\n      setSaveStatus('error');\n      setErrors(prev => ({ ...prev, submit: '\u062a\u0639\u0630\u0631 \u0627\u0644\u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u062e\u0627\u062f\u0645. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0634\u0628\u0643\u0629 \u0648\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u062c\u062f\u062f\u0627\u064b' }));\n    }\n  };"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Updating handleSave in LessonsPage.tsx",
+    "toolSummary": "Update handleSave in LessonsPage"
+  },
+  {
+    "Description": "Add tabs for lesson details and content",
+    "Instruction": "Wrap the modal body with tabs for details and content, and add content fields.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 891,
+        "ReplacementContent": "            {/* Modal Tabs */}\n            <div className=\"flex border-b border-slate-100 px-6 sm:px-8 shrink-0 bg-white\">\n              <button\n                onClick={() => setActiveTab('details')}\n                className={`py-3.5 px-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'details' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}\n              >\n                \u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u062f\u0631\u0633\n              </button>\n              <button\n                onClick={() => setActiveTab('content')}\n                className={`py-3.5 px-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'content' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}\n              >\n                \u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0648\u0627\u0644\u0645\u0631\u0641\u0642\u0627\u062a\n                {(errors.submit && activeTab !== 'content') && <span className=\"w-2 h-2 rounded-full bg-red-500\"></span>}\n              </button>\n            </div>\n\n            {/* Modal Body */}\n            <div className=\"p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6\">\n              {errors.submit && (\n                <div className=\"flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700\">\n                  <AlertCircle className=\"w-5 h-5 flex-shrink-0\" />\n                  <span className=\"text-sm font-bold\">{errors.submit}</span>\n                </div>\n              )}\n\n              {activeTab === 'details' && (\n                <div className=\"space-y-6 animate-in fade-in duration-300\">\n                  {/* Section 1: Relational Structure */}",
+        "StartLine": 883,
+        "TargetContent": "            {/* Modal Body */}\n            <div className=\"p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6\">\n              {errors.submit && (\n                <div className=\"flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700\">\n                  <AlertCircle className=\"w-5 h-5 flex-shrink-0\" />\n                  <span className=\"text-sm font-bold\">{errors.submit}</span>\n                </div>\n              )}\n\n              {/* Section 1: Relational Structure */}"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 1043,
+        "ReplacementContent": "                      </button>\n                    )}\n                  </div>\n                </Field>\n              </div>\n              </div>\n              )}\n\n              {activeTab === 'content' && (\n                <div className=\"space-y-6 animate-in fade-in duration-300\">\n                  {/* Content Type Selector */}\n                  <div className=\"p-1 bg-slate-100 rounded-2xl flex flex-col sm:flex-row gap-1\">\n                    {(Object.entries(TYPE_CONFIG) as [LocalContentType, typeof TYPE_CONFIG[LocalContentType]][]).map(([key, config]) => {\n                      const Icon = config.icon;\n                      const isActive = form.type === key;\n                      return (\n                        <button\n                          key={key}\n                          onClick={() => { setForm(p => ({ ...p, type: key })); setErrors(p => { const x = { ...p }; delete x.submit; return x; }); }}\n                          className={`flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-bold text-sm transition-all ${isActive ? 'bg-white shadow-sm ring-1 ring-black/5 text-slate-800' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}\n                        >\n                          <Icon className={`w-4 h-4 ${isActive ? '' : 'opacity-70'}`} style={{ color: isActive ? config.color : undefined }} />\n                          {config.label}\n                        </button>\n                      );\n                    })}\n                  </div>\n\n                  {/* Video Content Fields */}\n                  {form.type === 'video' && (\n                    <div className=\"space-y-5\">\n                      <Field label=\"\u0631\u0627\u0628\u0637 \u0627\u0644\u0641\u064a\u062f\u064a\u0648 (YouTube)\" required error={errors.submit?.includes('\u0641\u064a\u062f\u064a\u0648') ? errors.submit : undefined}>\n                        <div className=\"relative\">\n                          <Link className=\"absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400\" />\n                          <input \n                            value={form.videoUrl} \n                            onChange={e => { setForm(p => ({ ...p, videoUrl: e.target.value })); setErrors(p => { const x = { ...p }; delete x.submit; return x; }); }} \n                            placeholder=\"https://youtube.com/watch?v=...\" \n                            className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 text-left font-mono ${errors.submit?.includes('\u0641\u064a\u062f\u064a\u0648') ? 'border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:bg-white' : 'border-slate-200 bg-white text-slate-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'}`} \n                            dir=\"ltr\" \n                          />\n                        </div>\n                      </Field>\n                    </div>\n                  )}\n\n                  {/* Markdown Content Fields */}\n                  {form.type === 'markdown' && (\n                    <div className=\"space-y-5\">\n                      <Field label=\"\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a (Markdown)\" required error={errors.submit?.includes('\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a') ? errors.submit : undefined}>\n                        <textarea \n                          value={form.content} \n                          onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.submit; return x; }); }} \n                          placeholder=\"# \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u0642\u0627\u0644&#10;&#10;\u0627\u0643\u062a\u0628 \u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0647\u0646\u0627...\" \n                          rows={8} \n                          className={`w-full p-4 rounded-xl border-2 outline-none transition-all duration-200 resize-none font-mono text-sm leading-relaxed ${errors.submit?.includes('\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a') ? 'border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:bg-white' : 'border-slate-200 bg-slate-50 text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10'}`} \n                          dir=\"rtl\" \n                        />\n                      </Field>\n                    </div>\n                  )}\n\n                  <hr className=\"border-slate-100\" />\n\n                  {/* Attachment Field */}\n                  <Field label=\"\u0645\u0631\u0641\u0642 PDF (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)\" error={errors.submit?.includes('\u0627\u0644\u0645\u0644\u0641') ? errors.submit : undefined}>\n                    <div className=\"relative\">\n                      <FileType2 className=\"absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400\" />\n                      <input \n                        value={form.pdfUrl} \n                        onChange={e => { setForm(p => ({ ...p, pdfUrl: e.target.value })); setErrors(p => { const x = { ...p }; delete x.submit; return x; }); }} \n                        placeholder=\"https://example.com/file.pdf\" \n                        className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 text-left font-mono ${errors.submit?.includes('\u0627\u0644\u0645\u0644\u0641') ? 'border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:bg-white' : 'border-slate-200 bg-white text-slate-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'}`} \n                        dir=\"ltr\" \n                      />\n                    </div>\n                  </Field>\n                </div>\n              )}\n            </div>\n\n            {/* Modal Footer */}",
+        "StartLine": 1039,
+        "TargetContent": "                    {form.moduleId && (\n                      <button type=\"button\" onClick={() => { setForm(p => ({ ...p, order: String(suggestedOrder()) })); setErrors(p => { const x = { ...p }; delete x.order; return x; }); }} className=\"px-4 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 rounded-xl transition-all font-bold flex items-center gap-2 shadow-sm shrink-0\" title=\"\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062a\u0644\u0642\u0627\u0626\u064a \u0627\u0644\u062a\u0627\u0644\u064a\">\n                        \u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u0645\u0642\u062a\u0631\u062d: {suggestedOrder()}\n                      </button>\n                    )}\n                  </div>\n                </Field>\n              </div>\n            </div>\n\n            {/* Modal Footer */}"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Adding content tabs and fields",
+    "toolSummary": "Add content tabs"
+  },
+  {
+    "Description": "Validate duplicate order and auto-populate suggested order on module change",
+    "Instruction": "Update validation to prevent duplicate order numbers in the same module, and auto-populate the suggested order when the user selects a module or creates a new one.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 300,
+        "ReplacementContent": "      } else {\n        const newMod = await createModule({\n          courseId: form.courseId as any,\n          title: newModuleTitle.trim(),\n          description: newModuleDesc.trim(),\n        });\n        setForm(p => ({ ...p, moduleId: String(newMod.id), order: !editingLessonId ? '1' : p.order }));\n      }",
+        "StartLine": 292,
+        "TargetContent": "      } else {\n        const newMod = await createModule({\n          courseId: form.courseId as any,\n          title: newModuleTitle.trim(),\n          description: newModuleDesc.trim(),\n        });\n        setForm(p => ({ ...p, moduleId: String(newMod.id) }));\n      }"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 324,
+        "ReplacementContent": "    if (!form.order.trim()) e.order = '\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062f\u0631\u0633 \u0645\u0637\u0644\u0648\u0628 \u062f\u0627\u062e\u0644 \u0627\u0644\u0648\u062d\u062f\u0629';\n    else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = '\u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u0631\u0642\u0645\u0627\u064b \u0645\u0648\u062c\u0628\u0627\u064b';\n    else if (lessons.some(l => String(l.courseId) === String(form.moduleId) && Number(l.order) === Number(form.order) && l.id !== editingLessonId)) {\n      e.order = `\u0647\u0630\u0627 \u0627\u0644\u062a\u0631\u062a\u064a\u0628 (${form.order}) \u0645\u0633\u062a\u062e\u062f\u0645 \u0628\u0627\u0644\u0641\u0639\u0644 \u0641\u064a \u0647\u0630\u0647 \u0627\u0644\u0648\u062d\u062f\u0629.`;\n    }\n    \n    // Content Validation",
+        "StartLine": 321,
+        "TargetContent": "    if (!form.order.trim()) e.order = '\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062f\u0631\u0633 \u0645\u0637\u0644\u0648\u0628 \u062f\u0627\u062e\u0644 \u0627\u0644\u0648\u062d\u062f\u0629';\n    else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = '\u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u0631\u0642\u0645\u0627\u064b \u0645\u0648\u062c\u0628\u0627\u064b';\n    \n    // Content Validation"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 984,
+        "ReplacementContent": "                          <select\n                            value={form.moduleId}\n                            onChange={e => { \n                              const val = e.target.value;\n                              const nOrder = lessons.filter(l => String(l.courseId) === String(val)).length + 1;\n                              setForm(p => ({ ...p, moduleId: val, order: !editingLessonId ? String(nOrder) : p.order })); \n                              setErrors(p => { const x = { ...p }; delete x.moduleId; return x; }); \n                            }}\n                            className={`w-full ${inputCls(!!errors.moduleId)} pr-11 font-medium appearance-none`}",
+        "StartLine": 981,
+        "TargetContent": "                          <select\n                            value={form.moduleId}\n                            onChange={e => { setForm(p => ({ ...p, moduleId: e.target.value })); setErrors(p => { const x = { ...p }; delete x.moduleId; return x; }); }}\n                            className={`w-full ${inputCls(!!errors.moduleId)} pr-11 font-medium appearance-none`}"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Add order validation and auto-populate",
+    "toolSummary": "Fix lesson order validation"
+  },
+  {
+    "Description": "Update LessonsPage to support PDF upload for text lessons and remove it for video",
+    "Instruction": "Add pdfFile state, clear it in resetModal, attach it to contentPayload if type is markdown, and replace the old pdfUrl UI field with a file upload UI within the markdown section only.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 168,
+        "ReplacementContent": "  const [form, setForm] = useState<FormState>({ courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' });\n  const [pdfFile, setPdfFile] = useState<File | null>(null);\n  const pdfFileRef = useRef<HTMLInputElement>(null);\n  const [errors, setErrors] = useState<FormError>({});\n  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');",
+        "StartLine": 166,
+        "TargetContent": "  const [form, setForm] = useState<FormState>({ courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' });\n  const [errors, setErrors] = useState<FormError>({});\n  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 225,
+        "ReplacementContent": "    setEditingLessonId(null);\n    setEditingContentId(null);\n    setActiveTab('details');\n    setPdfFile(null);\n  }, []);",
+        "StartLine": 222,
+        "TargetContent": "    setEditingLessonId(null);\n    setEditingContentId(null);\n    setActiveTab('details');\n  }, []);"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 381,
+        "ReplacementContent": "          videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n          content: form.type === 'markdown' ? form.content.trim() : undefined,\n          pdfUrl: form.type === 'markdown' ? form.pdfUrl.trim() || null : null,\n          file: form.type === 'markdown' && pdfFile ? pdfFile : undefined,\n          isReading: form.type !== 'video',\n        };",
+        "StartLine": 377,
+        "TargetContent": "          videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n          content: form.type === 'markdown' ? form.content.trim() : undefined,\n          pdfUrl: form.pdfUrl.trim() || null,\n          isReading: form.type !== 'video',\n        };"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 1146,
+        "ReplacementContent": "                  {/* Markdown Content Fields */}\n                  {form.type === 'markdown' && (\n                    <div className=\"space-y-5\">\n                      <Field label=\"\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a (Markdown)\" required error={errors.submit?.includes('\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a') ? errors.submit : undefined}>\n                        <textarea \n                          value={form.content} \n                          onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.submit; return x; }); }} \n                          placeholder=\"# \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u0642\u0627\u0644&#10;&#10;\u0627\u0643\u062a\u0628 \u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0647\u0646\u0627...\" \n                          rows={8} \n                          className={`w-full p-4 rounded-xl border-2 outline-none transition-all duration-200 resize-none font-mono text-sm leading-relaxed ${errors.submit?.includes('\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a') ? 'border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:bg-white' : 'border-slate-200 bg-slate-50 text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10'}`} \n                          dir=\"rtl\" \n                        />\n                      </Field>\n                      \n                      <hr className=\"border-slate-100\" />\n                      \n                      <div className=\"space-y-2\">\n                        <label className=\"block text-xs font-bold text-slate-700\">\u0645\u0631\u0641\u0642 PDF (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)</label>\n                        <input\n                          type=\"file\"\n                          ref={pdfFileRef}\n                          className=\"hidden\"\n                          accept=\"application/pdf, .pdf\"\n                          onChange={(e) => {\n                            const file = e.target.files?.[0];\n                            if (file) {\n                              setPdfFile(file);\n                              setForm(p => ({ ...p, pdfUrl: file.name }));\n                            }\n                            e.target.value = '';\n                          }}\n                        />\n\n                        {pdfFile || form.pdfUrl ? (\n                          <div className=\"p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between\">\n                            <div className=\"flex items-center gap-3\">\n                              <div className=\"w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm\">\n                                <FileText className=\"w-5 h-5\" />\n                              </div>\n                              <div>\n                                <span className=\"block text-sm font-bold text-emerald-800 line-clamp-1 truncate max-w-[200px]\" dir=\"ltr\">\n                                  {pdfFile ? pdfFile.name : (form.pdfUrl.split('/').pop() || form.pdfUrl)}\n                                </span>\n                                {pdfFile && (\n                                  <span className=\"block text-xs font-medium text-emerald-600 mt-0.5\">\n                                    {(pdfFile.size / 1024 / 1024).toFixed(2)} MB\n                                  </span>\n                                )}\n                              </div>\n                            </div>\n                            <button\n                              type=\"button\"\n                              onClick={(e) => {\n                                e.stopPropagation();\n                                setPdfFile(null);\n                                setForm(p => ({ ...p, pdfUrl: '' }));\n                                if (pdfFileRef.current) pdfFileRef.current.value = '';\n                              }}\n                              className=\"w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-700 bg-white hover:bg-red-50 rounded-lg border border-red-100 transition-colors\"\n                            >\n                              <X className=\"w-4 h-4\" />\n                            </button>\n                          </div>\n                        ) : (\n                          <div\n                            className=\"border-2 border-dashed border-slate-200 hover:border-emerald-400 rounded-2xl p-6 text-center cursor-pointer bg-white transition-all group\"\n                            onClick={() => pdfFileRef.current?.click()}\n                          >\n                            <div className=\"w-12 h-12 bg-slate-50 text-slate-400 rounded-xl mx-auto flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-all\">\n                              <Upload className=\"w-6 h-6\" />\n                            </div>\n                            <p className=\"text-sm font-bold text-slate-700\">\u0627\u0636\u063a\u0637 \u0644\u0631\u0641\u0639 \u0645\u0644\u0641 PDF \u0645\u0646 \u062c\u0647\u0627\u0632\u0643</p>\n                            <p className=\"text-xs text-slate-400 mt-1\">\u0627\u0644\u062d\u062f \u0627\u0644\u0623\u0642\u0635\u0649 \u0644\u0644\u0645\u0644\u0641 10MB</p>\n                          </div>\n                        )}\n                      </div>\n                    </div>\n                  )}",
+        "StartLine": 1115,
+        "TargetContent": "                  {/* Markdown Content Fields */}\n                  {form.type === 'markdown' && (\n                    <div className=\"space-y-5\">\n                      <Field label=\"\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a (Markdown)\" required error={errors.submit?.includes('\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a') ? errors.submit : undefined}>\n                        <textarea \n                          value={form.content} \n                          onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.submit; return x; }); }} \n                          placeholder=\"# \u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u0642\u0627\u0644&#10;&#10;\u0627\u0643\u062a\u0628 \u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0647\u0646\u0627...\" \n                          rows={8} \n                          className={`w-full p-4 rounded-xl border-2 outline-none transition-all duration-200 resize-none font-mono text-sm leading-relaxed ${errors.submit?.includes('\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a') ? 'border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:bg-white' : 'border-slate-200 bg-slate-50 text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10'}`} \n                          dir=\"rtl\" \n                        />\n                      </Field>\n                    </div>\n                  )}\n\n                  <hr className=\"border-slate-100\" />\n\n                  {/* Attachment Field */}\n                  <Field label=\"\u0645\u0631\u0641\u0642 PDF (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)\" error={errors.submit?.includes('\u0627\u0644\u0645\u0644\u0641') ? errors.submit : undefined}>\n                    <div className=\"relative\">\n                      <FileType2 className=\"absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400\" />\n                      <input \n                        value={form.pdfUrl} \n                        onChange={e => { setForm(p => ({ ...p, pdfUrl: e.target.value })); setErrors(p => { const x = { ...p }; delete x.submit; return x; }); }} \n                        placeholder=\"https://example.com/file.pdf\" \n                        className={`w-full pr-12 pl-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 text-left font-mono ${errors.submit?.includes('\u0627\u0644\u0645\u0644\u0641') ? 'border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:bg-white' : 'border-slate-200 bg-white text-slate-800 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'}`} \n                        dir=\"ltr\" \n                      />\n                    </div>\n                  </Field>"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Update LessonsPage UI and state",
+    "toolSummary": "Update UI for PDF upload"
+  },
+  {
+    "Description": "Allow file without text and simplify payload",
+    "Instruction": "Update validation logic to allow either text content or a PDF file, and simplify handleSave to send all fields in one request.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 336,
+        "ReplacementContent": "    } else if (form.type === 'markdown') {\n      if (!form.content.trim() && !pdfFile && !form.pdfUrl.trim()) e.submit = '\u064a\u062c\u0628 \u0625\u062f\u062e\u0627\u0644 \u0645\u062d\u062a\u0648\u0649 \u0646\u0635\u064a \u0623\u0648 \u0625\u0631\u0641\u0627\u0642 \u0645\u0644\u0641 PDF';\n    }",
+        "StartLine": 334,
+        "TargetContent": "    } else if (form.type === 'markdown') {\n      if (!form.content.trim()) e.submit = '\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a \u0645\u0637\u0644\u0648\u0628 \u0641\u064a \u062a\u0628\u0648\u064a\u0628 \u0627\u0644\u0645\u062d\u062a\u0648\u0649';\n    }"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 392,
+        "ReplacementContent": "      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined,\n        pdf: form.type === 'markdown' && pdfFile ? pdfFile : undefined,\n      };\n\n      if (editingLessonId) {\n        await updateLesson({ id: editingLessonId, ...payload });\n      } else {\n        await addLesson(payload);\n      }",
+        "StartLine": 354,
+        "TargetContent": "      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n      };\n\n      let lessonIdToUse = editingLessonId;\n      let newLessonId: any = null;\n\n      if (editingLessonId) {\n        await updateLesson({ id: editingLessonId, ...payload });\n      } else {\n        const addedLesson = await addLesson(payload);\n        newLessonId = addedLesson?.id || '';\n        lessonIdToUse = newLessonId;\n      }\n\n      if (lessonIdToUse) {\n        // Save content\n        const contentPayload = {\n          lessonId: lessonIdToUse,\n          lessonTitle: form.title.trim(),\n          title: form.title.trim(), // use lesson title for content title\n          type: form.type as any,\n          videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n          content: form.type === 'markdown' ? form.content.trim() : undefined,\n          pdfUrl: (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined,\n          file: form.type === 'markdown' && pdfFile ? pdfFile : undefined,\n          isReading: form.type !== 'video',\n        };\n\n        if (editingContentId) {\n          await updateContent(editingContentId, contentPayload, () => {});\n        } else {\n          await addContent(contentPayload as any, () => {});\n        }\n      }"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Simplify lesson save logic",
+    "toolSummary": "Simplify handleSave"
+  },
+  {
+    "Description": "Use uploadService to upload PDF first to bypass image filter",
+    "Instruction": "Import uploadService and use it to upload the PDF first, then pass the URL to addLesson/updateLesson instead of the File object.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 6,
+        "ReplacementContent": "import { uploadService, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';",
+        "StartLine": 6,
+        "TargetContent": "import { classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 364,
+        "ReplacementContent": "      let finalPdfUrl = (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined;\n      \n      if (form.type === 'markdown' && pdfFile) {\n        try {\n          finalPdfUrl = await uploadService.uploadPdf(pdfFile);\n        } catch (err: any) {\n          setSaveStatus('error');\n          setErrors(prev => ({ ...prev, submit: err.message || '\u0641\u0634\u0644 \u0631\u0641\u0639 \u0645\u0644\u0641 PDF.' }));\n          return;\n        }\n      }\n\n      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: finalPdfUrl,\n      };",
+        "StartLine": 354,
+        "TargetContent": "      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined,\n        pdf: form.type === 'markdown' && pdfFile ? pdfFile : undefined,\n      };"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Upload PDF directly",
+    "toolSummary": "Fix PDF upload"
+  },
+  {
+    "Description": "Revert to sending PDF directly to /lessons endpoint because /upload/image strictly rejects PDFs.",
+    "Instruction": "Revert the handleSave method in LessonsPage to pass the pdf directly to the payload instead of calling uploadService.uploadPdf.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 6,
+        "ReplacementContent": "import { classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';",
+        "StartLine": 6,
+        "TargetContent": "import { uploadService, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 370,
+        "ReplacementContent": "      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined,\n        pdf: form.type === 'markdown' && pdfFile ? pdfFile : undefined,\n      };",
+        "StartLine": 350,
+        "TargetContent": "      let finalPdfUrl = (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined;\n      \n      if (form.type === 'markdown' && pdfFile) {\n        try {\n          finalPdfUrl = await uploadService.uploadPdf(pdfFile);\n        } catch (err: any) {\n          setSaveStatus('error');\n          setErrors(prev => ({ ...prev, submit: err.message || '\u0641\u0634\u0644 \u0631\u0641\u0639 \u0645\u0644\u0641 PDF.' }));\n          return;\n        }\n      }\n\n      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: finalPdfUrl,\n      };"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Revert PDF upload to use /lessons endpoint",
+    "toolSummary": "Fix PDF upload logic"
+  },
+  {
+    "Description": "Show detailed error message in the UI when save fails",
+    "Instruction": "Update `handleSave` catch block to display the actual error message from the backend so we know exactly why the POST request is failing.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 381,
+        "ReplacementContent": "    } catch (err: any) {\n      setSaveStatus('error');\n      const backendMessage = err?.response?.data?.message || err?.message || '\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u062f\u0631\u0633 \u0623\u0648 \u0627\u0644\u0645\u062d\u062a\u0648\u0649. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u062c\u062f\u062f\u0627\u064b';\n      const errorMsg = Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage;\n      setErrors(prev => ({ ...prev, submit: `\u062e\u0637\u0623 \u0645\u0646 \u0627\u0644\u062e\u0627\u062f\u0645: ${errorMsg}` }));\n    }",
+        "StartLine": 377,
+        "TargetContent": "    } catch {\n      setSaveStatus('error');\n      setErrors(prev => ({ ...prev, submit: '\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u062f\u0631\u0633 \u0623\u0648 \u0627\u0644\u0645\u062d\u062a\u0648\u0649. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u062c\u062f\u062f\u0627\u064b' }));\n    }"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Update error message handling",
+    "toolSummary": "Show detailed error"
+  },
+  {
+    "Description": "Ensure PDF file strictly has .pdf extension and application/pdf mimetype to bypass strict backend filters.",
+    "Instruction": "Update `LessonsPage.tsx` to force the PDF file name to end in `.pdf` and set its type to `application/pdf` before passing it to the payload.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 364,
+        "ReplacementContent": "      let finalPdfFile: File | undefined = undefined;\n      if (form.type === 'markdown' && pdfFile) {\n        // Force the file name to have .pdf extension and the type to be application/pdf\n        // to pass the strict backend Multer fileFilter and FileTypeValidator\n        const newFileName = pdfFile.name.toLowerCase().endsWith('.pdf') ? pdfFile.name : `${pdfFile.name}.pdf`;\n        finalPdfFile = new File([pdfFile], newFileName, { type: 'application/pdf' });\n      }\n\n      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined,\n        pdf: finalPdfFile,\n      };",
+        "StartLine": 354,
+        "TargetContent": "      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined,\n        pdf: form.type === 'markdown' && pdfFile ? pdfFile : undefined,\n      };"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Fix PDF file payload for strict backend",
+    "toolSummary": "Force PDF extension"
+  },
+  {
+    "Description": "Update validation to allow optional content if PDF is provided, and use uploadService.uploadPdf for file uploads before creating the lesson.",
+    "Instruction": "1. In `validate()`, change the markdown validation to require EITHER content OR a PDF file.\n2. In `handleSave()`, await `uploadService.uploadPdf(pdfFile)` if a PDF is selected, get the `pdfUrl`, and pass it to the payload instead of the raw `File`.\n3. Add `window.alert` for server errors to ensure the user sees them.",
+    "ReplacementChunks": [
+      {
+        "AllowMultiple": false,
+        "EndLine": 341,
+        "ReplacementContent": "      if (form.type === 'video' && !form.videoUrl.trim()) newErrors.submit = '\u0631\u0627\u0628\u0637 \u0627\u0644\u0641\u064a\u062f\u064a\u0648 \u0645\u0637\u0644\u0648\u0628';\n      if (form.type === 'markdown' && !form.content.trim() && !pdfFile && !form.pdfUrl) {\n        newErrors.submit = '\u0627\u0644\u0631\u062c\u0627\u0621 \u0625\u062f\u062e\u0627\u0644 \u0645\u062d\u062a\u0648\u0649 \u0646\u0635\u064a \u0623\u0648 \u0625\u0631\u0641\u0627\u0642 \u0645\u0644\u0641 PDF';\n      }\n    }",
+        "StartLine": 338,
+        "TargetContent": "      if (form.type === 'video' && !form.videoUrl.trim()) newErrors.submit = '\u0631\u0627\u0628\u0637 \u0627\u0644\u0641\u064a\u062f\u064a\u0648 \u0645\u0637\u0644\u0648\u0628';\n      if (form.type === 'markdown' && !form.content.trim()) newErrors.submit = '\u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0635\u064a \u0645\u0637\u0644\u0648\u0628';\n    }"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 373,
+        "ReplacementContent": "  const handleSave = async () => {\n    if (!validate()) return;\n    setSaveStatus('loading');\n    const course = courses.find(c => c.id === form.courseId)!;\n    try {\n      let finalPdfUrl: string | undefined = undefined;\n      \n      if (form.type === 'markdown' && pdfFile) {\n        // Upload the PDF first using the upload service (similar to Exam Models)\n        finalPdfUrl = await uploadService.uploadPdf(pdfFile);\n      }\n\n      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: finalPdfUrl || ((form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined),\n      };",
+        "StartLine": 349,
+        "TargetContent": "  const handleSave = async () => {\n    if (!validate()) return;\n    setSaveStatus('loading');\n    const course = courses.find(c => c.id === form.courseId)!;\n    try {\n      let finalPdfFile: File | undefined = undefined;\n      if (form.type === 'markdown' && pdfFile) {\n        // Force the file name to have .pdf extension and the type to be application/pdf\n        // to pass the strict backend Multer fileFilter and FileTypeValidator\n        const newFileName = pdfFile.name.toLowerCase().endsWith('.pdf') ? pdfFile.name : `${pdfFile.name}.pdf`;\n        finalPdfFile = new File([pdfFile], newFileName, { type: 'application/pdf' });\n      }\n\n      const payload = {\n        courseId: Number(form.moduleId),\n        courseName: course.title,\n        title: form.title.trim(),\n        description: form.description.trim(),\n        order: Number(form.order),\n        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,\n        content: form.type === 'markdown' ? form.content.trim() : undefined,\n        pdfUrl: (form.type === 'markdown' && !pdfFile) ? form.pdfUrl.trim() || undefined : undefined,\n        pdf: finalPdfFile,\n      };"
+      },
+      {
+        "AllowMultiple": false,
+        "EndLine": 388,
+        "ReplacementContent": "    } catch (err: any) {\n      setSaveStatus('error');\n      const backendMessage = err?.uploadError?.message || err?.response?.data?.message || err?.message || '\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u062f\u0631\u0633 \u0623\u0648 \u0627\u0644\u0645\u062d\u062a\u0648\u0649. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u062c\u062f\u062f\u0627\u064b';\n      const errorMsg = Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage;\n      setErrors(prev => ({ ...prev, submit: `\u062e\u0637\u0623 \u0645\u0646 \u0627\u0644\u062e\u0627\u062f\u0645: ${errorMsg}` }));\n      window.alert(`\u062e\u0637\u0623: ${errorMsg}`); // Force the user to see the exact error if it fails\n    }",
+        "StartLine": 385,
+        "TargetContent": "    } catch (err: any) {\n      setSaveStatus('error');\n      const backendMessage = err?.response?.data?.message || err?.message || '\u062a\u0639\u0630\u0631 \u062d\u0641\u0638 \u0627\u0644\u062f\u0631\u0633 \u0623\u0648 \u0627\u0644\u0645\u062d\u062a\u0648\u0649. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u062c\u062f\u062f\u0627\u064b';\n      const errorMsg = Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage;"
+      }
+    ],
+    "TargetFile": "c:\\Users\\pc\\Desktop\\aljunaid-khaled\\aljunaid-admin-dashboard\\src\\modules\\lessons\\pages\\LessonsPage.tsx",
+    "toolAction": "Update LessonsPage.tsx",
+    "toolSummary": "Update LessonsPage"
+  }
+]

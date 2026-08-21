@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { path: ROUTES.dashboard, icon: LayoutDashboard, label: 'الرئيسية' },
   { path: ROUTES.courses, icon: BookOpen, label: 'المقررات' },
   { path: ROUTES.lessons, icon: BookMarked, label: 'الدروس' },
-  { path: ROUTES.content, icon: FileText, label: 'المحتوى' },
+
   { path: ROUTES.quiz, icon: ClipboardList, label: 'الاختبارات' },
   { path: ROUTES.examModels, icon: FileSpreadsheet, label: 'نماذج الامتحانات' },
   { path: ROUTES.publish, icon: Send, label: 'نشر الدروس' },

@@ -75,6 +75,13 @@ export function resolveErrorMessage(err: unknown): string {
 
   // HTTP status code based
   if (appError.status && HTTP_ERROR_MESSAGES[appError.status]) {
+    if (appError.status === 400) {
+      const originalMsg = (err as any)?.response?.data?.message;
+      const msgStr = Array.isArray(originalMsg) ? originalMsg.join(', ') : originalMsg;
+      if (msgStr) {
+        return `${HTTP_ERROR_MESSAGES[400]} (${msgStr})`;
+      }
+    }
     return HTTP_ERROR_MESSAGES[appError.status];
   }
 

@@ -120,7 +120,7 @@ export const contentService = {
     payload: CreateContentPayload & { lessonTitle: string; pdfUrl?: string | null; videoUrl?: string; content?: string; isReading?: boolean },
     onUploadProgress?: (progressEvent: any) => void
   ): Promise<ContentItem> {
-    const hasPdfFile = payload.type === 'pdf' && payload.file instanceof File;
+    const hasPdfFile = payload.file instanceof File;
 
     let data: BackendLesson | { data: BackendLesson };
 
@@ -131,6 +131,8 @@ export const contentService = {
       const fd = new FormData();
       fd.append('pdf', payload.file as File);
       if (payload.pdfUrl) fd.append('pdfUrl', payload.pdfUrl);
+      if (payload.content) fd.append('content', payload.content);
+      if (payload.videoUrl) fd.append('videoUrl', payload.videoUrl);
 
       ({ data } = await api.patch<BackendLesson | { data: BackendLesson }>(
         `/lessons/${payload.lessonId}`,

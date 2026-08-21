@@ -6,8 +6,12 @@ export interface Lesson {
   courseName: string;
   title: string;
   description: string;
-  order: number;
-  isPublished: boolean;
+  order?: number;
+  isPublished?: boolean;
+  videoUrl?: string;
+  pdfUrl?: string;
+  content?: string;
+  type?: string;
   hasContent: boolean;
   createdAt: string;
   publishedAt?: string;
@@ -19,6 +23,11 @@ export interface CreateLessonPayload {
   title: string;
   description: string;
   order: number;
+  videoUrl?: string;
+  pdfUrl?: string;
+  content?: string;
+  type?: string;
+  isReading?: boolean;
 }
 
 export interface UpdateLessonPayload extends Partial<CreateLessonPayload> {

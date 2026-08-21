@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, FileText, FileType2, Upload, Link
 } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
@@ -104,12 +104,23 @@ function PortalSelect({ value, onChange, options, placeholder, className, disabl
   );
 }
 
+type LocalContentType = 'video' | 'markdown' | 'pdf';
+const TYPE_CONFIG: Record<LocalContentType, { label: string; icon: React.ElementType; color: string; bg: string }> = {
+  video: { label: 'مقطع فيديو', icon: PlayCircle, color: '#3B82F6', bg: '#EFF6FF' },
+  markdown: { label: 'محتوى نصي (Markdown)', icon: FileText, color: '#6366F1', bg: '#EEF2FF' },
+  pdf: { label: 'مستند PDF', icon: FileType2, color: '#EF4444', bg: '#FEF2F2' },
+};
+
 interface FormState {
   courseId: string;
   moduleId: string;
   title: string;
   description: string;
   order: string;
+  type: LocalContentType;
+  videoUrl: string;
+  pdfUrl: string;
+  content: string;
 }
 
 type FormError = Partial<Record<keyof FormState | 'submit', string>>;
@@ -145,9 +156,12 @@ export function LessonsPage() {
     void fetchModules();
   }, [fetchCourses, fetchLessons, fetchModules]);
 
-  const [form, setForm] = useState<FormState>({ courseId: '', moduleId: '', title: '', description: '', order: '' });
+  const [form, setForm] = useState<FormState>({ courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' });
   const [errors, setErrors] = useState<FormError>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+
+  const [activeTab, setActiveTab] = useState<'details' | 'content'>('details');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
 
   const filteredModules = allModules.filter(m => String(m.courseId) === String(form.courseId));
   const modulesLoading = false;
@@ -202,6 +216,8 @@ export function LessonsPage() {
     setNewModuleDesc('');
     setEditingModuleId(null);
     setEditingLessonId(null);
+    setPdfFile(null);
+    setActiveTab('details');
   }, []);
 
   const openModal = () => { resetModal(); setShowModal(true); };
@@ -216,8 +232,12 @@ export function LessonsPage() {
         courseId: String(parentModule.courseId),
         moduleId: lesson.courseId,
         title: lesson.title,
-        description: lesson.description,
+        description: '', // description UI field removed
         order: String(lesson.order),
+        type: (lesson as any).type || 'video',
+        videoUrl: (lesson as any).videoUrl || '',
+        pdfUrl: (lesson as any).pdfUrl || '',
+        content: (lesson as any).content || '',
       });
     } else {
       setModulesError('تعذر تحميل الوحدة المرتبطة بهذا الدرس.');
@@ -225,14 +245,18 @@ export function LessonsPage() {
         courseId: '',
         moduleId: lesson.courseId,
         title: lesson.title,
-        description: lesson.description,
+        description: '', // description UI field removed
         order: String(lesson.order),
+        type: (lesson as any).type || 'video',
+        videoUrl: (lesson as any).videoUrl || '',
+        pdfUrl: (lesson as any).pdfUrl || '',
+        content: (lesson as any).content || '',
       });
     }
   };
 
   const closeModal = () => {
-    const isDirty = form.courseId || form.moduleId || form.title || form.description || form.order;
+    const isDirty = form.courseId || form.moduleId || form.title || form.content || form.order;
     if (isDirty && saveStatus !== 'success' && !confirm('لديك تغييرات غير محفوظة. هل أنت متأكد من الإلغاء؟')) {
       return;
     }
@@ -293,6 +317,11 @@ export function LessonsPage() {
     else if (form.title.trim().length < 2) e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
     if (!form.order.trim()) e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
     else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = 'يجب أن يكون الترتيب رقماً موجباً';
+
+    if (activeTab === 'content' || editingLessonId) {
+      if (form.type === 'video' && !form.videoUrl.trim()) e.videoUrl = 'رابط الفيديو مطلوب';
+      if (form.type === 'pdf' && !pdfFile && !form.pdfUrl) e.pdfUrl = 'يرجى اختيار ملف PDF';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -303,12 +332,28 @@ export function LessonsPage() {
     setSaveStatus('loading');
     const course = courses.find(c => c.id === form.courseId)!;
     try {
+
+      let finalPdfFile: File | undefined = undefined;
+
+      if (form.type === 'pdf' && pdfFile) {
+        // Force .pdf extension to bypass backend Multer validation
+        const newFileName = pdfFile.name.toLowerCase().endsWith('.pdf') ? pdfFile.name : `${pdfFile.name}.pdf`;
+        finalPdfFile = new File([pdfFile], newFileName, { type: 'application/pdf' });
+      }
+
       const payload = {
         courseId: form.moduleId,
         courseName: course.title,
         title: form.title.trim(),
-        description: form.description.trim(),
+        description: form.type === 'markdown' ? form.content.trim() : '',
         order: Number(form.order),
+        type: form.type, // إرسال النوع الحقيقي للباكاند بدون تحايل
+        videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,
+        // Removed content field because we map it to description
+        pdfUrl: form.type === 'pdf' && !finalPdfFile ? form.pdfUrl.trim() : undefined,
+        pdf: form.type === 'pdf' ? finalPdfFile : undefined,
+        // إرسال true بشكل صريح للـ PDF والنص
+        isReading: (form.type === 'pdf' || form.type === 'markdown') ? true : false,
       };
 
       if (editingLessonId) {
@@ -321,9 +366,12 @@ export function LessonsPage() {
         setShowModal(false);
         resetModal();
       }, 1000);
-    } catch {
+    } catch (err: any) {
       setSaveStatus('error');
-      setErrors(prev => ({ ...prev, submit: 'تعذر الاتصال بالخادم. يرجى التحقق من الشبكة والمحاولة مجدداً' }));
+      const backendMessage = err?.response?.data?.message || err?.message || 'تعذر حفظ الدرس. تأكد من حجم الملف (أقل من 10MB)';
+      const errorMsg = Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage;
+      setErrors(prev => ({ ...prev, submit: `خطأ من الخادم: ${errorMsg}` }));
+      window.alert(`خطأ: ${errorMsg}`);
     }
   };
 
@@ -331,7 +379,7 @@ export function LessonsPage() {
     setDeleteTarget({ type: 'lesson', id: lessonId });
   };
 
-  const isFormValid = form.courseId && form.moduleId && form.title.trim() && form.description.trim() && form.order.trim();
+  const isFormValid = form.courseId && form.moduleId && form.title.trim() && form.order.trim() && (form.type === 'markdown' ? form.content.trim() : true);
 
   const handleBulkAction = async (action: 'publish' | 'archive' | 'delete' | 'duplicate') => {
     if (selectedLessons.length === 0) return;
@@ -364,10 +412,8 @@ export function LessonsPage() {
 
     let matchesView = true;
     if (activeView === 'published') matchesView = !!l.isPublished;
-    if (activeView === 'draft') matchesView = !l.isPublished;
-    if (activeView === 'no_content') matchesView = !l.hasContent;
-    if (activeView === 'no_desc') matchesView = !l.description?.trim();
-    if (activeView === 'incomplete') matchesView = !l.hasContent || !l.description?.trim();
+    if (activeView === 'drafts') matchesView = !l.isPublished;
+    if (activeView === 'incomplete') matchesView = !l.hasContent;
 
     return matchesSearch && matchesStatus && matchesCourse && matchesView;
   });
@@ -376,8 +422,8 @@ export function LessonsPage() {
     total: lessons.length,
     published: lessons.filter(l => l.isPublished).length,
     drafts: lessons.filter(l => !l.isPublished).length,
-    withContent: lessons.filter(l => l.hasContent).length,
-    healthScore: lessons.length ? Math.round((lessons.filter(l => l.hasContent && l.description?.trim() && l.isPublished).length / lessons.length) * 100) : 0
+    missingContent: lessons.filter(l => !l.hasContent).length,
+    healthScore: lessons.length ? Math.round((lessons.filter(l => l.hasContent && l.isPublished).length / lessons.length) * 100) : 0
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -495,11 +541,9 @@ export function LessonsPage() {
           onChange={setActiveView}
           views={[
             { id: 'all', label: 'الكل', icon: Layers },
-            { id: 'published', label: 'الدروس المنشورة', icon: CheckCircle },
-            { id: 'draft', label: 'مسودات مخفية', icon: Clock },
-            { id: 'incomplete', label: 'غير مكتملة', icon: AlertTriangle },
-            { id: 'no_content', label: 'بدون محتوى', icon: AlertTriangle },
-            { id: 'no_desc', label: 'بدون وصف', icon: FileWarning },
+            { id: 'published', label: 'منشور', icon: CheckCircle },
+            { id: 'drafts', label: 'مسودات', icon: Clock },
+            { id: 'incomplete', label: 'غير مكتمل', icon: AlertTriangle }
           ]}
         />
       </StickyToolbar>
@@ -567,85 +611,81 @@ export function LessonsPage() {
             {paginatedLessons.map(lesson => {
               const moduleObj = allModules.find(m => String(m.id) === String(lesson.courseId));
               return (
-                <div
+                <details
                   key={lesson.id}
-                  className={`p-4 space-y-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-sm hover:shadow-md transition-all ${selectedLessons.includes(lesson.id) ? 'bg-emerald-50/40 border-emerald-300' : ''
+                  className={`group bg-white border rounded-2xl shadow-sm hover:shadow-md transition-all ${selectedLessons.includes(lesson.id) ? 'border-emerald-400 ring-2 ring-emerald-50' : 'border-slate-200/80'
                     }`}
                 >
-                  {/* Header with Lesson order & course badge */}
-                  <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <summary className="p-4 flex items-center justify-between cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
+                    <div className="flex items-center gap-3 w-full">
                       <button
-                        onClick={() => setSelectedLessons(p => p.includes(lesson.id) ? p.filter(id => id !== lesson.id) : [...p, lesson.id])}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedLessons(p => p.includes(lesson.id) ? p.filter(id => id !== lesson.id) : [...p, lesson.id]);
+                        }}
                         className="text-slate-400 hover:text-emerald-500 transition-colors shrink-0"
                       >
                         {selectedLessons.includes(lesson.id) ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
                       </button>
-                      <div className="w-8 h-8 shrink-0 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 font-extrabold text-xs shadow-xs">
-                        {lesson.order}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-slate-900 font-extrabold text-sm truncate" title={lesson.title}>{lesson.title}</div>
-                        <div className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5 truncate">
+
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <h4 className="text-slate-900 font-extrabold text-sm truncate" title={lesson.title}>{lesson.title}</h4>
+                        <div className="text-[11px] text-indigo-600 font-bold flex items-center gap-1 mt-0.5">
                           <BookMarked className="w-3 h-3 shrink-0" />
                           <span className="truncate">{lesson.courseName || 'مقرر مجهول'}</span>
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">
+                          {lesson.order}
+                        </div>
+                        <StatusBadge status={lesson.isPublished ? 'published' : 'draft'} />
+                        <ChevronDown className="w-5 h-5 text-slate-400 group-open:-rotate-180 transition-transform" />
+                      </div>
                     </div>
-                    <StatusBadge status={lesson.isPublished ? 'published' : 'draft'} />
-                  </div>
+                  </summary>
 
-                  {/* Description */}
-                  {lesson.description && (
-                    <p className="text-slate-600 text-xs line-clamp-2 leading-relaxed bg-slate-50/60 p-2.5 rounded-xl border border-slate-100/60" title={lesson.description}>
-                      {lesson.description}
-                    </p>
-                  )}
+                  {/* Expanded Content */}
+                  <div className="px-4 pb-4 pt-2 border-t border-slate-100 flex flex-col gap-4">
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                      {/* Unit */}
+                      <div className="flex items-center gap-1.5 bg-emerald-50/80 text-emerald-700 px-2.5 py-1.5 rounded-lg border border-emerald-100/50">
+                        <Layers className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-[120px]">{moduleObj ? moduleObj.title.replace(/^وحدة:\s*/, '') : 'الوحدة'}</span>
+                      </div>
 
-                  {/* Breadcrumbs / Connection info */}
-                  <div className="space-y-1.5 pt-1">
-                    <div className="text-[11px] text-slate-400 font-bold flex items-center gap-1">
-                      <Layers className="w-3 h-3 text-slate-400" /> التبعية والمسار:
-                    </div>
-                    <Breadcrumbs items={[
-                      { label: lesson.courseName || 'المقرر' },
-                      { label: moduleObj ? moduleObj.title.replace(/^وحدة:\s*/, '') : 'الوحدة' },
-                      { label: lesson.title }
-                    ]} />
-                  </div>
-
-                  {/* Badges & content indicator */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                    <div className="flex flex-wrap gap-1.5">
-                      <HealthBadge condition={!lesson.description?.trim()} label="وصف مفقود" type="warning" />
-                      <HealthBadge condition={!lesson.hasContent} label="بدون محتوى" type="error" />
-                      {lesson.hasContent ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100 shadow-2xs">
-                          <PlayCircle className="w-3 h-3" /> مادة علمية متوفرة
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold border border-slate-200">
-                          <AlertCircle className="w-3 h-3" /> قيد الإعداد
-                        </span>
-                      )}
+                      {/* Type */}
+                      <div className="flex items-center gap-1.5 bg-amber-50/80 text-amber-700 px-2.5 py-1.5 rounded-lg border border-amber-100/50">
+                        {lesson.type === 'video' || lesson.videoUrl ? <PlayCircle className="w-3.5 h-3.5" /> : lesson.type === 'pdf' || lesson.pdfUrl ? <FileText className="w-3.5 h-3.5" /> : <FileType2 className="w-3.5 h-3.5" />}
+                        <span>{lesson.type === 'video' || lesson.videoUrl ? 'فيديو' : lesson.type === 'pdf' || lesson.pdfUrl ? 'ملف PDF' : lesson.content ? 'مقال' : 'درس'}</span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
-                      <button onClick={() => setPreviewLesson(lesson)} className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-all" title="معاينة">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => updateLesson({ id: lesson.id, isPublished: !lesson.isPublished })} className={`p-1.5 rounded-lg transition-all ${lesson.isPublished ? 'text-slate-500 hover:text-amber-600 hover:bg-white' : 'text-slate-500 hover:text-emerald-600 hover:bg-white'}`} title={lesson.isPublished ? "مسودة" : "نشر"}>
-                        {lesson.isPublished ? <Clock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => void openEdit(lesson)} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-lg transition-all" title="تعديل">
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => void handleDelete(lesson.id)} disabled={deleteStatus === 'loading'} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-white rounded-lg transition-all disabled:opacity-50" title="حذف">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    {/* Footer: Health & Actions */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                      <div className="flex flex-wrap gap-1.5">
+                        <HealthBadge condition={!lesson.hasContent} label="محتوى مفقود" type="danger" />
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-white">
+                        <button onClick={() => setPreviewLesson(lesson)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="معاينة">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => updateLesson({ id: lesson.id, isPublished: !lesson.isPublished })} className={`p-2 rounded-xl transition-all ${lesson.isPublished ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={lesson.isPublished ? "مسودة" : "نشر"}>
+                          {lesson.isPublished ? <Clock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                        </button>
+                        <button onClick={() => void openEdit(lesson)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="تعديل">
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => void handleDelete(lesson.id)} disabled={deleteStatus === 'loading'} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:opacity-50" title="حذف">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </details>
               );
             })}
           </div>
@@ -691,11 +731,7 @@ export function LessonsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-slate-800 font-bold mb-1 truncate max-w-xs" title={lesson.title}>{lesson.title}</div>
-                      <div className="text-slate-500 text-xs truncate max-w-xs leading-relaxed" title={lesson.description}>
-                        {lesson.description}
-                      </div>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        <HealthBadge condition={!lesson.description?.trim()} label="وصف مفقود" type="warning" />
                         <HealthBadge condition={!lesson.hasContent} label="درس غير مكتمل (بدون محتوى)" type="error" />
                         <HealthBadge condition={!lesson.isPublished} label="غير منشور" type="info" />
                       </div>
@@ -813,14 +849,13 @@ export function LessonsPage() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-8">
               {errors.submit && (
                 <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
                   <span className="text-sm font-bold">{errors.submit}</span>
                 </div>
               )}
-
               {/* Section 1: Relational Structure */}
               <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-5 relative">
                 <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-100 text-xs font-bold text-emerald-600 shadow-sm flex items-center gap-1.5">
@@ -956,14 +991,6 @@ export function LessonsPage() {
                   <input value={form.title} onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setErrors(p => { const x = { ...p }; delete x.title; return x; }); }} placeholder="مثال: حل المعادلات من الدرجة الأولى" className={inputCls(!!errors.title, 'font-semibold')} />
                 </Field>
 
-                <Field
-                  label="وصف الدرس"
-                  required
-                  error={errors.description}
-                  action={<AIMagicButton onClick={handleGenerateDesc} loading={aiLoading === 'desc'} label="توليد ملخص" />}
-                >
-                  <textarea value={form.description} onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }} placeholder="يغطي هذا الدرس المحاور التالية..." rows={3} className={`${inputCls(!!errors.description)} resize-none leading-relaxed text-sm`} />
-                </Field>
 
                 <Field label="ترتيب التشغيل" required error={errors.order} helperText="تُعرض الدروس للمتعلم تصاعدياً بناءً على هذا الرقم.">
                   <div className="flex gap-3 items-stretch">
@@ -975,6 +1002,126 @@ export function LessonsPage() {
                     )}
                   </div>
                 </Field>
+              </div>
+
+              {/* Section 3: Knowledge Content */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 relative">
+                <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
+                  المحتوى المعرفي
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-1">نوع المادة العلمية <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(Object.entries(TYPE_CONFIG) as [LocalContentType, typeof TYPE_CONFIG[LocalContentType]][]).map(([type, cfg]) => {
+                      const isActive = form.type === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, type, videoUrl: '', pdfUrl: '', content: '' }))}
+                          className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${isActive ? 'shadow-sm' : 'hover:bg-slate-50'}`}
+                          style={isActive ? { background: cfg.bg, borderColor: cfg.color } : { background: '#FAFAFA', borderColor: '#E2E8F0' }}
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? 'bg-white shadow-sm' : ''}`}>
+                            <cfg.icon className="w-5 h-5" style={{ color: isActive ? cfg.color : '#94A3B8' }} />
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: isActive ? 700 : 600, color: isActive ? cfg.color : '#64748B' }}>{cfg.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {form.type === 'video' && (
+                  <Field label="رابط يوتيوب (YouTube URL)" required error={errors.videoUrl}>
+                    <input
+                      value={form.videoUrl}
+                      onChange={e => { setForm(p => ({ ...p, videoUrl: e.target.value })); setErrors(p => { const x = { ...p }; delete x.videoUrl; return x; }); }}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className={inputCls(!!errors.videoUrl, 'font-mono text-left')}
+                      dir="ltr"
+                    />
+                  </Field>
+                )}
+
+                {form.type === 'markdown' && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <Field label="محتوى نصي (Markdown مدعوم)" required error={errors.content}>
+                      <textarea
+                        value={form.content}
+                        onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.content; return x; }); }}
+                        placeholder="اكتب المحتوى النصي هنا..."
+                        rows={6}
+                        className={`${inputCls(!!errors.content)} resize-y text-sm leading-relaxed`}
+                      />
+                    </Field>
+                  </div>
+                )}
+
+                {form.type === 'pdf' && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <Field label="مستند الدرس (ملف PDF)" error={errors.pdfUrl} required>
+                      <div className="space-y-3">
+                        {form.pdfUrl && !pdfFile && (
+                          <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
+                            <FileType2 className="w-5 h-5 text-red-500" />
+                            <a href={form.pdfUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm font-medium text-red-700 hover:underline truncate dir-ltr text-left">
+                              {form.pdfUrl}
+                            </a>
+                            <button type="button" onClick={() => setForm(p => ({ ...p, pdfUrl: '' }))} className="p-1.5 hover:bg-red-100 text-red-500 rounded-lg transition-colors">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+
+                        {pdfFile && (
+                          <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                            <FileType2 className="w-5 h-5 text-emerald-500" />
+                            <div className="flex-1 text-sm font-medium text-emerald-700 truncate dir-ltr text-left">
+                              {pdfFile.name} ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
+                            </div>
+                            <button type="button" onClick={() => setPdfFile(null)} className="p-1.5 hover:bg-emerald-100 text-emerald-500 rounded-lg transition-colors">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+
+                        {!pdfFile && (
+                          <label className={`flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all ${errors.pdfUrl ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300'
+                            }`}>
+                            <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center">
+                              <Upload className="w-5 h-5 text-slate-400" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-slate-700">انقر هنا لرفع ملف PDF من جهازك</p>
+                              <p className="text-xs text-slate-500 mt-1">الحد الأقصى 10MB</p>
+                            </div>
+                            <input
+                              type="file"
+                              accept="application/pdf"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  if (file.size > 10 * 1024 * 1024) {
+                                    setErrors(p => ({ ...p, pdfUrl: 'حجم الملف يتجاوز 10MB' }));
+                                    return;
+                                  }
+                                  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                                    setErrors(p => ({ ...p, pdfUrl: 'يجب أن يكون الملف بصيغة PDF' }));
+                                    return;
+                                  }
+                                  setPdfFile(file);
+                                  setErrors(p => { const x = { ...p }; delete x.pdfUrl; return x; });
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </Field>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1034,7 +1181,7 @@ function Field({ label, required, error, helperText, action, children }: { label
 
 function inputCls(hasError: boolean, extra = '') {
   return `w-full px-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 ${hasError
-      ? 'border-red-300 bg-red-50/50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:bg-white'
-      : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+    ? 'border-red-300 bg-red-50/50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:bg-white'
+    : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
     } ${extra}`;
 }

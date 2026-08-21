@@ -7,7 +7,7 @@ export const ROUTES = {
   dashboard: '/admin',
   courses: '/admin/courses',
   lessons: '/admin/lessons',
-  content: '/admin/content',
+
   quiz: '/admin/quiz',
   examModels: '/admin/exam-models',
   publish: '/admin/publish',

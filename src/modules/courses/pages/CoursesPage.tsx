@@ -216,7 +216,7 @@ export function CoursesPage() {
 
   const handleSave = useCallback(async () => {
     if (!validate()) return;
-    setSaveStatus(form.thumbnailFile ? 'uploading' : 'loading');
+    setSaveStatus('loading');
     setUploadError(null);
     setUploadProgress(null);
     setErrors({});
@@ -224,13 +224,6 @@ export function CoursesPage() {
     try {
       let finalThumbnailUrl = form.thumbnailUrl.trim().startsWith('http') ? form.thumbnailUrl.trim() : undefined;
 
-      // 🚀 الضربة القاضية: نرفع الصورة هنا مباشرة ونأخذ الرابط، لضمان عدم ضياع الملف في المتجر
-      if (form.thumbnailFile) {
-        const onProgress = (evt: UploadProgress) => setUploadProgress(evt);
-        finalThumbnailUrl = await uploadService.uploadImage(form.thumbnailFile, onProgress);
-      }
-
-      // الآن الـ Payload نظيف تماماً ومفهوم للمتجر بنسبة 100% (نصوص فقط)
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
@@ -251,27 +244,66 @@ export function CoursesPage() {
       }, 1000);
     } catch (err) {
       setSaveStatus('error');
-      const classified = classifyUploadError(err);
       const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'تعذر حفظ البيانات بسبب خطأ في النظام.';
-      if (form.thumbnailFile) {
-        setUploadError(classified);
-      } else {
-        setErrors(prev => ({ ...prev, submit: Array.isArray(msg) ? msg[0] : msg }));
-      }
+      setErrors(prev => ({ ...prev, submit: Array.isArray(msg) ? msg[0] : msg }));
     }
   }, [form, editingId, validate, updateCourse, addCourse, resetModal, fetchCourses]);
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     const validationErr = validateImageFile(file);
     if (validationErr) {
       setUploadError(validationErr);
       return;
     }
     setUploadError(null);
+    setSaveStatus('uploading');
+    
     setForm(p => ({ ...p, thumbnailFile: file, thumbnailUrl: '' }));
     const preview = URL.createObjectURL(file);
     setPreviewUrl(preview);
-    return () => URL.revokeObjectURL(preview);
+    
+    try {
+      const onProgress = (evt: UploadProgress) => setUploadProgress(evt);
+      const uploadedUrl = await uploadService.uploadImage(file, onProgress);
+      
+      setForm(p => ({ ...p, thumbnailUrl: uploadedUrl, thumbnailFile: null }));
+      setPreviewUrl(uploadedUrl);
+      setSaveStatus('idle');
+      setUploadProgress(null);
+      setUploadError(null);
+    } catch (err) {
+      setUploadError(classifyUploadError(err));
+      setSaveStatus('idle');
+      setUploadProgress(null);
+    }
+  };
+
+  const handleRetryUpload = async () => {
+    if (form.thumbnailFile) {
+      setUploadError(null);
+      setSaveStatus('uploading');
+      try {
+        const onProgress = (evt: UploadProgress) => setUploadProgress(evt);
+        const uploadedUrl = await uploadService.uploadImage(form.thumbnailFile, onProgress);
+        
+        setForm(p => ({ ...p, thumbnailUrl: uploadedUrl, thumbnailFile: null }));
+        setPreviewUrl(uploadedUrl);
+        setSaveStatus('idle');
+        setUploadProgress(null);
+        setUploadError(null);
+      } catch (err) {
+        setUploadError(classifyUploadError(err));
+        setSaveStatus('idle');
+        setUploadProgress(null);
+      }
+    } else {
+      setUploadError(null);
+      setSaveStatus('idle');
+      if (fileRef.current) {
+        fileRef.current.value = '';
+        fileRef.current.click();
+      }
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -609,7 +641,7 @@ export function CoursesPage() {
 
               {uploadError && (
                 <div className="mb-6">
-                  <UploadErrorBanner error={uploadError} onRetry={() => { setUploadError(null); setSaveStatus('idle'); }} />
+                  <UploadErrorBanner error={uploadError} onRetry={handleRetryUpload} />
                 </div>
               )}
 
@@ -650,10 +682,27 @@ export function CoursesPage() {
                     {(previewUrl || (form.thumbnailUrl && form.thumbnailUrl.startsWith('http'))) ? (
                       <div className="mb-4 rounded-2xl overflow-hidden border-2 border-emerald-100 shadow-sm relative group bg-slate-50" style={{ height: 180 }}>
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10 backdrop-blur-[2px]">
-                          <button type="button" onClick={() => fileRef.current?.click()} className="px-4 py-2 bg-white text-emerald-600 rounded-xl font-bold text-sm shadow-lg hover:bg-emerald-50 transition-colors mx-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (fileRef.current) fileRef.current.value = '';
+                              fileRef.current?.click();
+                            }}
+                            className="px-4 py-2 bg-white text-emerald-600 rounded-xl font-bold text-sm shadow-lg hover:bg-emerald-50 transition-colors mx-2 flex items-center gap-2"
+                          >
                             <Upload className="w-4 h-4" /> تغيير الصورة
                           </button>
-                          <button type="button" onClick={() => { setPreviewUrl(null); setForm(p => ({ ...p, thumbnailFile: null, thumbnailUrl: '' })); setUploadError(null); if (fileRef.current) fileRef.current.value = ''; }} className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-red-600 transition-colors mx-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPreviewUrl(null);
+                              setForm(p => ({ ...p, thumbnailFile: null, thumbnailUrl: '' }));
+                              setUploadError(null);
+                              setUploadProgress(null);
+                              if (fileRef.current) fileRef.current.value = '';
+                            }}
+                            className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-red-600 transition-colors mx-2 flex items-center gap-2"
+                          >
                             <Trash2 className="w-4 h-4" /> إزالة
                           </button>
                         </div>
@@ -673,7 +722,10 @@ export function CoursesPage() {
                       <div
                         className="border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all mb-4 group bg-slate-50"
                         style={{ borderColor: errors.thumbnailUrl ? '#EF4444' : '#CBD5E1' }}
-                        onClick={() => fileRef.current?.click()}
+                        onClick={() => {
+                          if (fileRef.current) fileRef.current.value = '';
+                          fileRef.current?.click();
+                        }}
                         onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#10B981'; e.currentTarget.style.backgroundColor = '#ECFDF5'; }}
                         onDragLeave={e => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.backgroundColor = '#F8FAFC'; }}
                         onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.backgroundColor = '#F8FAFC'; const f = e.dataTransfer.files[0]; if (f) handleFileSelect(f); }}
@@ -685,7 +737,14 @@ export function CoursesPage() {
                         <p className="text-slate-400 text-xs">أو قم بسحب وإفلات الصورة هنا</p>
                       </div>
                     )}
-                    <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onClick={e => { (e.target as HTMLInputElement).value = ''; }}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+                    />
                     {uploadProgress && saveStatus === 'uploading' && <UploadProgressBar progress={uploadProgress} />}
                     {!previewUrl && !form.thumbnailFile && (
                       <div className="relative group">

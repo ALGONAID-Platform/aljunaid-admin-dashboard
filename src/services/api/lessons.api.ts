@@ -36,10 +36,11 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule): Lesson {
     description: bl.description ?? '',
     order: bl.order ?? 0,
     isPublished: isPub,
-    hasContent: !!(bl.videoUrl ?? bl.pdfUrl ?? bl.content),
+    hasContent: !!(bl.videoUrl ?? bl.pdfUrl ?? bl.content ?? (bl.isReading ? bl.description : undefined)),
     videoUrl: bl.videoUrl ?? undefined,
     pdfUrl: bl.pdfUrl ?? undefined,
-    content: bl.content ?? undefined,
+    content: (bl.isReading && !bl.pdfUrl) ? (bl.description ?? undefined) : (bl.content ?? undefined),
+    type: bl.pdfUrl ? 'pdf' : (bl.isReading ? 'markdown' : 'video'),
     createdAt: bl.createdAt ?? new Date().toISOString(),
     publishedAt: bl.publishedAt ?? undefined,
     publishedBy: typeof bl.publishedBy === 'object' ? bl.publishedBy?.name : bl.publishedBy ?? undefined,
@@ -59,13 +60,14 @@ function buildLessonFormData(payload: {
   pdf?: File;
   isPublished?: boolean;
   status?: 'DRAFT' | 'PUBLISHED';
+  isReading?: boolean;
 }): FormData {
   const fd = new FormData();
   if (payload.title !== undefined) fd.append('title', payload.title);
   if (payload.description !== undefined) fd.append('description', payload.description);
-  if (payload.content !== undefined) fd.append('content', payload.content);
-  if (payload.videoUrl !== undefined) fd.append('videoUrl', payload.videoUrl);
-  if (payload.pdfUrl !== undefined) fd.append('pdfUrl', payload.pdfUrl);
+  if (payload.content !== undefined && payload.content !== '') fd.append('content', payload.content);
+  if (payload.videoUrl !== undefined && payload.videoUrl !== '') fd.append('videoUrl', payload.videoUrl);
+  if (payload.pdfUrl !== undefined && payload.pdfUrl !== '') fd.append('pdfUrl', payload.pdfUrl);
   if (payload.order !== undefined) fd.append('order', String(payload.order));
   if (payload.moduleId !== undefined) fd.append('moduleId', String(payload.moduleId));
   if (payload.pdf instanceof File) fd.append('pdf', payload.pdf);
@@ -150,9 +152,15 @@ export const lessonService = {
       isPublished: payload.isPublished ?? true,
     });
 
-    const { data } = await api.post<BackendLesson | { data: BackendLesson }>('/lessons', fd, {
-    });
-    const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
+    const { data } = await api.post<BackendLesson | { data: BackendLesson }>('/lessons', fd);
+    let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
+
+    // Send isReading explicitly via JSON to bypass FormData boolean/string strict validation in backend
+    if ((payload as any).isReading !== undefined) {
+      const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${lesson.id}`, { isReading: (payload as any).isReading });
+      lesson = (updatedData as { data?: BackendLesson }).data ?? (updatedData as BackendLesson);
+    }
+
     return adaptLesson(lesson);
   },
 
@@ -169,9 +177,14 @@ export const lessonService = {
       moduleId: courseId !== undefined ? Number(courseId) : undefined,
     });
 
-    const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd, {
-    });
-    const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
+    const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd);
+    let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
+
+    if ((payload as any).isReading !== undefined) {
+      const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, { isReading: (payload as any).isReading });
+      lesson = (updatedData as { data?: BackendLesson }).data ?? (updatedData as BackendLesson);
+    }
+
     return adaptLesson(lesson);
   },
 

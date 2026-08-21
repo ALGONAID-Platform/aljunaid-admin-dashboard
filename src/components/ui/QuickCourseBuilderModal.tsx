@@ -160,7 +160,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
     }
 
     let finalThumbnail = courseImagePreview;
-    if (imageInputMode === 'url' && courseImageUrl.trim()) {
+    if (courseImageUrl.trim()) {
       try {
         finalThumbnail = uploadService.validateUrl(courseImageUrl.trim());
       } catch (err: any) {
@@ -177,16 +177,16 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
           id: activeCourseId,
           title: courseTitle.trim(),
           description: courseDesc.trim(),
-          thumbnail: imageInputMode === 'url' && courseImageUrl.trim() ? finalThumbnail : undefined,
-          imageFile: imageInputMode === 'upload' ? (courseImageFile || undefined) : undefined,
+          thumbnail: courseImageUrl.trim() ? finalThumbnail : undefined,
+          imageFile: undefined,
         } as any);
         setSuccessMessage('تم تحديث بيانات المقرر بنجاح');
       } else {
         const created = await addCourse({
           title: courseTitle.trim(),
           description: courseDesc.trim(),
-          thumbnail: imageInputMode === 'url' && courseImageUrl.trim() ? finalThumbnail : undefined,
-          imageFile: imageInputMode === 'upload' ? (courseImageFile || undefined) : undefined,
+          thumbnail: courseImageUrl.trim() ? finalThumbnail : undefined,
+          imageFile: undefined,
         } as any);
         setActiveCourseId(String(created.id));
         setSuccessMessage('تم تأسيس المقرر وإتاحة مرحلة الوحدات التعليمية');
@@ -693,11 +693,35 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                           accept="image/*"
                           id="course-thumbnail-upload-enhanced"
                           className="hidden"
-                          onChange={e => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
+                            if (!file) return;
+
+                            try {
+                              setErrorMessage(null);
+                              setIsSaving(true);
+
+                              const previewUrl = URL.createObjectURL(file);
+                              setCourseImagePreview(previewUrl);
                               setCourseImageFile(file);
-                              setCourseImagePreview(URL.createObjectURL(file));
+
+                              const uploadedUrl = await uploadService.uploadImage(file);
+
+                              setCourseImageUrl(uploadedUrl);
+                              setCourseImagePreview(uploadedUrl);
+                              setCourseImageFile(null);
+
+                              setSuccessMessage('تم رفع صورة غلاف المقرر بنجاح');
+                              setTimeout(() => setSuccessMessage(null), 2000);
+                            } catch (err: any) {
+                              console.error('Course image upload failed:', err);
+                              setCourseImageFile(null);
+                              setCourseImagePreview('');
+                              setCourseImageUrl('');
+                              setErrorMessage(err?.message || 'فشل رفع صورة غلاف المقرر.');
+                            } finally {
+                              setIsSaving(false);
+                              e.target.value = '';
                             }
                           }}
                         />
