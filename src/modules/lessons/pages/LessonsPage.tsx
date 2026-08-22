@@ -232,7 +232,7 @@ export function LessonsPage() {
         courseId: String(parentModule.courseId),
         moduleId: lesson.courseId,
         title: lesson.title,
-        description: '', // description UI field removed
+        description: lesson.description || '',
         order: String(lesson.order),
         type: (lesson as any).type || 'video',
         videoUrl: (lesson as any).videoUrl || '',
@@ -245,7 +245,7 @@ export function LessonsPage() {
         courseId: '',
         moduleId: lesson.courseId,
         title: lesson.title,
-        description: '', // description UI field removed
+        description: lesson.description || '',
         order: String(lesson.order),
         type: (lesson as any).type || 'video',
         videoUrl: (lesson as any).videoUrl || '',
@@ -315,6 +315,7 @@ export function LessonsPage() {
     if (!form.moduleId) e.moduleId = 'يرجى تحديد الوحدة التي ينتمي لها الدرس';
     if (!form.title.trim()) e.title = 'عنوان الدرس مطلوب';
     else if (form.title.trim().length < 2) e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
+    if (form.type !== 'markdown' && !form.description.trim()) e.description = 'وصف الدرس مطلوب';
     if (!form.order.trim()) e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
     else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = 'يجب أن يكون الترتيب رقماً موجباً';
 
@@ -345,11 +346,11 @@ export function LessonsPage() {
         courseId: form.moduleId,
         courseName: course.title,
         title: form.title.trim(),
-        description: form.type === 'markdown' ? form.content.trim() : '',
+        description: form.type === 'markdown' ? form.content.trim() : form.description.trim(),
         order: Number(form.order),
         type: form.type, // إرسال النوع الحقيقي للباكاند بدون تحايل
         videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,
-        // Removed content field because we map it to description
+        content: undefined,
         pdfUrl: form.type === 'pdf' && !finalPdfFile ? form.pdfUrl.trim() : undefined,
         pdf: form.type === 'pdf' ? finalPdfFile : undefined,
         // إرسال true بشكل صريح للـ PDF والنص
@@ -379,7 +380,7 @@ export function LessonsPage() {
     setDeleteTarget({ type: 'lesson', id: lessonId });
   };
 
-  const isFormValid = form.courseId && form.moduleId && form.title.trim() && form.order.trim() && (form.type === 'markdown' ? form.content.trim() : true);
+  const isFormValid = form.courseId && form.moduleId && form.title.trim() && (form.type === 'markdown' ? form.content.trim() : form.description.trim()) && form.order.trim();
 
   const handleBulkAction = async (action: 'publish' | 'archive' | 'delete' | 'duplicate') => {
     if (selectedLessons.length === 0) return;
@@ -990,6 +991,23 @@ export function LessonsPage() {
                 >
                   <input value={form.title} onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setErrors(p => { const x = { ...p }; delete x.title; return x; }); }} placeholder="مثال: حل المعادلات من الدرجة الأولى" className={inputCls(!!errors.title, 'font-semibold')} />
                 </Field>
+
+                {form.type !== 'markdown' && (
+                  <Field
+                    label="وصف الدرس"
+                    required
+                    error={errors.description}
+                    action={<AIMagicButton onClick={handleGenerateDesc} loading={aiLoading === 'desc'} label="اقتراح وصف" />}
+                  >
+                    <textarea
+                      value={form.description}
+                      onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
+                      placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
+                      rows={3}
+                      className={`${inputCls(!!errors.description)} resize-none font-medium leading-relaxed`}
+                    />
+                  </Field>
+                )}
 
 
                 <Field label="ترتيب التشغيل" required error={errors.order} helperText="تُعرض الدروس للمتعلم تصاعدياً بناءً على هذا الرقم.">
