@@ -78,8 +78,8 @@ function PortalSelect({ value, onChange, options, placeholder, className, disabl
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`${className} flex items-center justify-between cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <span className="truncate">{selectedOpt ? selectedOpt.label : placeholder}</span>
-        <ChevronDown className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="truncate flex-1 min-w-0 text-right">{selectedOpt ? selectedOpt.label : placeholder}</span>
+        <ChevronDown className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''} shrink-0 mr-2`} />
       </div>
       {isOpen && typeof document !== 'undefined' && createPortal(
         <div
@@ -163,6 +163,16 @@ export function LessonsPage() {
   const [activeTab, setActiveTab] = useState<'details' | 'content'>('details');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
 
+  // Persist "Create New Lesson" form state
+  useEffect(() => {
+    if (showModal && !editingLessonId) {
+      const timer = setTimeout(() => {
+        sessionStorage.setItem('create_lesson_form_state', JSON.stringify(form));
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [form, showModal, editingLessonId]);
+
   const filteredModules = allModules.filter(m => String(m.courseId) === String(form.courseId));
   const modulesLoading = false;
   const [modulesError, setModulesError] = useState<string | null>(null);
@@ -220,7 +230,20 @@ export function LessonsPage() {
     setActiveTab('details');
   }, []);
 
-  const openModal = () => { resetModal(); setShowModal(true); };
+  const openModal = () => {
+    resetModal();
+    const saved = sessionStorage.getItem('create_lesson_form_state');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Only restore state for new lessons
+        setForm(parsed);
+      } catch (e) {
+        console.error('Failed to parse saved lesson form state', e);
+      }
+    }
+    setShowModal(true);
+  };
 
   const openEdit = (lesson: { id: string; courseId: string; title: string; description: string; order: number }) => {
     resetModal();
@@ -259,6 +282,9 @@ export function LessonsPage() {
     const isDirty = form.courseId || form.moduleId || form.title || form.content || form.order;
     if (isDirty && saveStatus !== 'success' && !confirm('لديك تغييرات غير محفوظة. هل أنت متأكد من الإلغاء؟')) {
       return;
+    }
+    if (!editingLessonId) {
+      sessionStorage.removeItem('create_lesson_form_state');
     }
     setShowModal(false);
     resetModal();
@@ -361,6 +387,7 @@ export function LessonsPage() {
         await updateLesson({ id: editingLessonId, ...payload });
       } else {
         await addLesson(payload);
+        sessionStorage.removeItem('create_lesson_form_state');
       }
       setSaveStatus('success');
       setTimeout(() => {
@@ -924,9 +951,9 @@ export function LessonsPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 w-full min-w-0">
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <div className="relative flex-1">
+                        <div className="relative flex-1 min-w-0">
                           <select
                             value={form.moduleId}
                             onChange={e => { setForm(p => ({ ...p, moduleId: e.target.value })); setErrors(p => { const x = { ...p }; delete x.moduleId; return x; }); }}
@@ -941,9 +968,9 @@ export function LessonsPage() {
                           <Layers className="w-4 h-4 text-indigo-600" /> إدارة الوحدات
                         </button>
                       </div>
-                      <div className="grid gap-2">
+                      <div className="flex flex-col gap-2 w-full min-w-0">
                         {filteredModules.map(module => (
-                          <div key={module.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                          <div key={module.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 w-full min-w-0">
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-bold text-slate-700 truncate">{module.title}</div>
                               {module.description && <div className="text-xs text-slate-400 truncate">{module.description}</div>}

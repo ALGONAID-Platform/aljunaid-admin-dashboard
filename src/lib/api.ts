@@ -4,13 +4,14 @@
  * Features:
  * - Base URL from VITE_API_URL environment variable
  * - JWT Bearer token injection via request interceptor
- * - Automatic 401 logout handling via response interceptor
+ * - No aggressive full-page reloads on 401 errors (Hard Redirect prevented)
+ * - Custom Event emission for soft logout handling
  * - 15-second request timeout
  * - Normalized error messages
  */
 
 import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
-
+import { toast } from "react-hot-toast";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API_BASE_URL = import.meta.env.VITE_API_URL as string | undefined
@@ -49,16 +50,41 @@ api.interceptors.request.use(
 
 // ─── Response Interceptor — Error Handling & 401 Logout ───────────────────────
 
+let isSessionExpiredToastShown = false; // لمنع تكرار رسالة الخطأ عدة مرات
+
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid — clear session and redirect to login
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-      // Redirect without React Router (safe from outside component tree)
+      // فقط إذا لم نكن في صفحة تسجيل الدخول بالفعل
       if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+
+        // مسح بيانات التوكن المنتهية
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+
+        // إظهار رسالة تنبيه للمستخدم مرة واحدة فقط
+        if (!isSessionExpiredToastShown) {
+          toast.error('انتهت صلاحية الجلسة. يرجى إعادة تسجيل الدخول.');
+          isSessionExpiredToastShown = true;
+
+          // إعادة ضبط المتغير بعد فترة قصيرة
+          setTimeout(() => {
+            isSessionExpiredToastShown = false;
+          }, 5000);
+        }
+
+        // --- التعديل السحري لمنع الـ Full Page Reload ---
+        // بدلاً من window.location.href الذي يدمر التطبيق، نطلق حدثاً مخصصاً (Custom Event)
+        // يمكن لالـ AuthProvider أو نظام الـ Router في الـ React التقاطه وعمل توجيه ناعم (Soft Navigate).
+        const logoutEvent = new CustomEvent('auth:session-expired');
+        window.dispatchEvent(logoutEvent);
+
+        // كخيار احتياطي، يمكنك إزالة الـ setTimeout أدناه إذا قمت بمعالجة الحدث أعلاه في الـ App.tsx
+        // أما إذا أردت إبقاء التوجيه القسري ولكن "بعد" السماح للمستخدم برؤية الرسالة وعدم المقاطعة الفورية:
+        // setTimeout(() => {
+        //   window.location.href = '/login'; 
+        // }, 2000);
       }
     }
     return Promise.reject(normalizeAxiosError(error));
