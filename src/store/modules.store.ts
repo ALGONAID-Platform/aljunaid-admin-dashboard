@@ -59,10 +59,18 @@ export const useModulesStore = create<ModulesState>()((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const updated = await modulesService.update(id, payload);
-      set(state => ({
-        modules: state.modules.map(m => String(m.id) === String(id) ? updated : m),
-        isLoading: false
-      }));
+      set(state => {
+        // If the backend returns the updated module, use it. Otherwise, merge the payload with the existing module.
+        const isFullModule = updated && updated.id;
+        return {
+          modules: state.modules.map(m => 
+            String(m.id) === String(id) 
+              ? (isFullModule ? updated : { ...m, ...payload }) 
+              : m
+          ),
+          isLoading: false
+        };
+      });
     } catch (err) {
       set({ error: resolveErrorMessage(err), isLoading: false });
       throw err;
