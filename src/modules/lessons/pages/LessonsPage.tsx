@@ -84,13 +84,14 @@ function PortalSelect({ value, onChange, options, placeholder, className, disabl
       {isOpen && typeof document !== 'undefined' && createPortal(
         <div
           ref={popupRef}
-          style={{ position: 'absolute', top: coords.top + 4, left: coords.left, width: coords.width, zIndex: 999999 }}
-          className="bg-white border border-slate-200 shadow-xl rounded-xl max-h-60 overflow-y-auto custom-scrollbar"
+          dir="rtl"
+          style={{ position: 'absolute', top: coords.top + 4, left: coords.left, width: coords.width, maxWidth: coords.width, zIndex: 999999 }}
+          className="bg-white border border-slate-200 shadow-xl rounded-xl max-h-60 overflow-y-auto overflow-x-hidden custom-scrollbar"
         >
           {options.map((opt: any) => (
             <div
               key={opt.value}
-              className={`px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm transition-colors ${value === opt.value ? 'bg-emerald-50 text-emerald-700 font-bold' : ''}`}
+              className={`px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm transition-colors break-words whitespace-normal leading-relaxed border-b border-slate-50 last:border-0 ${value === opt.value ? 'bg-emerald-50 text-emerald-700 font-bold' : ''}`}
               onClick={() => { onChange(opt.value); setIsOpen(false); }}
             >
               {opt.label}
@@ -362,7 +363,7 @@ export function LessonsPage() {
 
       let finalPdfFile: File | undefined = undefined;
 
-      if (form.type === 'pdf' && pdfFile) {
+      if ((form.type === 'pdf' || form.type === 'video') && pdfFile) {
         // Force .pdf extension to bypass backend Multer validation
         const newFileName = pdfFile.name.toLowerCase().endsWith('.pdf') ? pdfFile.name : `${pdfFile.name}.pdf`;
         finalPdfFile = new File([pdfFile], newFileName, { type: 'application/pdf' });
@@ -377,8 +378,8 @@ export function LessonsPage() {
         type: form.type, // إرسال النوع الحقيقي للباكاند بدون تحايل
         videoUrl: form.type === 'video' ? form.videoUrl.trim() : undefined,
         content: undefined,
-        pdfUrl: form.type === 'pdf' && !finalPdfFile ? form.pdfUrl.trim() : undefined,
-        pdf: form.type === 'pdf' ? finalPdfFile : undefined,
+        pdfUrl: (form.type === 'pdf' || form.type === 'video') && !finalPdfFile && form.pdfUrl ? form.pdfUrl.trim() : undefined,
+        pdf: (form.type === 'pdf' || form.type === 'video') ? finalPdfFile : undefined,
         // إرسال true بشكل صريح للـ PDF والنص
         isReading: (form.type === 'pdf' || form.type === 'markdown') ? true : false,
       };
@@ -1063,7 +1064,7 @@ export function LessonsPage() {
                         <button
                           key={type}
                           type="button"
-                          onClick={() => setForm(p => ({ ...p, type, videoUrl: '', pdfUrl: '', content: '' }))}
+                          onClick={() => { setForm(p => ({ ...p, type, videoUrl: '', pdfUrl: '', content: '' })); setPdfFile(null); }}
                           className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${isActive ? 'shadow-sm' : 'hover:bg-slate-50'}`}
                           style={isActive ? { background: cfg.bg, borderColor: cfg.color } : { background: '#FAFAFA', borderColor: '#E2E8F0' }}
                         >
@@ -1103,9 +1104,9 @@ export function LessonsPage() {
                   </div>
                 )}
 
-                {form.type === 'pdf' && (
+                {(form.type === 'pdf' || form.type === 'video') && (
                   <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <Field label="مستند الدرس (ملف PDF)" error={errors.pdfUrl} required>
+                    <Field label={form.type === 'video' ? "مستند PDF إضافي (اختياري)" : "مستند الدرس (ملف PDF)"} error={errors.pdfUrl} required={form.type === 'pdf'}>
                       <div className="space-y-3">
                         {form.pdfUrl && !pdfFile && (
                           <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">

@@ -148,6 +148,7 @@ export interface BackendModule {
   id: number;
   title: string;
   description?: string;
+  imageUrl?: string;
   courseId: number;
   createdAt?: string;
   updatedAt?: string;
@@ -156,12 +157,14 @@ export interface BackendModule {
 export interface CreateModuleDto {
   title: string;
   description?: string;
+  imageUrl?: string;
   courseId: number;
 }
 
 export interface UpdateModuleDto {
   title?: string;
   description?: string;
+  imageUrl?: string;
   courseId?: number;
 }
 

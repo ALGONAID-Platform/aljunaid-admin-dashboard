@@ -12,6 +12,7 @@ export const ROUTES = {
   examModels: '/admin/exam-models',
   publish: '/admin/publish',
   progress: '/admin/progress',
+  media: '/admin/media',
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];

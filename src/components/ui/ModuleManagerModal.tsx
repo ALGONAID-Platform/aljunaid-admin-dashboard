@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Layers, Plus, Edit3, Trash2, X, Loader2, BookOpen, AlertCircle, CheckCircle2, Search, BookMarked, FileText, FileSpreadsheet
+  Layers, Plus, Edit3, Trash2, X, Loader2, BookOpen, AlertCircle, CheckCircle2, Search, BookMarked, FileText, FileSpreadsheet, UploadCloud, Image as ImageIcon
 } from 'lucide-react';
 import { useCoursesStore, useModulesStore, useLessonsStore, useContentStore, useExamModelsStore } from '../../store';
+import { useMediaStore } from '../../store/media.store';
 import { CascadeDeleteModal } from './CascadeDeleteModal';
 import type { BackendModule } from '../../types/api';
 
@@ -24,6 +25,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
   const { lessons } = useLessonsStore();
   const { content } = useContentStore();
   const { examModels, fetchExamModels } = useExamModelsStore();
+  const { uploadImage, isUploading } = useMediaStore();
 
   const [selectedCourseId, setSelectedCourseId] = useState<string>(initialCourseId || 'all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,12 +35,15 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
   const [editingModuleId, setEditingModuleId] = useState<string | number | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState<string>('');
   const [targetCourseId, setTargetCourseId] = useState<string>('');
   
   // Status State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  
+  const formRef = useRef<HTMLDivElement>(null);
 
   // Cascade Delete State
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
@@ -71,6 +76,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
     setEditingModuleId(null);
     setTitle('');
     setDescription('');
+    setImageUrl('');
     setFormError(null);
     setFormSuccess(null);
     if (selectedCourseId !== 'all') {
@@ -85,9 +91,14 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
     setEditingModuleId(mod.id);
     setTitle(mod.title);
     setDescription(mod.description || '');
+    setImageUrl(mod.imageUrl || '');
     setTargetCourseId(String(mod.courseId));
     setFormError(null);
     setFormSuccess(null);
+
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,6 +122,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
           courseId: Number(targetCourseId) || (targetCourseId as any),
           title: title.trim(),
           description: description.trim(),
+          imageUrl: imageUrl || undefined,
         });
         setFormSuccess('تم تحديث الوحدة التعليمية بنجاح');
       } else {
@@ -118,6 +130,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
           courseId: Number(targetCourseId) || (targetCourseId as any),
           title: title.trim(),
           description: description.trim(),
+          imageUrl: imageUrl || undefined,
         });
         setFormSuccess('تم إنشاء الوحدة التعليمية بنجاح');
         if (onModuleSelected) {
@@ -161,7 +174,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
         <div className="flex-1 overflow-y-auto lg:overflow-hidden lg:grid lg:grid-cols-12 custom-scrollbar">
 
           {/* Left Column: Create/Edit Form (5 Cols) */}
-          <div className="lg:col-span-5 p-5 sm:p-6 bg-slate-50/80 border-b lg:border-b-0 lg:border-l border-slate-200 lg:overflow-y-auto space-y-4">
+          <div ref={formRef} className="lg:col-span-5 p-5 sm:p-6 bg-slate-50/80 border-b lg:border-b-0 lg:border-l border-slate-200 lg:overflow-y-auto space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                 {isEditing ? <Edit3 className="w-4 h-4 text-indigo-600" /> : <Plus className="w-4 h-4 text-emerald-600" />}
@@ -231,6 +244,59 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                   placeholder="نبذة شاملة عن المحاور المغطاة في هذه الوحدة..."
                   className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 transition-colors resize-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  صورة الوحدة (اختياري)
+                </label>
+                <div className="flex items-center gap-4">
+                  {imageUrl ? (
+                    <div className="relative w-24 h-16 rounded-lg overflow-hidden border border-slate-200 group shrink-0">
+                      <img src={imageUrl} alt="Module cover" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setImageUrl('')}
+                        className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-24 h-16 rounded-lg bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                      <ImageIcon className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      id="module-image-upload"
+                      accept="image/jpeg, image/png, image/webp"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const result = await uploadImage(file);
+                          if (result?.url) {
+                             setImageUrl(result.url);
+                          }
+                        } catch (err: any) {
+                          setFormError('فشل رفع الصورة: ' + err.message);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="module-image-upload"
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-colors cursor-pointer ${
+                        isUploading ? 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none' : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+                      }`}
+                    >
+                      {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                      {isUploading ? 'جاري الرفع...' : 'اختر صورة من الجهاز'}
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <button
@@ -309,11 +375,15 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
-                            <Layers className="w-5 h-5" />
-                          </div>
-                          <div>
+                        <div className="flex items-start gap-3 flex-1">
+                          {mod.imageUrl ? (
+                            <img src={mod.imageUrl} alt={mod.title} className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover shrink-0 border border-slate-200 mt-1" />
+                          ) : (
+                            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                              <Layers className="w-5 h-5 sm:w-6 sm:h-6" />
+                            </div>
+                          )}
+                          <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <h5 className="font-bold text-slate-800 text-sm">{mod.title}</h5>
                               {isDraft && (

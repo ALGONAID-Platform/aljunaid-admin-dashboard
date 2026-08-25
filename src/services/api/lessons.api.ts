@@ -97,7 +97,7 @@ export const lessonService = {
       modules.map(async (mod) => {
         try {
           const { data } = await api.get<BackendLesson[] | { data: BackendLesson[] }>(
-            `/lessons/module/${mod.id}`
+            `/lessons/module/${mod.id}?limit=1000`
           );
           const lessons: BackendLesson[] = Array.isArray(data)
             ? data
@@ -118,7 +118,7 @@ export const lessonService = {
    */
   async getByCourse(moduleId: string): Promise<Lesson[]> {
     const { data } = await api.get<BackendLesson[] | { data: BackendLesson[] }>(
-      `/lessons/module/${moduleId}`
+      `/lessons/module/${moduleId}?limit=1000`
     );
     const lessons: BackendLesson[] = Array.isArray(data)
       ? data

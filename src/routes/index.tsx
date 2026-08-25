@@ -33,6 +33,9 @@ const PublishPage = lazy(() =>
 const AcademicProgressPage = lazy(() =>
   import('../modules/dashboard/pages/AcademicProgressPage').then((m) => ({ default: m.AcademicProgressPage }))
 );
+const MediaPage = lazy(() =>
+  import('../modules/media/pages/MediaPage').then((m) => ({ default: m.default }))
+);
 
 
 const PageLoader = () => (
@@ -57,6 +60,7 @@ function DashboardRoutes() {
           <Route path="exam-models" element={<ExamModelsPage />} />
           <Route path="publish" element={<PublishPage />} />
           <Route path="progress" element={<AcademicProgressPage />} />
+          <Route path="media" element={<MediaPage />} />
         </Routes>
       </Suspense>
     </MainDashboardLayout>
