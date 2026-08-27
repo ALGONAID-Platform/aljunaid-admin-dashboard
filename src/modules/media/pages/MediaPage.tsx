@@ -8,6 +8,7 @@ export default function MediaPage() {
   const [uploadResult, setUploadResult] = useState<any | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -49,8 +50,8 @@ export default function MediaPage() {
     setErrorMsg(null);
     setUploadResult(null);
 
-    if (file.size > 10 * 1024 * 1024) {
-      setErrorMsg('حجم الملف يتجاوز 10MB');
+    if (file.size > 50 * 1024 * 1024) {
+      setErrorMsg('حجم الملف يتجاوز 50MB');
       return;
     }
 
@@ -61,7 +62,16 @@ export default function MediaPage() {
 
     try {
       console.log("🚀 جاري رفع الملف:", file.name);
-      const result = await uploadImage(file);
+      setUploadProgress(0);
+      
+      const onProgress = (evt: any) => {
+        if (evt.total) {
+          const percent = Math.round((evt.loaded * 100) / evt.total);
+          setUploadProgress(percent);
+        }
+      };
+
+      const result = await uploadImage(file, onProgress);
       console.log("✅ اكتمل الرفع! النتيجة القادمة من الباك إند هي:", result);
       setUploadResult(result);
     } catch (err: any) {
@@ -104,15 +114,31 @@ export default function MediaPage() {
             onChange={handleChange}
           />
 
-          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-inner">
+          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-inner relative">
             {isUploading ? (
-              <Loader2 className="w-10 h-10 animate-spin" />
+              <>
+                <Loader2 className="w-10 h-10 animate-spin opacity-20" />
+                <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-emerald-700">
+                  {uploadProgress}%
+                </span>
+              </>
             ) : (
               <UploadCloud className="w-10 h-10" />
             )}
           </div>
-          <h3 className="text-xl font-bold text-slate-800 mb-2">قم بسحب وإفلات الصورة هنا</h3>
-          <p className="text-slate-500 mb-8 text-center font-medium">يدعم JPG, PNG, WEBP, GIF حتى 10 ميغابايت</p>
+          <h3 className="text-xl font-bold text-slate-800 mb-2">
+            {isUploading ? 'جاري رفع الملف...' : 'قم بسحب وإفلات الصورة هنا'}
+          </h3>
+          <p className="text-slate-500 mb-8 text-center font-medium">يدعم JPG, PNG, WEBP, GIF حتى 50 ميغابايت</p>
+          
+          {isUploading && uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="w-full max-w-sm mb-6 animate-in fade-in">
+              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                <div className="bg-emerald-500 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={() => fileInputRef.current?.click()}
             className="px-8 py-3.5 bg-white border-2 border-emerald-500 text-emerald-600 font-bold text-lg rounded-xl hover:bg-emerald-50 transition-colors shadow-sm"

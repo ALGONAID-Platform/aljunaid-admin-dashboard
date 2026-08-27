@@ -16,8 +16,8 @@ interface ExamModelsState {
 
   fetchExamModels: (options?: ExamModelFilterOptions) => Promise<void>;
   fetchByCourse: (courseId: string | number) => Promise<ExamModel[]>;
-  addExamModel: (payload: CreateExamModelPayload) => Promise<ExamModel>;
-  updateExamModel: (payload: UpdateExamModelPayload) => Promise<ExamModel>;
+  addExamModel: (payload: CreateExamModelPayload, onUploadProgress?: (p: any) => void) => Promise<ExamModel>;
+  updateExamModel: (payload: UpdateExamModelPayload, onUploadProgress?: (p: any) => void) => Promise<ExamModel>;
   deleteExamModel: (id: string) => Promise<void>;
   bulkDelete: (ids: string[]) => Promise<void>;
   setFilters: (newFilters: Partial<ExamModelFilterOptions>) => void;
@@ -59,10 +59,10 @@ export const useExamModelsStore = create<ExamModelsState>()((set, get) => ({
     }
   },
 
-  addExamModel: async (payload) => {
+  addExamModel: async (payload, onUploadProgress) => {
     set({ isLoading: true, error: null });
     try {
-      const created = await examModelsService.create(payload);
+      const created = await examModelsService.create(payload, onUploadProgress);
       set((state) => ({
         examModels: [created, ...state.examModels],
         isLoading: false,
@@ -74,10 +74,10 @@ export const useExamModelsStore = create<ExamModelsState>()((set, get) => ({
     }
   },
 
-  updateExamModel: async (payload) => {
+  updateExamModel: async (payload, onUploadProgress) => {
     set({ isLoading: true, error: null });
     try {
-      const updated = await examModelsService.update(payload);
+      const updated = await examModelsService.update(payload, onUploadProgress);
       set((state) => ({
         examModels: state.examModels.map((item) =>
           String(item.id) === String(payload.id) ? updated : item

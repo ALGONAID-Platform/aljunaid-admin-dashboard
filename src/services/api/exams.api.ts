@@ -172,6 +172,7 @@ export const quizService = {
     const formData = new FormData();
     formData.append('image', file);
     const { data } = await api.post<{ imageUrl?: string; url?: string; data?: { imageUrl?: string; url?: string } }>('/exams/upload-image', formData, {
+      timeout: 0,
       onUploadProgress: (evt) => {
         if (onUploadProgress && evt.total) {
           onUploadProgress({

@@ -34,7 +34,7 @@ export type UploadError =
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ALLOWED_IMAGE_EXTS = ['JPG', 'PNG', 'WEBP'];
 const MAX_IMAGE_MB = 5;
-const MAX_PDF_MB = 10;
+const MAX_PDF_MB = 50;
 
 /** Classify upload errors into human-readable Arabic messages */
 export function classifyUploadError(err: unknown): UploadError {
@@ -54,7 +54,7 @@ export function classifyUploadError(err: unknown): UploadError {
     return { type: 'network', message: 'انتهت مهلة الرفع. الملف قد يكون كبيراً جداً أو الاتصال بطيء.' };
   }
   if (e.status === 413 || e.message?.includes('too large') || e.message?.includes('file size')) {
-    return { type: 'size', message: `حجم الصورة يتجاوز الحد المسموح به (${MAX_IMAGE_MB} MB).`, maxMB: MAX_IMAGE_MB };
+    return { type: 'size', message: 'حجم الملف يتجاوز الحد الأقصى المسموح به (50 MB).', maxMB: 50 };
   }
   if (e.status === 415 || e.message?.includes('unsupported') || e.message?.includes('mime')) {
     return { type: 'format', message: 'نوع الملف غير مدعوم.', allowed: ALLOWED_IMAGE_EXTS };
@@ -128,6 +128,7 @@ export const uploadService = {
 
     try {
       const { data } = await api.post<UploadResponse>('/upload/image', formData, {
+        timeout: 0, // Disable timeout for large uploads
         headers: {
           Accept: 'application/json',
         },
@@ -198,6 +199,7 @@ export const uploadService = {
     try {
       // Backend uses the same endpoint for all uploadcare uploads
       const { data } = await api.post<UploadResponse>('/upload/image', formData, {
+        timeout: 0, // Disable timeout for large uploads
         headers: {
           Accept: 'application/json',
         },

@@ -40,7 +40,7 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule): Lesson {
     videoUrl: bl.videoUrl ?? undefined,
     pdfUrl: bl.pdfUrl ?? undefined,
     content: (bl.isReading && !bl.pdfUrl) ? (bl.description ?? undefined) : (bl.content ?? undefined),
-    type: bl.pdfUrl ? 'pdf' : (bl.isReading ? 'markdown' : 'video'),
+    type: bl.videoUrl ? 'video' : (bl.pdfUrl ? 'pdf' : (bl.isReading ? 'markdown' : 'video')),
     createdAt: bl.createdAt ?? new Date().toISOString(),
     publishedAt: bl.publishedAt ?? undefined,
     publishedBy: typeof bl.publishedBy === 'object' ? bl.publishedBy?.name : bl.publishedBy ?? undefined,
@@ -65,9 +65,9 @@ function buildLessonFormData(payload: {
   const fd = new FormData();
   if (payload.title !== undefined) fd.append('title', payload.title);
   if (payload.description !== undefined) fd.append('description', payload.description);
-  if (payload.content !== undefined && payload.content !== '') fd.append('content', payload.content);
-  if (payload.videoUrl !== undefined && payload.videoUrl !== '') fd.append('videoUrl', payload.videoUrl);
-  if (payload.pdfUrl !== undefined && payload.pdfUrl !== '') fd.append('pdfUrl', payload.pdfUrl);
+  if (payload.content !== undefined) fd.append('content', payload.content);
+  if (payload.videoUrl !== undefined) fd.append('videoUrl', payload.videoUrl);
+  if (payload.pdfUrl !== undefined) fd.append('pdfUrl', payload.pdfUrl);
   if (payload.order !== undefined) fd.append('order', String(payload.order));
   if (payload.moduleId !== undefined) fd.append('moduleId', String(payload.moduleId));
   if (payload.pdf instanceof File) fd.append('pdf', payload.pdf);
@@ -137,7 +137,7 @@ export const lessonService = {
    * POST /lessons (multipart/form-data)
    * Frontend's courseId is treated as moduleId.
    */
-  async create(payload: CreateLessonPayload & { courseName?: string; pdf?: File; pdfUrl?: string; videoUrl?: string; content?: string; status?: 'DRAFT' | 'PUBLISHED'; isPublished?: boolean }): Promise<Lesson> {
+  async create(payload: CreateLessonPayload & { courseName?: string; pdf?: File; pdfUrl?: string; videoUrl?: string; content?: string; status?: 'DRAFT' | 'PUBLISHED'; isPublished?: boolean }, onUploadProgress?: (progressEvent: any) => void): Promise<Lesson> {
     const status = payload.status ?? ((payload.isPublished ?? true) ? 'PUBLISHED' : 'DRAFT');
     const fd = buildLessonFormData({
       title: payload.title,
@@ -152,7 +152,7 @@ export const lessonService = {
       isPublished: payload.isPublished ?? true,
     });
 
-    const { data } = await api.post<BackendLesson | { data: BackendLesson }>('/lessons', fd);
+    const { data } = await api.post<BackendLesson | { data: BackendLesson }>('/lessons', fd, { onUploadProgress, timeout: 0 });
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
     // Send isReading explicitly via JSON to bypass FormData boolean/string strict validation in backend
@@ -165,7 +165,7 @@ export const lessonService = {
   },
 
   /** PATCH /lessons/{id} (multipart/form-data) */
-  async update(payload: UpdateLessonPayload & { pdf?: File; pdfUrl?: string; videoUrl?: string; content?: string; status?: 'DRAFT' | 'PUBLISHED' }): Promise<Lesson> {
+  async update(payload: UpdateLessonPayload & { pdf?: File; pdfUrl?: string; videoUrl?: string; content?: string; status?: 'DRAFT' | 'PUBLISHED' }, onUploadProgress?: (progressEvent: any) => void): Promise<Lesson> {
     const { id, courseId, ...rest } = payload;
     const fd = buildLessonFormData({
       ...rest,
@@ -177,7 +177,7 @@ export const lessonService = {
       moduleId: courseId !== undefined ? Number(courseId) : undefined,
     });
 
-    const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd);
+    const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd, { onUploadProgress, timeout: 0 });
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
     if ((payload as any).isReading !== undefined) {

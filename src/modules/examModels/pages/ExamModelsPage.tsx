@@ -125,11 +125,11 @@ export function ExamModelsPage() {
     setShowPreviewModal(true);
   };
 
-  const handleSaveForm = async (payload: CreateExamModelPayload & { id?: string }) => {
+  const handleSaveForm = async (payload: CreateExamModelPayload & { id?: string }, onUploadProgress?: (p: any) => void) => {
     if (payload.id) {
-      await updateExamModel({ id: payload.id, ...payload });
+      await updateExamModel({ id: payload.id, ...payload }, onUploadProgress);
     } else {
-      await addExamModel(payload);
+      await addExamModel(payload, onUploadProgress);
     }
   };
 
@@ -151,14 +151,6 @@ export function ExamModelsPage() {
     }
   };
 
-  const handleDeleteSingle = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا النموذج نهائياً؟')) return;
-    try {
-      await deleteExamModel(id);
-    } catch {
-      alert('تعذر حذف نموذج الامتحان.');
-    }
-  };
 
   if (isLoading && examModels.length === 0) return <Loader fullPage />;
 
@@ -333,15 +325,10 @@ export function ExamModelsPage() {
       <CascadeDeleteModal
         isOpen={!!deleteConfirmId}
         onClose={() => setDeleteConfirmId(null)}
-        onConfirm={() => {
-          if (deleteConfirmId) {
-            void handleDeleteSingle(deleteConfirmId);
-            setDeleteConfirmId(null);
-          }
-        }}
-        title="حذف نموذج الامتحان"
-        message="هل أنت متأكد من رغبتك في حذف هذا النموذج؟ هذا الإجراء سيؤدي إلى حذف جميع البيانات المرتبطة به نهائياً ولا يمكن التراجع عنه."
-        itemType="examModel"
+        onSuccess={() => setDeleteConfirmId(null)}
+        targetType="examModel"
+        targetId={deleteConfirmId || ''}
+        customTitle="نموذج الامتحان"
       />
     </div>
   );

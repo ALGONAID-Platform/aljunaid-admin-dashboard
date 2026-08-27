@@ -9,8 +9,8 @@ interface LessonsState {
   error: string | null;
 
   fetchLessons: () => Promise<void>;
-  addLesson: (payload: CreateLessonPayload & { courseName: string; pdf?: File }) => Promise<Lesson>;
-  updateLesson: (payload: UpdateLessonPayload & { pdf?: File }) => Promise<void>;
+  addLesson: (payload: CreateLessonPayload & { courseName: string; pdf?: File }, onUploadProgress?: (progressEvent: any) => void) => Promise<Lesson>;
+  updateLesson: (payload: UpdateLessonPayload & { pdf?: File }, onUploadProgress?: (progressEvent: any) => void) => Promise<void>;
   deleteLesson: (id: string) => Promise<void>;
   togglePublish: (id: string) => Promise<void>;
   clearError: () => void;
@@ -31,10 +31,10 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
     }
   },
 
-  addLesson: async (payload) => {
+  addLesson: async (payload, onUploadProgress) => {
     set({ isLoading: true, error: null });
     try {
-      const newLesson = await lessonService.create(payload);
+      const newLesson = await lessonService.create(payload, onUploadProgress);
       set(state => ({ lessons: [newLesson, ...state.lessons], isLoading: false }));
       return newLesson;
     } catch (err) {
@@ -43,10 +43,10 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
     }
   },
 
-  updateLesson: async (payload) => {
+  updateLesson: async (payload, onUploadProgress) => {
     set({ isLoading: true, error: null });
     try {
-      const updated = await lessonService.update(payload);
+      const updated = await lessonService.update(payload, onUploadProgress);
       set(state => ({
         lessons: state.lessons.map(l => String(l.id) === String(payload.id) ? updated : l),
         isLoading: false

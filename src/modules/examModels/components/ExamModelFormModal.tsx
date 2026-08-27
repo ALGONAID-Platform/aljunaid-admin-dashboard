@@ -14,7 +14,7 @@ interface ExamModelFormModalProps {
   editingModel?: ExamModel | null;
   defaultCourseId?: string;
   onClose: () => void;
-  onSave: (payload: CreateExamModelPayload & { id?: string }) => Promise<void>;
+  onSave: (payload: CreateExamModelPayload & { id?: string }, onUploadProgress?: (p: any) => void) => Promise<void>;
 }
 
 export function ExamModelFormModal({
@@ -45,6 +45,9 @@ export function ExamModelFormModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const pdfFileRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +74,8 @@ export function ExamModelFormModal({
       setPdfFile(null);
       setErrors({});
       setSubmitSuccess(false);
+      setUploadProgress(0);
+      setIsUploadingPdf(false);
     }
   }, [isOpen, editingModel, defaultCourseId]);
 
@@ -283,14 +288,60 @@ export function ExamModelFormModal({
               ref={pdfFileRef}
               className="hidden"
               accept="application/pdf, .pdf"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
-                if (file) handlePdfFileSelect(file);
+                if (file) {
+                  if (file.size > 50 * 1024 * 1024) {
+                    setErrors((prev) => ({ ...prev, pdfUrl: 'حجم الملف يتجاوز 50MB' }));
+                    return;
+                  }
+                  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+                  if (!isPdf) {
+                    setErrors((prev) => ({ ...prev, pdfUrl: 'يرجى اختيار ملف بصيغة PDF فقط' }));
+                    return;
+                  }
+                  
+                  setErrors((prev) => {
+                    const copy = { ...prev };
+                    delete copy.pdfUrl;
+                    delete copy.submit;
+                    return copy;
+                  });
+
+                  setIsUploadingPdf(true);
+                  setUploadProgress(0);
+                  
+                  try {
+                    const { uploadService } = await import('../../../services/api/upload.api');
+                    const url = await uploadService.uploadPdf(file, (p) => setUploadProgress(p.percent));
+                    setForm(p => ({ ...p, pdfUrl: url }));
+                    setPdfFile(file); // Only for UI display
+                  } catch (err: any) {
+                    setErrors(p => ({ ...p, pdfUrl: err.message || 'فشل الرفع' }));
+                  } finally {
+                    setIsUploadingPdf(false);
+                  }
+                }
                 e.target.value = '';
               }}
             />
 
-            {pdfFile ? (
+            {isUploadingPdf && (
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl animate-in fade-in duration-300">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
+                    <span className="text-sm font-bold text-emerald-700">جاري رفع الملف...</span>
+                  </div>
+                  <span className="text-sm font-bold text-emerald-700">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-emerald-200/50 rounded-full h-2 overflow-hidden">
+                  <div className="bg-emerald-500 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                </div>
+              </div>
+            )}
+
+            {pdfFile && !isUploadingPdf ? (
               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm">
@@ -318,7 +369,7 @@ export function ExamModelFormModal({
                   <X className="w-4 h-4" />
                 </button>
               </div>
-            ) : (
+            ) : !isUploadingPdf ? (
               <div
                 className="border-2 border-dashed border-red-200 hover:border-red-400 rounded-2xl p-6 text-center cursor-pointer bg-white transition-all group"
                 onClick={() => pdfFileRef.current?.click()}
@@ -327,9 +378,9 @@ export function ExamModelFormModal({
                   <Upload className="w-6 h-6" />
                 </div>
                 <p className="text-sm font-bold text-slate-700">اضغط لرفع ملف PDF من جهازك</p>
-                <p className="text-xs text-slate-400 mt-1">الحد الأقصى للملف 10MB</p>
+                <p className="text-xs text-slate-400 mt-1">الحد الأقصى للملف 50MB</p>
               </div>
-            )}
+            ) : null}
 
             <div className="relative flex items-center py-2">
               <div className="flex-grow border-t border-slate-200"></div>
@@ -357,23 +408,22 @@ export function ExamModelFormModal({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-all"
-              disabled={isSubmitting}
+              className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl transition-all disabled:opacity-50"
+              disabled={isSubmitting || isUploadingPdf}
             >
               إلغاء
             </button>
 
             <button
               type="submit"
-              disabled={isSubmitting || submitSuccess}
+              disabled={isSubmitting || submitSuccess || isUploadingPdf}
               className="px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm shadow-emerald-600/20 transition-all flex items-center gap-2 disabled:opacity-70"
             >
-              {isSubmitting ? (
+              {(isSubmitting || isUploadingPdf) ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   جاري الحفظ...

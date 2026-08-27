@@ -5,17 +5,17 @@ import { UploadMediaResponse } from '../types/media.types';
 interface MediaState {
   isUploading: boolean;
   error: string | null;
-  uploadImage: (file: File) => Promise<UploadMediaResponse>;
+  uploadImage: (file: File, onProgress?: (evt: any) => void) => Promise<UploadMediaResponse>;
 }
 
 export const useMediaStore = create<MediaState>((set) => ({
   isUploading: false,
   error: null,
 
-  uploadImage: async (file: File) => {
+  uploadImage: async (file: File, onProgress?: (evt: any) => void) => {
     set({ isUploading: true, error: null });
     try {
-      const response = await mediaApi.uploadImage(file);
+      const response = await mediaApi.uploadImage(file, onProgress);
       set({ isUploading: false });
       return response;
     } catch (error: any) {

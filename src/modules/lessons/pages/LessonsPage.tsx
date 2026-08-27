@@ -160,6 +160,9 @@ export function LessonsPage() {
   const [form, setForm] = useState<FormState>({ courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' });
   const [errors, setErrors] = useState<FormError>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const [pdfUploadProgress, setPdfUploadProgress] = useState(0);
 
   const [activeTab, setActiveTab] = useState<'details' | 'content'>('details');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -229,6 +232,8 @@ export function LessonsPage() {
     setEditingLessonId(null);
     setPdfFile(null);
     setActiveTab('details');
+    setPdfUploadProgress(0);
+    setIsUploadingPdf(false);
   }, []);
 
   const openModal = () => {
@@ -397,7 +402,7 @@ export function LessonsPage() {
       }, 1000);
     } catch (err: any) {
       setSaveStatus('error');
-      const backendMessage = err?.response?.data?.message || err?.message || 'تعذر حفظ الدرس. تأكد من حجم الملف (أقل من 10MB)';
+      const backendMessage = err?.response?.data?.message || err?.message || 'تعذر حفظ الدرس. تأكد من حجم الملف (أقل من 50MB)';
       const errorMsg = Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage;
       setErrors(prev => ({ ...prev, submit: `خطأ من الخادم: ${errorMsg}` }));
       window.alert(`خطأ: ${errorMsg}`);
@@ -1108,7 +1113,7 @@ export function LessonsPage() {
                   <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <Field label={form.type === 'video' ? "مستند PDF إضافي (اختياري)" : "مستند الدرس (ملف PDF)"} error={errors.pdfUrl} required={form.type === 'pdf'}>
                       <div className="space-y-3">
-                        {form.pdfUrl && !pdfFile && (
+                        {form.pdfUrl && !pdfFile && !isUploadingPdf && (
                           <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
                             <FileType2 className="w-5 h-5 text-red-500" />
                             <a href={form.pdfUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm font-medium text-red-700 hover:underline truncate dir-ltr text-left">
@@ -1117,6 +1122,21 @@ export function LessonsPage() {
                             <button type="button" onClick={() => setForm(p => ({ ...p, pdfUrl: '' }))} className="p-1.5 hover:bg-red-100 text-red-500 rounded-lg transition-colors">
                               <X className="w-4 h-4" />
                             </button>
+                          </div>
+                        )}
+
+                        {isUploadingPdf && (
+                          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl animate-in fade-in duration-300">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
+                                <span className="text-sm font-bold text-emerald-700">جاري رفع الملف...</span>
+                              </div>
+                              <span className="text-sm font-bold text-emerald-700">{pdfUploadProgress}%</span>
+                            </div>
+                            <div className="w-full bg-emerald-200/50 rounded-full h-2 overflow-hidden">
+                              <div className="bg-emerald-500 h-2 rounded-full transition-all duration-300" style={{ width: `${pdfUploadProgress}%` }}></div>
+                            </div>
                           </div>
                         )}
 
@@ -1132,7 +1152,7 @@ export function LessonsPage() {
                           </div>
                         )}
 
-                        {!pdfFile && (
+                        {!pdfFile && !isUploadingPdf && (
                           <label className={`flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all ${errors.pdfUrl ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300'
                             }`}>
                             <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center">
@@ -1140,25 +1160,36 @@ export function LessonsPage() {
                             </div>
                             <div className="text-center">
                               <p className="text-sm font-bold text-slate-700">انقر هنا لرفع ملف PDF من جهازك</p>
-                              <p className="text-xs text-slate-500 mt-1">الحد الأقصى 10MB</p>
+                              <p className="text-xs text-slate-500 mt-1">الحد الأقصى 50MB</p>
                             </div>
                             <input
                               type="file"
                               accept="application/pdf"
                               className="hidden"
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  if (file.size > 10 * 1024 * 1024) {
-                                    setErrors(p => ({ ...p, pdfUrl: 'حجم الملف يتجاوز 10MB' }));
+                                  if (file.size > 50 * 1024 * 1024) {
+                                    setErrors(p => ({ ...p, pdfUrl: 'حجم الملف يتجاوز 50MB' }));
                                     return;
                                   }
                                   if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
                                     setErrors(p => ({ ...p, pdfUrl: 'يجب أن يكون الملف بصيغة PDF' }));
                                     return;
                                   }
-                                  setPdfFile(file);
                                   setErrors(p => { const x = { ...p }; delete x.pdfUrl; return x; });
+                                  setIsUploadingPdf(true);
+                                  setPdfUploadProgress(0);
+                                  try {
+                                    const { uploadService } = await import('../../../services/api/upload.api');
+                                    const url = await uploadService.uploadPdf(file, (p) => setPdfUploadProgress(p.percent));
+                                    setForm(p => ({ ...p, pdfUrl: url }));
+                                    setPdfFile(file); // Keep for UI display only
+                                  } catch (err: any) {
+                                    setErrors(p => ({ ...p, pdfUrl: err.message || 'فشل الرفع' }));
+                                  } finally {
+                                    setIsUploadingPdf(false);
+                                  }
                                 }
                               }}
                             />
@@ -1173,11 +1204,11 @@ export function LessonsPage() {
 
             {/* Modal Footer */}
             <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2rem] flex flex-col sm:flex-row items-center justify-end gap-3 shrink-0">
-              <button onClick={closeModal} className="w-full sm:w-auto px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all focus:ring-2 focus:ring-slate-200 order-2 sm:order-1">
+              <button onClick={closeModal} disabled={isUploadingPdf} className="w-full sm:w-auto px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all focus:ring-2 focus:ring-slate-200 order-2 sm:order-1 disabled:opacity-50">
                 إلغاء الأمر
               </button>
-              <button onClick={handleSave} disabled={!isFormValid || saveStatus === 'loading' || saveStatus === 'success'} className="w-full sm:w-auto px-8 py-3 text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 order-1 sm:order-2" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                {saveStatus === 'loading' && <Loader2 className="w-5 h-5 animate-spin" />}
+              <button onClick={handleSave} disabled={!isFormValid || saveStatus === 'loading' || saveStatus === 'success' || isUploadingPdf} className="w-full sm:w-auto px-8 py-3 text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 order-1 sm:order-2" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                {(saveStatus === 'loading' || isUploadingPdf) && <Loader2 className="w-5 h-5 animate-spin" />}
                 {saveStatus === 'success' && <CheckCircle className="w-5 h-5 animate-bounce" />}
                 {saveStatus === 'loading' ? 'جاري المعالجة...' : saveStatus === 'success' ? 'تم الحفظ!' : editingLessonId ? 'حفظ تعديلات الدرس' : 'حفظ الدرس الجديد'}
               </button>
