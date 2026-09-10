@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { UploadCloud, Image as ImageIcon, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { uploadService, classifyUploadError, validateImageFile } from '../../../services/api/upload.api';
+import { mediaApi } from '../../../services/api/media.api';
 
 interface Props {
   imageUrl?: string;
@@ -24,30 +24,28 @@ export function QuestionImageUpload({ imageUrl, onImageUploaded, onImageRemoved 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateAndUpload = async (file: File) => {
-    setError(null);
-    setLastFile(file);
-    const validationError = validateImageFile(file);
-    if (validationError) {
-      setError(validationError.message);
-      return;
-    }
-
     setIsUploading(true);
     setProgress(0);
+    setError(null);
+    setLastFile(file);
 
     try {
-      const url = await uploadService.uploadImage(file, (p) => setProgress(p.percent));
-      setProgress(100);
-      setTimeout(() => {
-        setIsUploading(false);
-        setProgress(0);
-        setLastFile(null);
-        onImageUploaded(url);
-      }, 300);
-    } catch (err) {
+      const response = await mediaApi.uploadImage(file, (evt) => {
+        setProgress(evt.percent);
+      });
+      
+      const rawUrl = response.data?.url;
+      if (rawUrl) {
+        onImageUploaded(rawUrl);
+      } else {
+        throw new Error('لم يتم إرجاع رابط الصورة من الخادم');
+      }
+    } catch (err: any) {
+      console.error("Upload error caught:", err);
+      setError(err.message || "حدث خطأ غير معروف أثناء رفع الصورة");
+    } finally {
       setIsUploading(false);
       setProgress(0);
-      setError(classifyUploadError(err).message);
     }
   };
 

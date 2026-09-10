@@ -100,9 +100,19 @@
     "typescript": "^7.0.2",
     "vite": "8.2.0"
   },
+  "overrides": {
+    "tar": "^7.5.21",
+    "sharp": "^0.35.0",
+    "nanoid": "^3.3.18",
+    "minimatch": "^3.1.2"
+  },
   "pnpm": {
     "overrides": {
-      "vite": "8.2.0"
+      "vite": "8.2.0",
+      "tar": "^7.5.21",
+      "sharp": "^0.35.0",
+      "nanoid": "^3.3.18",
+      "minimatch": "^3.1.2"
     }
   }
 }

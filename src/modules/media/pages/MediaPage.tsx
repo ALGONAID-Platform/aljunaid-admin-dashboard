@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UploadCloud, Link as LinkIcon, Code, Copy, CheckCircle2, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { useMediaStore } from '../../../store/media.store';
 
 export default function MediaPage() {
@@ -73,7 +74,17 @@ export default function MediaPage() {
 
       const result = await uploadImage(file, onProgress);
       console.log("✅ اكتمل الرفع! النتيجة القادمة من الباك إند هي:", result);
-      setUploadResult(result);
+      
+      const finalResult = (result as any).data ? (result as any).data : result;
+      
+      if (finalResult && finalResult.url) {
+        setUploadResult(finalResult);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } else {
+        throw new Error('الخادم لم يرجع رابط الصورة');
+      }
     } catch (err: any) {
       console.error("❌ فشل الرفع:", err);
       setErrorMsg(err.message || 'فشل رفع الصورة');

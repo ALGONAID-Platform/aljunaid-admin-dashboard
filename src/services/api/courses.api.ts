@@ -20,7 +20,7 @@ import type {
   BackendCourseResponse,
 } from '../../types/api';
 import type { Course, CreateCoursePayload, UpdateCoursePayload } from '../../types';
-import { uploadService } from './upload.api';
+import { mediaApi } from './media.api';
 
 // ─── Adapter: Backend Course → Frontend Course ────────────────────────────────
 
@@ -76,7 +76,8 @@ export const courseService = {
     let thumbnailUrl = payload.thumbnail;
 
     if (payload.imageFile) {
-      thumbnailUrl = await uploadService.uploadImage(payload.imageFile, onUploadProgress);
+      const result = await mediaApi.uploadImage(payload.imageFile, onUploadProgress);
+      thumbnailUrl = result.data.url;
     }
 
     const body = {
@@ -96,7 +97,8 @@ export const courseService = {
     let thumbnailUrl = rest.thumbnail;
 
     if (rest.imageFile) {
-      thumbnailUrl = await uploadService.uploadImage(rest.imageFile, onUploadProgress);
+      const result = await mediaApi.uploadImage(rest.imageFile, onUploadProgress);
+      thumbnailUrl = result.data.url;
     }
 
     const body = {

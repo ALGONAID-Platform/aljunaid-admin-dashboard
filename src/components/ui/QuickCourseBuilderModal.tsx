@@ -7,6 +7,7 @@ import {
 import { useCoursesStore, useModulesStore, useLessonsStore, useContentStore, useQuizzesStore } from '../../store';
 import { resolveErrorMessage } from '../../lib/errors';
 import { courseService, lessonService, contentService, quizService, publishService } from '../../services';
+import { mediaApi } from '../../services/api/media.api';
 import { uploadService } from '../../services/api/upload.api';
 import { MarkdownQuestionEditor } from '../../modules/quizzes/components/MarkdownQuestionEditor';
 import type { Course, Lesson, ContentItem, Quiz, Question } from '../../types';
@@ -705,10 +706,10 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                               setCourseImagePreview(previewUrl);
                               setCourseImageFile(file);
 
-                              const uploadedUrl = await uploadService.uploadImage(file);
+                              const result = await mediaApi.uploadImage(file);
 
-                              setCourseImageUrl(uploadedUrl);
-                              setCourseImagePreview(uploadedUrl);
+                              setCourseImageUrl(result.data.url);
+                              setCourseImagePreview(result.data.url);
                               setCourseImageFile(null);
 
                               setSuccessMessage('تم رفع صورة غلاف المقرر بنجاح');

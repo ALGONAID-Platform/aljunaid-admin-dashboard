@@ -5,6 +5,7 @@ import {
   Eye, Edit, Loader2, AlertCircle, UploadCloud
 } from 'lucide-react';
 import { quizService } from '../../../services';
+import { mediaApi } from '../../../services/api/media.api';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface Props {
@@ -55,7 +56,8 @@ export function MarkdownQuestionEditor({ value, onChange, placeholder = 'اكت�
 
     setIsUploading(true);
     try {
-      const url = await quizService.uploadImage(file);
+      const result = await mediaApi.uploadImage(file);
+      const url = result.data.url;
       const imageName = file.name.replace(/\.[^/.]+$/, "");
       insertText(`\n![${imageName}](${url})\n`);
     } catch (err: any) {
