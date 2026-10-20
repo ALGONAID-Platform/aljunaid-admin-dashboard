@@ -162,7 +162,7 @@ export function AcademicProgressPage() {
             className="w-full pl-4 pr-11 py-3 rounded-xl border-2 border-slate-100 focus:border-emerald-500 bg-slate-50 focus:bg-white outline-none transition-all text-sm font-medium"
           />
         </div>
-        <div className="relative min-w-[200px] shrink-0">
+        <div className="relative w-full min-w-0 shrink-0 md:w-auto md:min-w-[200px]">
           <Filter className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
           <select 
             value={activeFilter}
@@ -175,7 +175,7 @@ export function AcademicProgressPage() {
             <option value="published">منشور للطلاب مسبقاً</option>
           </select>
         </div>
-        <div className="relative min-w-[180px] shrink-0">
+        <div className="relative w-full min-w-0 shrink-0 md:w-auto md:min-w-[180px]">
           <select
             value={sortOption}
             onChange={(e) => setSortOption(e.target.value as SortOption)}

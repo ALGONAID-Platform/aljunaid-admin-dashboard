@@ -15,11 +15,11 @@ export function ExamModelPreviewModal({
   if (!isOpen || !examModel) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-md transition-all">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-250 overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-900/70 backdrop-blur-md transition-all">
+      <div className="bg-white rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl w-full max-w-4xl max-h-[96dvh] sm:max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-250 overflow-hidden">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 bg-white shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-4 sm:py-6 border-b border-slate-100 bg-white shrink-0">
           <div className="flex items-center gap-3.5 min-w-0">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-red-50 text-red-600`}>
               <FileText className="w-6 h-6" />
@@ -45,7 +45,7 @@ export function ExamModelPreviewModal({
         </div>
 
         {/* Content Preview Container */}
-        <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+        <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6">
           {/* Metadata Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
             <div className="flex items-center gap-2">

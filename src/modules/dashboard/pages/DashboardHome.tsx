@@ -171,7 +171,7 @@ export function DashboardHome() {
             ) : (
               <div className="divide-y divide-slate-50/80">
                 {recentActivity.map((item, i) => (
-                  <div key={i} className="px-4 py-4 flex items-start sm:items-center gap-4 hover:bg-slate-50/80 transition-colors rounded-xl mx-2 my-1 group">
+                  <div key={i} className="interactive-surface px-4 py-4 flex items-start sm:items-center gap-4 hover:bg-slate-50/80 transition-colors rounded-xl mx-2 my-1 group">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${item.bg} ${item.border} group-hover:scale-110 transition-transform duration-300`}>
                       <item.icon className={`w-5 h-5 ${item.color}`} />
                     </div>
@@ -248,7 +248,7 @@ export function DashboardHome() {
               {/* Mini List */}
               <div className="p-2 flex-1 overflow-y-auto max-h-[220px] custom-scrollbar">
                 {lessons.slice(0, 5).map((lesson) => (
-                  <div key={lesson.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 rounded-xl transition-colors mx-2 my-1 group">
+                  <div key={lesson.id} className="interactive-surface px-4 py-3 flex items-center justify-between hover:bg-slate-50 rounded-xl transition-colors mx-2 my-1 group">
                     <div className="flex items-center gap-3 min-w-0">
                       {lesson.isPublished
                         ? <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100"><CheckCircle2 className="w-4 h-4" /></div>
@@ -282,7 +282,7 @@ function StatCard({ icon: Icon, label, value, color, lightBg, sub }: {
   icon: React.ElementType; label: string; value: number; color: string; lightBg: string; sub: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-5 flex items-center gap-3 sm:gap-4 shadow-sm hover:shadow-md transition-all group">
+    <div className="interactive-surface bg-white rounded-2xl border border-slate-100 p-3.5 sm:p-5 flex items-center gap-3 sm:gap-4 shadow-sm hover:shadow-md transition-all group">
       <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 duration-300" style={{ background: lightBg, border: `1px solid ${color}20` }}>
         <Icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color }} />
       </div>

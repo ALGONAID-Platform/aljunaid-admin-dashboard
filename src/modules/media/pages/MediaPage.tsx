@@ -98,18 +98,18 @@ export default function MediaPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8 animate-in fade-in duration-500 max-w-3xl mx-auto">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">استضافة الصور (Image Hosting)</h1>
-        <p className="text-slate-500 mt-2">قم برفع الصور واستخدام الروابط المباشرة في أي مكان.</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">استضافة الصور (Image Hosting)</h1>
+        <p className="text-sm sm:text-base text-slate-500 mt-2">قم برفع الصور واستخدام الروابط المباشرة في أي مكان.</p>
       </div>
 
       <div className="space-y-6">
 
         {/* Upload Section */}
         <div
-          className={`relative flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-[2rem] transition-all duration-200 ease-in-out
+          className={`relative flex flex-col items-center justify-center p-6 sm:p-12 border-2 border-dashed rounded-[2rem] transition-all duration-200 ease-in-out
             ${dragActive ? 'border-emerald-500 bg-emerald-50/50 scale-[1.02]' : 'border-slate-300 bg-white hover:border-emerald-400 hover:bg-slate-50'}
             ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
           onDragEnter={handleDrag}
@@ -137,7 +137,7 @@ export default function MediaPage() {
               <UploadCloud className="w-10 h-10" />
             )}
           </div>
-          <h3 className="text-xl font-bold text-slate-800 mb-2">
+          <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-2 text-center">
             {isUploading ? 'جاري رفع الملف...' : 'قم بسحب وإفلات الصورة هنا'}
           </h3>
           <p className="text-slate-500 mb-8 text-center font-medium">يدعم JPG, PNG, WEBP, GIF حتى 50 ميغابايت</p>
@@ -152,7 +152,7 @@ export default function MediaPage() {
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="px-8 py-3.5 bg-white border-2 border-emerald-500 text-emerald-600 font-bold text-lg rounded-xl hover:bg-emerald-50 transition-colors shadow-sm"
+            className="w-full sm:w-auto px-6 sm:px-8 py-3.5 bg-white border-2 border-emerald-500 text-emerald-600 font-bold text-base sm:text-lg rounded-xl hover:bg-emerald-50 transition-colors shadow-sm"
           >
             اختيار صورة من الجهاز
           </button>

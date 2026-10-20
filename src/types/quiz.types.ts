@@ -26,6 +26,7 @@ export interface Quiz {
   description: string;
   instructions: string;
   passingScore: number;
+  maxAttempts: number;
   timeLimit: number;
   questions: Question[];
   createdAt: string;
@@ -38,6 +39,7 @@ export interface CreateQuizPayload {
   description: string;
   instructions: string;
   passingScore: number;
+  maxAttempts: number;
   timeLimit: number;
   questions: Omit<Question, 'id'>[];
 }
@@ -53,5 +55,6 @@ export interface QuizFormValues {
   description: string;
   instructions: string;
   passingScore: number;
+  maxAttempts: number;
   timeLimit: number;
 }

@@ -40,15 +40,16 @@ function adaptExamToQuiz(exam: any): Quiz {
 
   return {
     id: String(exam.id),
-    courseId: String(exam.lesson?.module?.courseId || ''),
-    lessonId: String(exam.lessonId),
-    courseName: exam.lesson?.module?.course?.title || '',
+    courseId: String(exam.courseId || exam.lesson?.module?.courseId || exam.lesson?.module?.course?.id || ''),
+    lessonId: exam.lessonId == null ? '' : String(exam.lessonId),
+    courseName: exam.course?.title || exam.lesson?.module?.course?.title || '',
     lessonTitle: exam.lesson?.title || '',
     title: exam.title,
     description: exam.description ?? '',
     instructions: '',
     passingScore: exam.passingScore,
-    timeLimit: 30, // Backend has no timeLimit — default 30 min
+    maxAttempts: exam.maxAttempts ?? 3,
+    timeLimit: exam.timeLimit ?? 30,
     questions,
     createdAt: exam.createdAt ?? new Date().toISOString(),
   };
@@ -59,7 +60,7 @@ function adaptQuizToCreateExamDto(payload: CreateQuizPayload): CreateExamDto {
     title: payload.title,
     description: payload.description,
     passingScore: payload.passingScore,
-    maxAttempts: 3,
+    maxAttempts: payload.maxAttempts,
     lessonId: Number(payload.lessonId),
     questions: payload.questions.map((q) => ({
       text: q.text?.trim() ?? '',
@@ -114,6 +115,7 @@ export const quizService = {
     if (rest.title) dto.title = rest.title;
     if (rest.description) dto.description = rest.description;
     if (rest.passingScore !== undefined) dto.passingScore = rest.passingScore;
+    if (rest.maxAttempts !== undefined) dto.maxAttempts = rest.maxAttempts;
     if (rest.lessonId !== undefined) dto.lessonId = Number(rest.lessonId);
     if (rest.questions) {
       dto.questions = rest.questions.map((q) => ({
@@ -133,15 +135,9 @@ export const quizService = {
       }));
     }
 
-    try {
-      const { data } = await api.patch<BackendExam | { data: BackendExam }>(`/exams/${id}`, dto);
-      const exam = (data as { data?: BackendExam }).data ?? (data as BackendExam);
-      return adaptExamToQuiz(exam);
-    } catch (err: any) {
-      console.error('BACKEND VALIDATION ERROR:', err.response?.data);
-      alert('تفاصيل الخطأ من الباك اند: ' + JSON.stringify(err.response?.data?.message || err.message));
-      throw err;
-    }
+    const { data } = await api.patch<BackendExam | { data: BackendExam }>(`/exams/${id}`, dto);
+    const exam = (data as { data?: BackendExam }).data ?? (data as BackendExam);
+    return adaptExamToQuiz(exam);
   },
 
   /** DELETE /exams/{id} */

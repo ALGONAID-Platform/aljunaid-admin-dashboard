@@ -70,7 +70,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
   };
 
   return (
-    <div dir="rtl" className="flex h-screen bg-slate-50 overflow-hidden relative" style={{ fontFamily: "'Cairo', sans-serif" }}>
+    <div dir="rtl" className="flex min-h-screen h-[100dvh] bg-slate-50 overflow-hidden relative" style={{ fontFamily: "'Cairo', sans-serif" }}>
       {/* Mobile Backdrop */}
       {!isSidebarCollapsed && (
         <div 
@@ -85,8 +85,8 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
         style={{ transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
         className={`bg-white border-l border-slate-200 flex flex-col fixed md:relative z-50 h-full right-0 shadow-2xl md:shadow-none ${
           isSidebarCollapsed 
-            ? 'translate-x-full md:translate-x-0 w-[270px] sm:w-[280px] md:w-[80px]' 
-            : 'translate-x-0 w-[270px] sm:w-[280px] md:w-[260px]'
+            ? 'translate-x-full md:translate-x-0 w-[min(270px,calc(100vw-1rem))] sm:w-[280px] md:w-[80px]'
+            : 'translate-x-0 w-[min(270px,calc(100vw-1rem))] sm:w-[280px] md:w-[260px]'
         }`}
       >
         {/* Brand Header */}
@@ -127,7 +127,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
                 key={item.path}
                 onClick={() => handleNavigation(item.path)}
                 title={isSidebarCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-3 min-h-[46px] rounded-xl transition-all active:scale-[0.98] ${
+                className={`interactive-surface w-full flex items-center gap-3 px-3 py-3 min-h-[46px] rounded-xl transition-all active:scale-[0.98] ${
                   active
                     ? 'text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
@@ -191,7 +191,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center px-3 sm:px-6 gap-2 sm:gap-4 flex-shrink-0 z-30 shadow-xs">
           <button
             onClick={toggleSidebar}
-            className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 active:scale-95 transition-all touch-target flex items-center justify-center"
+            className="interactive-surface p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 active:scale-95 transition-all touch-target flex items-center justify-center"
             aria-label="تبديل القائمة"
           >
             <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -231,7 +231,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
               <button
                 key={item.path}
                 onClick={() => handleNavigation(item.path)}
-                className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all touch-target ${
+                className={`interactive-surface flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all touch-target ${
                   active ? 'text-emerald-600 font-extrabold' : 'text-slate-400 hover:text-slate-600'
                 }`}
               >

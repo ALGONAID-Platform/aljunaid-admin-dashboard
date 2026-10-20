@@ -210,7 +210,7 @@ export function ExamModelFormModal({
 
         {/* Form Content - noValidate لمنع تدخل المتصفح */}
         <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+          <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6">
             {errors.submit && (
               <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-bold">
                 <AlertCircle className="w-5 h-5 shrink-0" />

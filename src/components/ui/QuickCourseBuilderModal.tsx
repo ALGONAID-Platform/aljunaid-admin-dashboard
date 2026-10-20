@@ -342,6 +342,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
         description: quizDesc.trim(),
         instructions: instructions.trim() || 'أجب على جميع الأسئلة بعناية.',
         passingScore,
+        maxAttempts,
         timeLimit,
         questions: validQuestions.map(q => ({
           type: q.type,

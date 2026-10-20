@@ -356,7 +356,7 @@ export function PublishPage() {
                   className="p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 cursor-pointer hover:bg-slate-50/50 transition-colors"
                   onClick={() => setExpandedCourses(p => ({ ...p, [course.id]: !p[course.id] }))}
                 >
-                  <div className="flex items-center gap-5 flex-1">
+                  <div className="flex items-center gap-3 sm:gap-5 flex-1 min-w-0">
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 shadow-sm flex items-center justify-center">
                       {course.imagePreview ? (
                         <img src={course.imagePreview} alt={course.name} className="w-full h-full object-cover" />
@@ -384,7 +384,7 @@ export function PublishPage() {
                   </div>
                   
                   {/* Course Actions */}
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
                     <button 
                       onClick={(e) => handlePublishAll(e, String(course.id))}
                       className="px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 rounded-xl text-xs font-bold transition-colors border border-emerald-100 flex items-center gap-2"
@@ -416,14 +416,14 @@ export function PublishPage() {
                         return (
                           <div key={module.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                             <div 
-                              className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                              className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 transition-colors"
                               onClick={() => setExpandedModules(p => ({ ...p, [module.id]: !p[module.id] }))}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
                                   <Layers className="w-4 h-4" />
                                 </div>
-                                <h4 className="font-bold text-slate-800">{module.title}</h4>
+                                <h4 className="font-bold text-slate-800 truncate">{module.title}</h4>
                                 <span className="text-xs text-slate-400 font-bold px-2 py-1 bg-slate-100 rounded-md">{mLessons.length} دروس</span>
                               </div>
                               <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${mExpanded ? 'rotate-180' : ''}`} />
@@ -520,10 +520,10 @@ export function PublishPage() {
 
       {/* Ultra-Modern Review & Publish Modal (Preserved exactly as before for the "Manage/Settings" action) */}
       {selectedLesson && selectedCL && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-900/60 backdrop-blur-md transition-all">
+          <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl w-full max-w-3xl max-h-[96dvh] sm:max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-300">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 shrink-0 bg-white rounded-t-[2rem]">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-4 sm:py-6 border-b border-slate-100 shrink-0 bg-white rounded-t-[2rem]">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center shadow-sm">
                   <Settings2 className="w-6 h-6 text-blue-600" />
@@ -538,7 +538,7 @@ export function PublishPage() {
               </button>
             </div>
             {/* Modal Body */}
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-8 bg-slate-50/50">
+            <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6 sm:space-y-8 bg-slate-50/50">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
                 <div className="relative z-10">

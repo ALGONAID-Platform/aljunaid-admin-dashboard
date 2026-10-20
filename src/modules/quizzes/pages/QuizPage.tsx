@@ -132,6 +132,7 @@ export function QuizPage() {
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
   const [passingScore, setPassingScore] = useState('60');
+  const [maxAttempts, setMaxAttempts] = useState('3');
   const [timeLimit, setTimeLimit] = useState('30');
   const [infoErrors, setInfoErrors] = useState<Record<string, string>>({});
 
@@ -142,7 +143,7 @@ export function QuizPage() {
 
   const resetModal = () => {
     setStep('info'); setCourseId(''); setLessonId(''); setTitle(''); setDescription('');
-    setInstructions(''); setPassingScore('60'); setTimeLimit('30');
+    setInstructions(''); setPassingScore('60'); setMaxAttempts('3'); setTimeLimit('30');
     setInfoErrors({}); setQuestions([newQuestion('mcq')]); setQErrors({}); setSaveStatus('idle');
     setEditingQuizId(null);
   };
@@ -171,6 +172,7 @@ export function QuizPage() {
     setDescription(quiz.description);
     setInstructions(quiz.instructions || '');
     setPassingScore(String(quiz.passingScore));
+    setMaxAttempts(String(quiz.maxAttempts ?? 3));
     setTimeLimit(String(quiz.timeLimit));
     setQuestions(quiz.questions);
     setInfoErrors({});
@@ -207,6 +209,7 @@ export function QuizPage() {
     else if (title.trim().length < 2) e.title = 'يجب أن يكون العنوان حرفين على الأقل';
     if (description.trim() && description.trim().length > 500) e.description = 'الوصف يتجاوز الحد الأقصى (500 حرف)';
     if (!passingScore || isNaN(Number(passingScore)) || Number(passingScore) < 0 || Number(passingScore) > 100) e.passingScore = 'درجة النجاح يجب أن تكون بين 0 و 100';
+    if (!maxAttempts || !Number.isInteger(Number(maxAttempts)) || Number(maxAttempts) < 1) e.maxAttempts = 'عدد المحاولات يجب أن يكون رقماً صحيحاً لا يقل عن 1';
     if (!timeLimit || isNaN(Number(timeLimit)) || Number(timeLimit) < 1) e.timeLimit = 'الوقت يجب أن يكون أكبر من صفر (بالدقائق)';
 
     setInfoErrors(e);
@@ -248,6 +251,7 @@ export function QuizPage() {
           description: description.trim(),
           instructions: instructions.trim(),
           passingScore: Number(passingScore),
+          maxAttempts: Number(maxAttempts),
           timeLimit: Number(timeLimit),
           questions,
         });
@@ -260,6 +264,7 @@ export function QuizPage() {
           description: description.trim(),
           instructions: instructions.trim(),
           passingScore: Number(passingScore),
+          maxAttempts: Number(maxAttempts),
           timeLimit: Number(timeLimit),
           questions,
         });
@@ -586,6 +591,7 @@ export function QuizPage() {
                 <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-2">
                   <InfoPill label={`${quiz.questions.length} أسئلة`} color="#2563EB" bg="#EFF6FF" icon={<HelpCircle className="w-3.5 h-3.5" />} />
                   <InfoPill label={`نسبة ${quiz.passingScore}%`} color="#059669" bg="#ECFDF5" icon={<CheckCircle className="w-3.5 h-3.5" />} />
+                  <InfoPill label={`${quiz.maxAttempts} محاولات`} color="#D97706" bg="#FFFBEB" icon={<Settings2 className="w-3.5 h-3.5" />} />
                   <InfoPill label={`${quiz.timeLimit} دقيقة`} color="#7C3AED" bg="#F5F3FF" icon={<Loader2 className="w-3.5 h-3.5" />} />
                 </div>
               </div>
@@ -696,6 +702,9 @@ export function QuizPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
                       <Field label="نسبة النجاح المطلوبة (%)" required error={infoErrors.passingScore}>
                         <input type="number" min={1} max={100} value={passingScore} onChange={e => { setPassingScore(e.target.value); setInfoErrors(p => { const x = { ...p }; delete x.passingScore; return x; }); }} className={inputCls(!!infoErrors.passingScore, 'text-center font-mono text-lg')} dir="ltr" />
+                      </Field>
+                      <Field label="الحد الأقصى للمحاولات" required error={infoErrors.maxAttempts}>
+                        <input type="number" min={1} step={1} value={maxAttempts} onChange={e => { setMaxAttempts(e.target.value); setInfoErrors(p => { const x = { ...p }; delete x.maxAttempts; return x; }); }} className={inputCls(!!infoErrors.maxAttempts, 'text-center font-mono text-lg')} dir="ltr" />
                       </Field>
                       <Field label="الوقت المسموح (بالدقائق)" required error={infoErrors.timeLimit}>
                         <input type="number" min={1} value={timeLimit} onChange={e => { setTimeLimit(e.target.value); setInfoErrors(p => { const x = { ...p }; delete x.timeLimit; return x; }); }} className={inputCls(!!infoErrors.timeLimit, 'text-center font-mono text-lg')} dir="ltr" />

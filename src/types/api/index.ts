@@ -240,9 +240,21 @@ export interface BackendExam {
   id: number;
   title: string;
   description?: string;
+  imageUrl?: string | null;
   passingScore: number;
   maxAttempts: number;
-  lessonId: number;
+  timeLimit?: number | null;
+  examType?: 'LESSON_QUIZ' | 'COURSE_QUIZ' | 'CHALLENGE';
+  rankingCriteria?: 'BOTH' | 'SCORE' | 'SPEED';
+  startTime?: string | null;
+  endTime?: string | null;
+  lessonId?: number | null;
+  courseId?: number | null;
+  asAssignment?: boolean;
+  course?: { id: number; title: string } | null;
+  lesson?: { id: number; title: string; module?: { courseId?: number; course?: { id: number; title: string } } } | null;
+  assignment?: { id?: number; examId?: number } | null;
+  _count?: { attempts?: number; comments?: number };
   questions: BackendQuestion[];
   createdAt?: string;
 }
@@ -250,9 +262,17 @@ export interface BackendExam {
 export interface CreateExamDto {
   title: string;
   description?: string;
+  imageUrl?: string;
   passingScore: number;
   maxAttempts: number;
-  lessonId: number;
+  timeLimit?: number | null;
+  examType?: 'LESSON_QUIZ' | 'COURSE_QUIZ' | 'CHALLENGE';
+  rankingCriteria?: 'BOTH' | 'SCORE' | 'SPEED';
+  startTime?: string;
+  endTime?: string;
+  lessonId?: number;
+  courseId?: number;
+  asAssignment?: boolean;
   questions: Omit<BackendQuestion, 'id'>[];
 }
 
