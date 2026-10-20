@@ -1,0 +1,80 @@
+.exams-table-wrapper {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.exams-table-wrapper:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.exams-table .ant-table-thead > tr > th {
+    background: var(--card-bg) !important;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.9rem;
+}
+
+.exams-table .ant-table-tbody > tr:hover > td {
+    background: rgba(108, 92, 231, 0.04) !important;
+}
+
+.exams-table .ant-table-tbody > tr > td {
+    border-bottom: 1px solid var(--border-color);
+    transition: var(--transition);
+}
+
+.exam-title-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.exam-thumbnail {
+    border-radius: var(--radius-sm) !important;
+    flex-shrink: 0;
+}
+
+.exam-title-text {
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.exam-type-tag {
+    border-radius: 20px;
+    font-weight: 500;
+    padding: 2px 12px;
+}
+
+/* Dark mode adjustments */
+body.dark-mode .exams-table-wrapper {
+    background: var(--card-bg);
+}
+
+body.dark-mode .exams-table .ant-table-thead > tr > th {
+    background: var(--card-bg) !important;
+    color: var(--text-secondary);
+    border-bottom-color: var(--border-color);
+}
+
+body.dark-mode .exams-table .ant-table-tbody > tr > td {
+    border-bottom-color: var(--border-color);
+}
+
+body.dark-mode .exams-table .ant-table-tbody > tr:hover > td {
+    background: rgba(108, 92, 231, 0.08) !important;
+}
+
+@media (max-width: 768px) {
+    .exam-title-cell {
+        gap: 8px;
+    }
+
+    .exam-thumbnail {
+        display: none;
+    }
+}
