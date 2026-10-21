@@ -26,11 +26,13 @@ import { mediaApi } from './media.api';
 
 function adaptCourse(bc: BackendCourse): Course {
   return {
+    ...bc,
     id: String(bc.id),
     title: bc.title,
     description: bc.description ?? '',
     thumbnail: bc.thumbnail ?? undefined,
     lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? bc._count?.modules ?? 0,
+    enrolledStudentsCount: bc._count?.enrollments,
     createdAt: bc.createdAt ?? new Date().toISOString(),
   };
 }
@@ -38,12 +40,17 @@ function adaptCourse(bc: BackendCourse): Course {
 // ─── Courses Service ──────────────────────────────────────────────────────────
 
 export const courseService = {
+  async convertToRecorded(id: string, prices: Record<string, number | undefined> = {}): Promise<void> {
+    await api.patch(`/courses/${id}/convert-to-recorded`, prices);
+  },
   async getAll(): Promise<Course[]> {
-    const { data } = await api.get<BackendCoursesListResponse | BackendCourse[]>('/courses');
-    const list = Array.isArray(data)
-      ? data
-      : (data as BackendCoursesListResponse).data ?? [];
-    return list.map(adaptCourse);
+    const [freeResponse, paidResponse] = await Promise.all([
+      api.get<BackendCoursesListResponse | BackendCourse[]>('/courses'),
+      api.get<BackendCoursesListResponse | BackendCourse[]>('/courses/paid'),
+    ]);
+    const asList = (data: BackendCoursesListResponse | BackendCourse[]) => Array.isArray(data) ? data : (data as BackendCoursesListResponse).data ?? [];
+    const merged = [...asList(freeResponse.data), ...asList(paidResponse.data)];
+    return [...new Map(merged.map(course => [String(course.id), adaptCourse(course)])).values()];
   },
 
   async getMyCourses(): Promise<Course[]> {
@@ -80,11 +87,8 @@ export const courseService = {
       thumbnailUrl = result.data.url;
     }
 
-    const body = {
-      title: payload.title,
-      description: payload.description,
-      thumbnail: thumbnailUrl,
-    };
+    const { imageFile: _imageFile, ...body } = payload;
+    Object.assign(body, { thumbnail: thumbnailUrl });
 
     const { data } = await api.post<BackendCourseResponse | BackendCourse>('/courses', body);
     const course = (data as BackendCourseResponse).data ?? (data as BackendCourse);
@@ -101,11 +105,8 @@ export const courseService = {
       thumbnailUrl = result.data.url;
     }
 
-    const body = {
-      title: rest.title,
-      description: rest.description,
-      thumbnail: thumbnailUrl,
-    };
+    const { imageFile: _imageFile, ...body } = rest;
+    Object.assign(body, { thumbnail: thumbnailUrl });
 
     const { data } = await api.patch<BackendCourseResponse | BackendCourse>(`/courses/${id}`, body);
     const course = (data as BackendCourseResponse).data ?? (data as BackendCourse);

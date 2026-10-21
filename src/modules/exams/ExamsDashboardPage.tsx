@@ -38,7 +38,7 @@ const emptyForm = (): ExamForm => ({
 });
 
 const examTypeLabel: Record<ExamType, string> = {
-  LESSON_QUIZ: 'اختبار درس', COURSE_QUIZ: 'اختبار مقرر', CHALLENGE: 'تحدي',
+  LESSON_QUIZ: 'اختبار درس', COURSE_QUIZ: 'اختبار نهائي للمقرر', CHALLENGE: 'تحدي',
 };
 
 function localDateValue(value?: string | null) {
@@ -236,7 +236,7 @@ export function ExamsDashboardPage() {
 
   return <div className="space-y-6 text-slate-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div><h1 className="text-2xl font-extrabold">إدارة الاختبارات</h1><p className="mt-1 text-sm text-slate-500">اختبارات الدروس والمقررات والتحديات، مع الإحصاءات ولوحة الشرف.</p></div>
+      <div><h1 className="text-2xl font-extrabold">إدارة الاختبارات</h1><p className="mt-1 text-sm text-slate-500">اختبارات الدروس والاختبارات النهائية للمقررات والتحديات، مع الإحصاءات ولوحة الشرف.</p></div>
       <button onClick={openCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 font-bold text-white hover:bg-emerald-700"><Plus size={18} /> إنشاء اختبار</button>
     </header>
 
@@ -245,7 +245,7 @@ export function ExamsDashboardPage() {
     <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row">
       <label className="relative flex-1"><Search className="absolute right-3 top-3.5 h-4 w-4 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث بالعنوان أو المقرر أو الدرس" className="w-full rounded-xl border border-slate-200 py-2.5 pl-3 pr-10 outline-none focus:border-emerald-500" /></label>
       <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as ExamType | '')} className="rounded-xl border border-slate-200 px-3 py-2.5">
-        <option value="">كل الأنواع</option><option value="LESSON_QUIZ">اختبار درس</option><option value="COURSE_QUIZ">اختبار مقرر</option><option value="CHALLENGE">تحدي</option>
+        <option value="">كل الأنواع</option><option value="LESSON_QUIZ">اختبار درس</option><option value="COURSE_QUIZ">اختبار نهائي للمقرر</option><option value="CHALLENGE">تحدي</option>
       </select>
     </div>
 
@@ -276,7 +276,7 @@ export function ExamsDashboardPage() {
         <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
           {formError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div>}
           <section className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold">نوع الاختبار<select disabled={Boolean(editing)} value={form.examType} onChange={(event) => setExamType(event.target.value as ExamType)} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="LESSON_QUIZ">اختبار درس</option><option value="COURSE_QUIZ">اختبار مقرر</option><option value="CHALLENGE">تحدي</option></select></label>
+            <label className="text-sm font-semibold">نوع الاختبار<select disabled={Boolean(editing)} value={form.examType} onChange={(event) => setExamType(event.target.value as ExamType)} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="LESSON_QUIZ">اختبار درس</option><option value="COURSE_QUIZ">اختبار نهائي للمقرر</option><option value="CHALLENGE">تحدي</option></select></label>
             <label className="text-sm font-semibold">المقرر<select required disabled={Boolean(editing)} value={form.courseId} onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value, lessonId: '' }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">اختر المقرر</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}</select></label>
             {form.examType === 'LESSON_QUIZ' && <label className="text-sm font-semibold">الدرس<select required disabled={Boolean(editing)} value={form.lessonId} onChange={(event) => setForm((current) => ({ ...current, lessonId: event.target.value }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">اختر الدرس</option>{filteredLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}</select></label>}
             <label className="text-sm font-semibold">عنوان الاختبار<input required value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal" /></label>

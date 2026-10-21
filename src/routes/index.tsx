@@ -36,6 +36,12 @@ const AcademicProgressPage = lazy(() =>
 const MediaPage = lazy(() =>
   import('../modules/media/pages/MediaPage').then((m) => ({ default: m.default }))
 );
+const PaymentsPage = lazy(() =>
+  import('../modules/payments/pages/PaymentsPage').then((m) => ({ default: m.PaymentsPage }))
+);
+const AssignmentsPage = lazy(() =>
+  import('../modules/assignments/pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage }))
+);
 
 
 const PageLoader = () => (
@@ -61,6 +67,8 @@ function DashboardRoutes() {
           <Route path="publish" element={<PublishPage />} />
           <Route path="progress" element={<AcademicProgressPage />} />
           <Route path="media" element={<MediaPage />} />
+          <Route path="payments" element={<PaymentsPage />} />
+          <Route path="assignments" element={<AssignmentsPage />} />
         </Routes>
       </Suspense>
     </MainDashboardLayout>

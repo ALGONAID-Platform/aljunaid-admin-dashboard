@@ -25,6 +25,8 @@ import { ModuleManagerModal } from '../../../components/ui/ModuleManagerModal';
 import { PageGuide } from '../../../components/ui/PageGuide';
 import { Layers } from 'lucide-react';
 import type { BackendModule } from '../../../types/api';
+import { lessonService } from '../../../services/api/lessons.api';
+import { mediaApi, type UploadProgress } from '../../../services/api/media.api';
 import { createPortal } from 'react-dom';
 
 function PortalSelect({ value, onChange, options, placeholder, className, disabled }: any) {
@@ -122,7 +124,14 @@ interface FormState {
   videoUrl: string;
   pdfUrl: string;
   content: string;
+  scheduledAt: string;
+  durationMinutes: string;
+  dayNumber: string;
+  isMandatory: boolean;
+  isFreePreview: boolean;
+  liveStatus: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED';
 }
+const emptyLessonForm: FormState = { courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '', scheduledAt: '', durationMinutes: '', dayNumber: '', isMandatory: true, isFreePreview: false, liveStatus: 'SCHEDULED' };
 
 type FormError = Partial<Record<keyof FormState | 'submit', string>>;
 type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -147,6 +156,7 @@ export function LessonsPage() {
   const [selectedLessons, setSelectedLessons] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<any>(null);
+  const syncedLiveStatuses = useRef(new Set<string>());
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setCurrentPage(1); setSelectedLessons([]); }, [searchQuery, courseFilter, activeView, itemsPerPage]);
@@ -157,7 +167,27 @@ export function LessonsPage() {
     void fetchModules();
   }, [fetchCourses, fetchLessons, fetchModules]);
 
-  const [form, setForm] = useState<FormState>({ courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '' });
+  useEffect(() => {
+    const syncStatuses = () => {
+      const now = Date.now();
+      const scheduled = lessons.filter(lesson => lesson.scheduledAt && Number(lesson.durationMinutes) > 0);
+      const updates = scheduled.flatMap(lesson => {
+        const start = new Date(lesson.scheduledAt!).getTime();
+        const end = start + Number(lesson.durationMinutes) * 60000;
+        const desired: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED' = now < start ? 'SCHEDULED' : now < end ? 'LIVE_NOW' : 'COMPLETED';
+        const syncKey = `${lesson.id}:${desired}`;
+        if (desired === lesson.liveStatus || syncedLiveStatuses.current.has(syncKey)) return [];
+        syncedLiveStatuses.current.add(syncKey);
+        return [lessonService.updateLiveStatus(lesson.id, desired).then(() => true, () => false)];
+      });
+      if (updates.length) void Promise.all(updates).then(results => { if (results.some(Boolean)) void fetchLessons(); });
+    };
+    syncStatuses();
+    const timer = window.setInterval(syncStatuses, 60_000);
+    return () => window.clearInterval(timer);
+  }, [lessons, fetchLessons]);
+
+  const [form, setForm] = useState<FormState>(emptyLessonForm);
   const [errors, setErrors] = useState<FormError>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   
@@ -166,6 +196,26 @@ export function LessonsPage() {
 
   const [activeTab, setActiveTab] = useState<'details' | 'content'>('details');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<UploadProgress | null>(null);
+  const [videoUploadError, setVideoUploadError] = useState('');
+  const [videoFileInfo, setVideoFileInfo] = useState<{name: string; size: number} | null>(null);
+
+  const uploadLessonVideo = async (file?: File) => {
+    if (!file || !form.courseId) return;
+    setVideoUploadError(''); setVideoUploadProgress({ percent: 0, loaded: 0, total: file.size });
+    try {
+      const uploaded = await mediaApi.uploadVideo(file, form.courseId, setVideoUploadProgress);
+      const videoUrl = uploaded.videoUrl ?? uploaded.url;
+      if (!videoUrl) throw new Error('لم يُرجع الخادم رابط الفيديو.');
+      setForm(current => ({ ...current, videoUrl }));
+      setVideoFileInfo({ name: uploaded.originalName ?? file.name, size: uploaded.size ?? file.size });
+      setVideoUploadProgress({ percent: 100, loaded: file.size, total: file.size });
+    } catch (error: any) {
+      setVideoUploadError(error?.response?.data?.message ?? error?.message ?? 'فشل رفع الفيديو.');
+      setVideoUploadProgress(null);
+    }
+  };
 
   // Persist "Create New Lesson" form state
   useEffect(() => {
@@ -178,6 +228,7 @@ export function LessonsPage() {
   }, [form, showModal, editingLessonId]);
 
   const filteredModules = allModules.filter(m => String(m.courseId) === String(form.courseId));
+  const selectedCourse = courses.find(course => String(course.id) === String(form.courseId));
   const modulesLoading = false;
   const [modulesError, setModulesError] = useState<string | null>(null);
 
@@ -221,7 +272,7 @@ export function LessonsPage() {
   };
 
   const resetModal = useCallback(() => {
-    setForm({ courseId: '', moduleId: '', title: '', description: '', order: '' });
+    setForm(emptyLessonForm);
     setErrors({});
     setSaveStatus('idle');
     setModulesError(null);
@@ -231,6 +282,10 @@ export function LessonsPage() {
     setEditingModuleId(null);
     setEditingLessonId(null);
     setPdfFile(null);
+    setVideoUploadProgress(null);
+    setVideoUploadError('');
+    setVideoFileInfo(null);
+    if (videoInputRef.current) videoInputRef.current.value = '';
     setActiveTab('details');
     setPdfUploadProgress(0);
     setIsUploadingPdf(false);
@@ -243,7 +298,7 @@ export function LessonsPage() {
       try {
         const parsed = JSON.parse(saved);
         // Only restore state for new lessons
-        setForm(parsed);
+        setForm({ ...emptyLessonForm, ...parsed });
       } catch (e) {
         console.error('Failed to parse saved lesson form state', e);
       }
@@ -267,6 +322,10 @@ export function LessonsPage() {
         videoUrl: (lesson as any).videoUrl || '',
         pdfUrl: (lesson as any).pdfUrl || '',
         content: (lesson as any).content || '',
+        scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
+        durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
+        isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
+        liveStatus: (lesson as any).liveStatus ?? 'SCHEDULED',
       });
     } else {
       setModulesError('تعذر تحميل الوحدة المرتبطة بهذا الدرس.');
@@ -280,6 +339,10 @@ export function LessonsPage() {
         videoUrl: (lesson as any).videoUrl || '',
         pdfUrl: (lesson as any).pdfUrl || '',
         content: (lesson as any).content || '',
+        scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
+        durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
+        isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
+        liveStatus: (lesson as any).liveStatus ?? 'SCHEDULED',
       });
     }
   };
@@ -387,6 +450,12 @@ export function LessonsPage() {
         pdf: (form.type === 'pdf' || form.type === 'video') ? finalPdfFile : undefined,
         // إرسال true بشكل صريح للـ PDF والنص
         isReading: (form.type === 'pdf' || form.type === 'markdown') ? true : false,
+        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
+        durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : undefined,
+        dayNumber: form.dayNumber ? Number(form.dayNumber) : undefined,
+        isMandatory: form.isMandatory,
+        isFreePreview: form.isFreePreview,
+        liveStatus: form.liveStatus,
       };
 
       if (editingLessonId) {
@@ -607,7 +676,7 @@ export function LessonsPage() {
           <EmptyState
             icon={BookMarked}
             title="لا توجد دروس حالياً"
-            description="قم ببناء المنهج الدراسي عن طريق إضافة دروس تفصيلية داخل الوحدات."
+            description="لم تُرجع الواجهة أي دروس منشورة. واجهة API الحالية لا تعرض المسودات في قائمة الدروس؛ تحقق من نشر الدروس أو أضف درساً جديداً."
             action={
               <button onClick={openModal} className="px-6 py-3 mt-2 text-white rounded-xl transition-all shadow-md hover:shadow-lg" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 700 }}>
                 إنشاء الدرس الأول
@@ -1053,6 +1122,19 @@ export function LessonsPage() {
                     )}
                   </div>
                 </Field>
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-3">
+                  <div><h4 className="font-bold text-slate-800">جدولة الدرس</h4><p className="text-xs text-slate-500">تُفتح الدروس المجدولة حسب الموعد المحدد. إذا كانت الدورة تمتد 30 يوماً، يمكن ضبط day number والموعد لكل درس.</p></div>
+                  {selectedCourse?.startDate && <p className="text-xs text-indigo-800">فترة المقرر: {new Date(selectedCourse.startDate).toLocaleDateString('ar')} {selectedCourse.endDate ? `– ${new Date(selectedCourse.endDate).toLocaleDateString('ar')}` : ''}</p>}
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <label className="text-sm font-semibold">رقم اليوم<input type="number" min={1} value={form.dayNumber} onChange={e=>setForm(p=>({...p,dayNumber:e.target.value}))} placeholder="1" className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
+                    <label className="text-sm font-semibold">وقت بدء الدرس<input type="datetime-local" value={form.scheduledAt} min={selectedCourse?.startDate?.slice(0,16)} max={selectedCourse?.endDate?.slice(0,16)} onChange={e=>setForm(p=>({...p,scheduledAt:e.target.value}))} className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
+                    <label className="text-sm font-semibold">المدة بالدقائق<input type="number" min={1} value={form.durationMinutes} onChange={e=>setForm(p=>({...p,durationMinutes:e.target.value}))} placeholder="مثلاً 60" className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
+                    <label className="text-sm font-semibold">حالة المحاضرة<select value={form.liveStatus} onChange={e=>setForm(p=>({...p,liveStatus:e.target.value as FormState['liveStatus']}))} className="mt-1 w-full rounded-xl border bg-white p-3"><option value="SCHEDULED">مجدولة</option><option value="LIVE_NOW">مباشرة الآن</option><option value="COMPLETED">انتهت</option></select></label>
+                    <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.isMandatory} onChange={e=>setForm(p=>({...p,isMandatory:e.target.checked}))}/>درس إلزامي للشهادة</label>
+                    <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.isFreePreview} onChange={e=>setForm(p=>({...p,isFreePreview:e.target.checked}))}/>معاينة مجانية</label>
+                  </div>
+                  {form.scheduledAt && form.durationMinutes && <p className="text-xs font-semibold text-indigo-800">وقت الانتهاء المحسوب: {new Date(new Date(form.scheduledAt).getTime()+Number(form.durationMinutes)*60000).toLocaleString('ar')}</p>}
+                </div>
               </div>
 
               {/* Section 3: Knowledge Content */}
@@ -1092,6 +1174,13 @@ export function LessonsPage() {
                       className={inputCls(!!errors.videoUrl, 'font-mono text-left')}
                       dir="ltr"
                     />
+                    <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-bold text-slate-600">أو ارفع فيديو للمقرر (MP4, MOV, AVI, MKV, WebM · حتى 1 GB)</span><button type="button" disabled={!form.courseId || videoUploadProgress?.percent !== undefined && videoUploadProgress.percent < 100} onClick={()=>videoInputRef.current?.click()} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">اختيار فيديو</button><input ref={videoInputRef} type="file" accept=".mp4,.mov,.avi,.mkv,.webm,video/*" className="hidden" onChange={e=>void uploadLessonVideo(e.target.files?.[0])}/></div>
+                      {!form.courseId && <p className="text-xs text-amber-700">اختر المقرر أولاً لرفع الفيديو إلى مجلده.</p>}
+                      {videoUploadProgress && <div><div className="h-2 overflow-hidden rounded bg-slate-200"><div className="h-full bg-indigo-500" style={{width:`${videoUploadProgress.percent}%`}}/></div><p className="mt-1 text-xs text-slate-500">{videoUploadProgress.percent}% · {(videoUploadProgress.loaded/1024/1024).toFixed(1)} / {(videoUploadProgress.total/1024/1024).toFixed(1)} MB</p></div>}
+                      {videoFileInfo && <p className="break-all text-xs text-emerald-700">{videoFileInfo.name} · {(videoFileInfo.size/1024/1024).toFixed(1)} MB · {form.videoUrl}</p>}
+                      {videoUploadError && <p role="alert" className="text-xs font-semibold text-red-600">{videoUploadError}</p>}
+                    </div>
                   </Field>
                 )}
 

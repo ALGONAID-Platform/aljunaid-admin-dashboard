@@ -92,6 +92,18 @@ export function validateImageFile(file: File): UploadError | null {
 
 
 export const mediaApi = {
+  uploadVideo: async (file: File, courseId: string | number, onProgress?: (evt: UploadProgress) => void) => {
+    const allowed = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!allowed.includes(ext)) throw new Error('صيغة الفيديو غير مدعومة. استخدم MP4 أو MOV أو AVI أو MKV أو WebM.');
+    if (file.size > 1024 * 1024 * 1024) throw new Error('حجم الفيديو يتجاوز الحد الأقصى 1 GB.');
+    const body = new FormData(); body.append('file', file);
+    const { data } = await api.post(`/media/courses/${courseId}/videos`, body, {
+      timeout: 0,
+      onUploadProgress: event => { if (event.total && onProgress) onProgress({ percent: Math.round(event.loaded * 100 / event.total), loaded: event.loaded, total: event.total }); },
+    });
+    return data as { url?: string; videoUrl?: string; originalName?: string; size?: number; fileName?: string };
+  },
   /**
    * Upload an image to the VPS canonical endpoint
    */

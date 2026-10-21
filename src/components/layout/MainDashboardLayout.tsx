@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect } from 'react';
 import {
   LayoutDashboard, BookOpen, BookMarked, FileText,
-  ClipboardList, Send, LogOut, Menu, Activity, FileSpreadsheet, X, Image as ImageIcon
+  ClipboardList, Send, LogOut, Menu, Activity, FileSpreadsheet, X, Image as ImageIcon, WalletCards, ClipboardCheck
 } from 'lucide-react';
 import { useUIStore, useAuthStore } from '../../store';
 import { useNavigate, useLocation } from 'react-router';
@@ -19,6 +19,8 @@ const NAV_ITEMS = [
   { path: ROUTES.examModels, icon: FileSpreadsheet, label: 'نماذج الامتحانات' },
   { path: ROUTES.publish, icon: Send, label: 'نشر الدروس' },
   { path: ROUTES.media, icon: ImageIcon, label: 'الوسائط' },
+  { path: ROUTES.payments, icon: WalletCards, label: 'المدفوعات' },
+  { path: ROUTES.assignments, icon: ClipboardCheck, label: 'الواجبات' },
   { path: ROUTES.progress, icon: Activity, label: 'التقدم الأكاديمي' },
 ];
 

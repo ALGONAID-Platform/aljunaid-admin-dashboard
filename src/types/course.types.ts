@@ -6,6 +6,16 @@ export interface Course {
   description: string;
   thumbnail?: string;
   lessonsCount: number;
+  enrolledStudentsCount?: number;
+  isPaid?: boolean;
+  courseType?: 'RECORDED' | 'LIVE';
+  maxStudents?: number | null;
+  startDate?: string;
+  endDate?: string;
+  durationWeeks?: number;
+  certificateMinScore?: number;
+  certificateMinAttendance?: number;
+  [key: string]: unknown;
   createdAt: string;
 }
 
@@ -13,6 +23,7 @@ export interface CreateCoursePayload {
   title: string;
   description: string;
   thumbnail?: string;
+  [key: string]: unknown;
 }
 
 export interface UpdateCoursePayload extends Partial<CreateCoursePayload> {

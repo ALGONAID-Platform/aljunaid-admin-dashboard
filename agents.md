@@ -1,115 +1,129 @@
-## STRICT PROJECT SCOPE
+# Admin Dashboard Implementation Requirements — Paid Courses System
 
-This is the Admin Dashboard repository.
+## 1. Paid Course Management
 
-You are authorized to read and modify files inside this repository only.
+- Implement interfaces for creating and editing paid courses, including recorded courses and live bootcamps.
+- Add support for regular and discounted prices in the following currencies:
+  - Old Yemeni Rial.
+  - New Yemeni Rial.
+  - Saudi Riyal.
+  - US Dollar.
+- Add a `maxStudents` field to configure course capacity, allowing unlimited enrollment when no limit is specified.
+- Add course start date, end date, duration in weeks, weekly schedule, and course objectives fields.
+- Add `certificateMinScore` and `certificateMinAttendance` fields to configure certificate eligibility requirements.
+- Display enrolled student counts, remaining seats, and course capacity status in course details.
+- Provide an action to convert a live course into a recorded course, allowing price updates during conversion.
 
-Never modify files in the API, client website, or mobile application repositories.
+## 2. Payment Requests and Enrollment Management
 
-If a requested feature requires backend changes, do not implement those changes.
-Explain the limitation and implement only the Admin Dashboard portion using the existing API.
+- Create a page for reviewing student-submitted manual payment requests.
+- Display the following information for each payment request:
+  - Student name and academic information.
+  - Course details.
+  - Payment amount and currency.
+  - Selected receiving bank account or payment wallet.
+  - Transaction number.
+  - Payment receipt image with a clear preview.
+  - Student notes and payment status.
+- Provide actions to approve or reject payment requests.
+- Require a rejection reason when rejecting a payment request.
+- Display payment statuses clearly, including `PENDING`, `APPROVED`, and `REJECTED`, where supported by the existing system.
+- Display success or error messages after approval or rejection.
+- Provide filters for payment status, course, student, and currency when supported by the available data and API.
+- Display the enrollment status associated with each payment request.
 
-Before finishing, verify that all modified files belong to this repository.
+## 3. Payment Accounts and Wallet Management
 
-# Admin Dashboard Development Instructions
+- Create a page for managing bank accounts and payment wallets used to receive course payments.
+- Provide forms for adding and editing payment accounts.
+- Support the following account fields:
+  - Bank or payment provider name.
+  - Account holder name.
+  - Account number.
+  - Currency.
+  - Payment instructions.
+  - QR code image URL, when available.
+  - Activation status (`isActive`).
+  - Display order (`order`).
+- Allow administrators to activate or deactivate accounts and change their display order.
+- Clearly display each account's currency to prevent confusion between different currencies.
 
-## 1. Project Scope
-This project is the Admin Dashboard for the Algonaid platform.
+## 4. Course Lessons and Modules Management
 
-All code changes must be limited to the Admin Dashboard project only.
+- Implement interfaces for creating and editing lessons and associating them with the appropriate modules and courses.
+- Add fields for lesson title, description, day number, and display order.
+- Support scheduled lesson dates through `scheduledAt` and lesson duration in minutes.
+- Add an `isMandatory` option to distinguish mandatory lessons from optional lessons.
+- Add an `isFreePreview` option to identify lessons available for free preview.
+- Support the lesson content types required by the existing system, including recorded videos, reading materials, live lectures, files, assignments, and exams, where applicable.
+- Provide controls for updating live lecture status, including `SCHEDULED` and `LIVE_NOW`, according to the statuses supported by the API.
+- Display clear validation errors when the API rejects a scheduled lesson date because it falls outside the course start and end dates.
+- Display lessons in the correct daily and manual order using the data returned by the existing system.
 
-- Do not modify the backend API project (`algonaid-api`).
-- Do not modify the client website project.
-- Do not modify the mobile application.
-- Do not modify files outside the Admin Dashboard project directory.
-- Treat the backend API as an existing service to integrate with, not as a codebase to modify.
+## 5. Lesson Video Uploads
 
-## 2. Backend API Integration
-The backend API base URL is:
+- Provide an interface for uploading video files and associating them with the appropriate course and lesson.
+- Allow administrators to select video files and display upload status and progress when supported.
+- Support the documented video formats: MP4, MOV, AVI, MKV, and WebM.
+- Respect the documented maximum file size of 1 GB.
+- After a successful upload, use the video URL returned by the API and associate it with the relevant lesson.
+- Display the file name, size, URL, and upload status.
+- Show clear error messages when an upload fails.
 
-`https://api.algonaid.online`
+## 6. Student Academic Evaluation
 
-Use the existing API client, authentication mechanism, access-token handling, and project conventions whenever available.
+- Create a page for viewing a student's academic evaluation within a specific course.
+- Display student and course information alongside the academic summary, including:
+  - Overall progress percentage.
+  - Cumulative GPA (`cumulativeGpa`).
+  - Letter grade (`gradeLetter`).
+  - Attendance percentage.
+  - Completed lessons and total counted lessons.
+  - Submitted assignments and total assignments.
+  - Assignment average score.
+  - Passed exams and total exams.
+  - Quiz average score.
+- Display the student's daily timeline, including attendance and completion status for each lesson.
+- Display the status and score of each associated assignment when available.
+- Display certificate eligibility requirements, including minimum attendance and score, along with eligibility and issuance statuses.
+- Use the evaluation results returned by the existing API. Do not reimplement GPA calculation formulas in the dashboard.
 
-Follow the API documentation provided in the project instructions or relevant documentation files.
+## 7. Assignment and Homework Review
 
-For every request:
-- Use the appropriate HTTP method and endpoint.
-- Send the required authentication headers.
-- Handle loading, success, empty, and error states.
-- Follow the documented request and response schemas.
-- Do not invent endpoints, fields, or response structures.
-- If the API does not support a required feature, report the limitation instead of modifying the backend.
+- Create an interface for viewing student-submitted assignments.
+- Display the assignment type, status, student information, and associated course and lesson.
+- Allow administrators to open submitted files and links, including PDF files, ZIP files, GitHub repositories, and Figma links, according to the attachment type.
+- Provide an interface for manually grading practical assignments.
+- Allow administrators to enter a score and written feedback.
+- Support attaching corrective images or code through `feedbackImageUrl` if supported by the existing system.
+- Display the grading status and saved score after evaluation.
+- Distinguish practical assignments (`TASK`) from automatically graded quizzes (`QUIZ`). Do not add manual grading controls for quizzes unless required by the existing system.
 
-## 3. Existing Codebase
-Before implementing a feature:
-- Inspect the relevant pages, components, routes, hooks, services, and types.
-- Reuse existing components and utilities where appropriate.
-- Follow the current architecture, naming conventions, styling system, and state-management approach.
-- Avoid unnecessary refactoring and unrelated changes.
-- Do not replace existing implementations without understanding their dependencies.
+## 8. Certificate Management
 
-## 4. Implementation Rules
-- Implement requested features completely within the Admin Dashboard.
-- Keep the interface responsive and consistent with the existing dashboard design.
-- Include appropriate form validation and user feedback.
-- Handle API errors gracefully.
-- Maintain type safety and follow the project's existing TypeScript conventions.
-- Do not introduce new dependencies unless they are genuinely necessary.
-- Never hardcode authentication tokens or secrets.
-- Do not remove existing functionality unrelated to the requested task.
+- Provide a page for reviewing certificates issued to students in each course.
+- Display the certificate serial number, student name, course, final grade, and issue date.
+- Display the verification URL and QR code when available.
+- Show certificate eligibility and issuance status within the student's academic evaluation page.
+- Do not introduce a manual certificate issuance process that bypasses the system's eligibility requirements unless an explicitly authorized capability already exists.
 
-## 5. Exam and Quiz Management
-When working on course exams, lesson quizzes, challenges, or practice exams, follow the API documentation for these features.
+## 9. User Experience and Permissions
 
-Supported exam types:
-- `LESSON_QUIZ`
-- `COURSE_QUIZ`
-- `CHALLENGE`
+- Organize the features into clear sections within the existing Admin Dashboard.
+- Reuse the project's existing components, styling, and design patterns.
+- Provide loading states, success and error messages, and empty states for each page.
+- Display API errors in a clear and understandable format for administrators.
+- Hide actions that the current administrator does not have permission to perform, according to the existing authorization system.
+- Integrate all functionality with the existing API. Do not create a new backend or modify API contracts as part of this task.
+- Preserve existing dashboard functionality and avoid unrelated changes to other project areas.
 
-Supported ranking criteria:
-- `BOTH`
-- `SCORE`
-- `SPEED`
+## Implementation Instructions for the Agent
 
-Supported question types:
-- `MULTIPLE_CHOICE`
-- `TRUE_FALSE`
-
-Important rules:
-- Lesson quizzes use `lessonId`; course exams and challenges use `courseId`. Never send both fields together.
-- Challenges require valid `startTime` and `endTime` values in ISO 8601 format.
-- Support `passingScore`, `maxAttempts`, `timeLimit`, and `rankingCriteria` according to the API schema.
-- Support `asAssignment` for lesson quizzes when applicable.
-- Allow questions to include their text, type, points, optional image, and answer options.
-- When updating questions, send the complete updated `questions` array if required by the API.
-- Support exam image uploads using the documented upload endpoint.
-- Implement exam statistics, leaderboards, and practice exam PDF management only through documented API endpoints.
-
-## 6. Verification
-After making changes:
-- Run the available linting, type-checking, and build commands when practical.
-- Fix errors introduced by the changes.
-- Review the final changes to ensure they are limited to the Admin Dashboard.
-- Report the files changed, features implemented, verification results, and any remaining issues.
-
-## 7. Working Process
-For each request:
-1. Understand the requested feature.
-2. Inspect the existing Admin Dashboard implementation.
-3. Identify the minimum files that need modification.
-4. Implement the feature without unrelated changes.
-5. Verify the implementation.
-6. Summarize the changes and any limitations.
-
-If a requirement is ambiguous or the API documentation is insufficient, explain the uncertainty before making assumptions that could affect functionality.
-
-## 8. Execution Status
-- [x] Expose `maxAttempts` in lesson quiz creation and editing, and send the configured value through the existing exams API.
-- [x] Support question replacement using the API's full-array update contract and require an explicit confirmation before replacing existing questions.
-- [x] Add lesson quizzes, course quizzes, and scheduled challenges with the documented association, timing, ranking, assignment, scoring, attempts, time-limit, and question fields.
-- [x] Add exam cover and question image uploads through `POST /exams/upload-image`.
-- [x] Add exam statistics and leaderboard views through the documented endpoints.
-- [x] Keep practice exam PDF management available through the existing `/practice-exams` dashboard screen.
-- [ ] API authorization needs alignment before the dashboard's `ADMIN` account can manage exams or practice PDFs: the API controllers/docs allow `ADMIN`, but the service permission checks currently allow only course instructors or `OWNER`. Do not change the API repository without authorization.
-- [ ] The API's `GET /exams/:id` response omits question text/options, so editing questions requires explicit full-bank replacement in the dashboard. The page warns and confirms before replacing the bank.
+1. Inspect the existing Admin Dashboard project and identify its current pages, components, services, and architecture.
+2. Implement the requirements above exclusively within the Admin Dashboard, reusing existing code wherever possible.
+3. Integrate the interfaces with the existing API endpoints documented in the project. Do not assume undocumented endpoints exist.
+4. If a feature requires an unavailable endpoint or field, document the limitation instead of modifying the API.
+5. Do not modify the Flutter mobile application, public website, backend API, database, or Prisma schema.
+6. Avoid broad refactoring, architectural changes, or technology migrations unrelated to these requirements.
+7. Test the dashboard pages and available operations, including course management, payment approval and rejection, video uploads, assignment grading, and academic evaluation.
+8. At completion, provide a summary of implemented features, incomplete features, and any API dependencies preventing full implementation.

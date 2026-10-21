@@ -111,6 +111,7 @@ export interface BackendCourse {
     modules?: number;
     enrollments?: number;
   };
+  [key: string]: any;
 }
 
 export interface BackendCourseSearchResponse {

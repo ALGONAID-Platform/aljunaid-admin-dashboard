@@ -44,6 +44,15 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule): Lesson {
     createdAt: bl.createdAt ?? new Date().toISOString(),
     publishedAt: bl.publishedAt ?? undefined,
     publishedBy: typeof bl.publishedBy === 'object' ? bl.publishedBy?.name : bl.publishedBy ?? undefined,
+    scheduledAt: (bl as any).scheduledAt ?? null,
+    durationMinutes: (bl as any).durationMinutes ?? null,
+    dayNumber: (bl as any).dayNumber ?? null,
+    liveStatus: (bl as any).liveStatus ?? null,
+    isMandatory: (bl as any).isMandatory ?? true,
+    isFreePreview: (bl as any).isFreePreview ?? false,
+    objectives: (bl as any).objectives ?? [],
+    liveMeetingUrl: (bl as any).liveMeetingUrl ?? undefined,
+    recordingVideoUrl: (bl as any).recordingVideoUrl ?? undefined,
   };
 }
 
@@ -61,6 +70,15 @@ function buildLessonFormData(payload: {
   isPublished?: boolean;
   status?: 'DRAFT' | 'PUBLISHED';
   isReading?: boolean;
+  scheduledAt?: string;
+  durationMinutes?: number;
+  dayNumber?: number;
+  liveStatus?: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED';
+  isMandatory?: boolean;
+  isFreePreview?: boolean;
+  liveMeetingUrl?: string;
+  recordingVideoUrl?: string;
+  objectives?: string[];
 }): FormData {
   const fd = new FormData();
   if (payload.title !== undefined) fd.append('title', payload.title);
@@ -83,6 +101,9 @@ function buildLessonFormData(payload: {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const lessonService = {
+  async updateLiveStatus(id: string, liveStatus: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED', recordingVideoUrl?: string): Promise<void> {
+    await api.patch(`/lessons/${id}/live-status`, { liveStatus, ...(recordingVideoUrl ? { recordingVideoUrl } : {}) });
+  },
   /**
    * Fetch all lessons across all modules.
    * Strategy: GET /modules → for each module GET /lessons/module/{id}
@@ -95,17 +116,13 @@ export const lessonService = {
 
     const lessonArrays = await Promise.all(
       modules.map(async (mod) => {
-        try {
-          const { data } = await api.get<BackendLesson[] | { data: BackendLesson[] }>(
-            `/lessons/module/${mod.id}?limit=1000`
-          );
-          const lessons: BackendLesson[] = Array.isArray(data)
-            ? data
-            : (data as { data: BackendLesson[] }).data ?? [];
-          return lessons.map((l) => adaptLesson(l, mod));
-        } catch {
-          return [];
-        }
+        const { data } = await api.get<BackendLesson[] | { data: BackendLesson[] }>(
+          `/lessons/module/${mod.id}?limit=1000`
+        );
+        const lessons: BackendLesson[] = Array.isArray(data)
+          ? data
+          : (data as { data: BackendLesson[] }).data ?? [];
+        return lessons.map((l) => adaptLesson(l, mod));
       })
     );
 
@@ -156,8 +173,10 @@ export const lessonService = {
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
     // Send isReading explicitly via JSON to bypass FormData boolean/string strict validation in backend
-    if ((payload as any).isReading !== undefined) {
-      const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${lesson.id}`, { isReading: (payload as any).isReading });
+    const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
+    const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
+    if (Object.keys(extraPayload).length) {
+      const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${lesson.id}`, extraPayload);
       lesson = (updatedData as { data?: BackendLesson }).data ?? (updatedData as BackendLesson);
     }
 
@@ -180,8 +199,10 @@ export const lessonService = {
     const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd, { onUploadProgress, timeout: 0 });
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
-    if ((payload as any).isReading !== undefined) {
-      const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, { isReading: (payload as any).isReading });
+    const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
+    const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
+    if (Object.keys(extraPayload).length) {
+      const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, extraPayload);
       lesson = (updatedData as { data?: BackendLesson }).data ?? (updatedData as BackendLesson);
     }
 

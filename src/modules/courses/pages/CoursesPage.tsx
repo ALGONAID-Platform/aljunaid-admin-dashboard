@@ -20,6 +20,7 @@ import { SavedViews } from '../../../components/ui/SavedViews';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import { PageGuide } from '../../../components/ui/PageGuide';
 import type { Course } from '../../../types';
+import { courseService } from '../../../services/api/courses.api';
 
 // 🚀 دالة فولاذية قسرية موضوعة هنا لضمان قراءتها متجاوزة أي كاش
 const getCloudUrl = (img?: string | null) => {
@@ -43,7 +44,14 @@ interface FormState {
   description: string;
   thumbnailUrl: string;
   thumbnailFile: File | null;
+  isPaid: boolean;
+  courseType: 'RECORDED' | 'LIVE';
+  priceYerOld: string; discountedPriceYerOld: string; priceYerNew: string; discountedPriceYerNew: string;
+  priceSar: string; discountedPriceSar: string; price: string; discountedPrice: string;
+  maxStudents: string; startDate: string; endDate: string; durationWeeks: string;
+  scheduleDaysText: string; objectives: string[]; certificateMinScore: string; certificateMinAttendance: string;
 }
+const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thumbnailFile: null, isPaid: false, courseType: 'RECORDED', priceYerOld: '', discountedPriceYerOld: '', priceYerNew: '', discountedPriceYerNew: '', priceSar: '', discountedPriceSar: '', price: '', discountedPrice: '', maxStudents: '', startDate: '', endDate: '', durationWeeks: '', scheduleDaysText: '', objectives: [], certificateMinScore: '70', certificateMinAttendance: '80' };
 
 type FormError = Partial<Record<keyof FormState | 'submit', string>>;
 type SaveStatus = 'idle' | 'uploading' | 'loading' | 'success' | 'error';
@@ -112,6 +120,7 @@ export function CoursesPage() {
   const { modules, fetchModules } = useModulesStore();
   const { lessons, fetchLessons } = useLessonsStore();
   const { examModels, fetchExamModels } = useExamModelsStore();
+  const [convertingCourseId, setConvertingCourseId] = useState<string | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -147,7 +156,7 @@ export function CoursesPage() {
     };
   }, [courses, modules, lessons]);
 
-  const [form, setForm] = useState<FormState>({ title: '', description: '', thumbnailUrl: '', thumbnailFile: null });
+  const [form, setForm] = useState<FormState>(emptyForm);
   const [errors, setErrors] = useState<FormError>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [uploadError, setUploadError] = useState<UploadError | null>(null);
@@ -164,7 +173,7 @@ export function CoursesPage() {
   }, [previewUrl]);
 
   const resetModal = useCallback(() => {
-    setForm({ title: '', description: '', thumbnailUrl: '', thumbnailFile: null });
+    setForm(emptyForm);
     setErrors({});
     setSaveStatus('idle');
     setUploadError(null);
@@ -180,17 +189,23 @@ export function CoursesPage() {
     resetModal();
     setEditingId(course.id);
     setForm({
+      ...emptyForm,
       title: course.title,
       description: course.description,
       thumbnailUrl: course.thumbnail || '',
-      thumbnailFile: null
+      thumbnailFile: null,
+      isPaid: Boolean(course.isPaid),
+      courseType: (course.courseType as FormState['courseType']) ?? 'RECORDED',
+      ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, (course as any)[k] == null ? '' : String((course as any)[k])])) as Partial<FormState>,
+      startDate: course.startDate?.slice(0, 10) ?? '', endDate: course.endDate?.slice(0, 10) ?? '',
+      scheduleDaysText: String((course as any).scheduleDaysText ?? ''), objectives: Array.isArray((course as any).objectives) ? [...(course as any).objectives] : []
     });
     if (course.thumbnail) setPreviewUrl(course.thumbnail);
     setShowModal(true);
   };
 
   const closeModal = () => {
-    const isDirty = form.title || form.description || form.thumbnailFile || form.thumbnailUrl;
+    const isDirty = form.title || form.description || form.thumbnailFile || form.thumbnailUrl || form.objectives.length || form.isPaid;
     if (isDirty && saveStatus !== 'success' && !confirm('لديك تغييرات غير محفوظة. هل أنت متأكد من الإلغاء؟')) {
       return;
     }
@@ -228,6 +243,14 @@ export function CoursesPage() {
         title: form.title.trim(),
         description: form.description.trim(),
         thumbnail: finalThumbnailUrl,
+        isPaid: form.isPaid,
+        courseType: form.courseType,
+        ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, form[k as keyof FormState] ? Number(form[k as keyof FormState]) : undefined])),
+        startDate: form.startDate || undefined,
+        endDate: form.endDate || undefined,
+        scheduleDaysText: form.scheduleDaysText || undefined,
+        scheduleDays: form.scheduleDaysText ? form.scheduleDaysText.split(',').map(s => s.trim()).filter(Boolean) : [],
+        objectives: form.objectives.map(s => s.trim()).filter(Boolean),
       };
 
       if (editingId) {
@@ -325,6 +348,8 @@ export function CoursesPage() {
     if (activeView === 'no_image') matchesView = !c.thumbnail;
     if (activeView === 'no_desc') matchesView = !c.description?.trim();
     if (activeView === 'empty') matchesView = c.lessonsCount === 0;
+    if (activeView === 'paid') matchesView = c.isPaid === true;
+    if (activeView === 'free') matchesView = c.isPaid !== true;
     return matchesSearch && matchesView;
   });
 
@@ -432,6 +457,8 @@ export function CoursesPage() {
             onChange={setActiveView}
             views={[
               { id: 'all', label: 'الكل', icon: BookOpen },
+              { id: 'paid', label: 'المقررات المدفوعة', icon: BookOpenCheck },
+              { id: 'free', label: 'المقررات المجانية', icon: BookOpen },
               { id: 'empty', label: 'بدون دروس', icon: FolderOpen },
               { id: 'no_image', label: 'بدون غلاف', icon: AlertCircle },
               { id: 'no_desc', label: 'بدون وصف', icon: AlertCircle },
@@ -586,6 +613,7 @@ export function CoursesPage() {
                         {new Date(course.createdAt).toLocaleDateString('ar-SA')}
                       </span>
                     </div>
+                    {(course as any).courseType === 'LIVE' && <button disabled={convertingCourseId === course.id} onClick={async () => { if (!window.confirm('تحويل هذا المعسكر إلى مقرر مسجل؟')) return; const priceInput = window.prompt('سعر المقرر المسجل بالدولار (اختياري، اتركه فارغاً للإبقاء على السعر الحالي):'); if (priceInput === null) return; const discountInput = window.prompt('سعر الخصم بالدولار (اختياري، اتركه فارغاً للإبقاء على السعر الحالي):'); if (discountInput === null) return; const prices: Record<string, number | undefined> = {}; if (priceInput.trim()) prices.price = Number(priceInput); if (discountInput.trim()) prices.discountedPrice = Number(discountInput); if (Object.values(prices).some(value => value !== undefined && (!Number.isFinite(value) || value < 0))) { window.alert('أدخل أسعاراً صحيحة غير سالبة.'); return; } setConvertingCourseId(course.id); try { await courseService.convertToRecorded(course.id, prices); await fetchCourses(); } catch (e: any) { window.alert(e?.response?.data?.message ?? e?.message ?? 'تعذر تحويل المقرر'); } finally { setConvertingCourseId(null); } }} className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 disabled:opacity-50">{convertingCourseId === course.id ? 'جارٍ التحويل…' : 'تحويل إلى مقرر مسجل'}</button>}
                   </div>
                 </div>
               );
@@ -671,6 +699,18 @@ export function CoursesPage() {
                       className={`${inputCls(!!errors.description)} resize-none leading-relaxed text-sm`}
                     />
                   </Field>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.isPaid} onChange={e=>setForm(p=>({...p,isPaid:e.target.checked}))}/>مقرر مدفوع</label>
+                    <label className="text-sm font-bold">نوع المقرر<select className={inputCls(false)} value={form.courseType} onChange={e=>setForm(p=>({...p,courseType:e.target.value as FormState['courseType']}))}><option value="RECORDED">مسجل</option><option value="LIVE">معسكر مباشر</option></select></label>
+                  </div>
+                  {form.isPaid && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['priceYerOld','السعر ر.ي قديم'],['discountedPriceYerOld','سعر الخصم ر.ي قديم'],['priceYerNew','السعر ر.ي جديد'],['discountedPriceYerNew','سعر الخصم ر.ي جديد'],['priceSar','السعر ر.س'],['discountedPriceSar','سعر الخصم ر.س'],['price','السعر USD'],['discountedPrice','سعر الخصم USD']].map(([key,label])=><label key={key} className="text-xs font-bold text-slate-600">{label}<input type="number" min="0" value={form[key as keyof FormState] as string} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} className={`${inputCls(false)} mt-1`} /></label>)}</div>}
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {([['maxStudents','الحد الأقصى للطلاب'],['durationWeeks','المدة بالأسابيع'],['certificateMinScore','حد درجة الشهادة %'],['certificateMinAttendance','حد الحضور للشهادة %']] as const).map(([key,label])=><label key={key} className="text-xs font-bold text-slate-600">{label}<input type="number" min="0" value={form[key]} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} placeholder={key==='maxStudents'?'غير محدود':''} className={`${inputCls(false)} mt-1`} /></label>)}
+                    <label className="text-xs font-bold text-slate-600">تاريخ البداية<input type="date" value={form.startDate} onChange={e=>setForm(p=>({...p,startDate:e.target.value}))} className={`${inputCls(false)} mt-1`}/></label>
+                    <label className="text-xs font-bold text-slate-600">تاريخ النهاية<input type="date" value={form.endDate} onChange={e=>setForm(p=>({...p,endDate:e.target.value}))} className={`${inputCls(false)} mt-1`}/></label>
+                  </div>
+                  {form.courseType === 'LIVE' && <Field label="أيام ومواعيد اللقاءات" helperText="افصل بين المواعيد بفاصلة."><input value={form.scheduleDaysText} onChange={e=>setForm(p=>({...p,scheduleDaysText:e.target.value}))} className={inputCls(false)} placeholder="الأحد 8 مساءً، الثلاثاء 8 مساءً"/></Field>}
+                  <div className="space-y-2"><div className="flex items-center justify-between"><span className="text-sm font-bold text-slate-700">أهداف المقرر</span><button type="button" onClick={()=>setForm(p=>({...p,objectives:[...p.objectives,'']}))} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">+ إضافة هدف</button></div>{form.objectives.map((objective,index)=><div key={index} className="flex gap-2"><input value={objective} onChange={e=>setForm(p=>({...p,objectives:p.objectives.map((item,i)=>i===index?e.target.value:item)}))} className={inputCls(false)} placeholder={`الهدف ${index+1}`}/><button type="button" aria-label={`حذف الهدف ${index+1}`} onClick={()=>setForm(p=>({...p,objectives:p.objectives.filter((_,i)=>i!==index)}))} className="rounded-lg border px-3 text-red-600">×</button></div>)}{form.objectives.length===0&&<p className="text-xs text-slate-400">أضف أهداف المقرر واحداً تلو الآخر.</p>}</div>
                 </div>
 
                 <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 relative mt-6">

@@ -16,6 +16,15 @@ export interface Lesson {
   createdAt: string;
   publishedAt?: string;
   publishedBy?: string;
+  scheduledAt?: string | null;
+  durationMinutes?: number | null;
+  dayNumber?: number | null;
+  liveStatus?: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED' | null;
+  isMandatory?: boolean;
+  isFreePreview?: boolean;
+  objectives?: string[];
+  liveMeetingUrl?: string;
+  recordingVideoUrl?: string;
 }
 
 export interface CreateLessonPayload {
@@ -28,6 +37,16 @@ export interface CreateLessonPayload {
   content?: string;
   type?: string;
   isReading?: boolean;
+  scheduledAt?: string;
+  durationMinutes?: number;
+  dayNumber?: number;
+  liveStatus?: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED';
+  isMandatory?: boolean;
+  isFreePreview?: boolean;
+  liveMeetingUrl?: string;
+  recordingVideoUrl?: string;
+  objectives?: string[];
+  [key: string]: unknown;
 }
 
 export interface UpdateLessonPayload extends Partial<CreateLessonPayload> {
