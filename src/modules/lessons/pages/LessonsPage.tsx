@@ -30,6 +30,10 @@ import { mediaApi, type UploadProgress } from '../../../services/api/media.api';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 
+const normalizeSearchText = (value: unknown) => String(value ?? '')
+  .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
+  .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').toLocaleLowerCase().trim();
+
 function PortalSelect({ value, onChange, options, placeholder, className, disabled }: any) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -574,8 +578,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   };
 
   const filteredLessons = lessons.filter(l => {
-    const matchesSearch = l.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (l.courseName && l.courseName.toLowerCase().includes(searchQuery.toLowerCase()));
+    const query = normalizeSearchText(searchQuery);
+    const lessonModuleForSearch = allModules.find(module => String(module.id) === String(l.courseId));
+    const courseForSearch = courses.find(course => String(course.id) === String(lessonModuleForSearch?.courseId));
+    const matchesSearch = !query || [l.title, l.description, l.courseName, lessonModuleForSearch?.title, courseForSearch?.title, l.objectives]
+      .some(value => normalizeSearchText(Array.isArray(value) ? value.join(' ') : value).includes(query));
     const matchesStatus = true;
     // Lesson.courseId is the module ID in this dashboard's backend adapter.
     // Comparing it directly to a course ID leaks lessons when IDs happen to overlap.
@@ -680,19 +687,20 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       />
 
       {/* Sticky Advanced Filters */}
-      <StickyToolbar position="top">
-        <div className="flex flex-col lg:flex-row gap-4 w-full">
-          <div className="relative flex-1 group w-full">
+      <StickyToolbar position="top" className="!flex-col !items-stretch">
+        <div className="flex w-full min-w-0 flex-col gap-3">
+          <div className="relative group w-full min-w-0">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="البحث الشامل عن درس أو مقرر... (Ctrl+F)"
-              className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
+              placeholder="ابحث باسم الدرس أو وصفه أو المقرر..."
+              className="min-h-12 w-full min-w-0 pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
             />
           </div>
+          <div className="w-full min-w-0">
           <AdvancedFilters
             filters={[
               {
@@ -706,6 +714,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
               }
             ]}
           />
+          </div>
         </div>
 
         <SavedViews

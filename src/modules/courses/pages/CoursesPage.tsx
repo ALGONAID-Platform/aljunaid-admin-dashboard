@@ -54,6 +54,10 @@ interface FormState {
 }
 const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thumbnailFile: null, isPaid: false, courseType: 'RECORDED', priceYerOld: '', discountedPriceYerOld: '', priceYerNew: '', discountedPriceYerNew: '', priceSar: '', discountedPriceSar: '', price: '', discountedPrice: '', maxStudents: '', startDate: '', endDate: '', durationWeeks: '', scheduleDaysText: '', objectives: [], certificateMinScore: '70', certificateMinAttendance: '80' };
 
+const normalizeSearchText = (value: unknown) => String(value ?? '')
+  .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
+  .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').toLocaleLowerCase().trim();
+
 type FormError = Partial<Record<keyof FormState | 'submit', string>>;
 type SaveStatus = 'idle' | 'uploading' | 'loading' | 'success' | 'error';
 
@@ -346,7 +350,12 @@ export function CoursesPage() {
   const isFormValid = form.title.trim() && form.description.trim();
 
   const filteredCourses = courses.filter(c => {
-    const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const query = normalizeSearchText(searchQuery);
+    const searchableValues = [c.title, c.description, c.objectives, c.keywords, c.tags];
+    const matchesSearch = !query || searchableValues.some(value => {
+      const text = Array.isArray(value) ? value.join(' ') : value;
+      return normalizeSearchText(text).includes(query);
+    });
     let matchesView = true;
     if (activeView === 'no_image') matchesView = !c.thumbnail;
     if (activeView === 'no_desc') matchesView = !c.description?.trim();
@@ -442,17 +451,17 @@ export function CoursesPage() {
         ]}
       />
 
-      <StickyToolbar position="top">
-        <div className="flex flex-col md:flex-row gap-4 w-full">
-          <div className="relative flex-1 group w-full">
+      <StickyToolbar position="top" className="!flex-col !items-stretch">
+        <div className="flex w-full min-w-0 flex-col gap-3">
+          <div className="relative group w-full min-w-0">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="البحث في المقررات، وصفها، أو الكلمات المفتاحية... (Ctrl+F)"
-              className="w-full pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
+              placeholder="ابحث باسم المقرر أو وصفه أو أهدافه..."
+              className="min-h-12 w-full min-w-0 pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
             />
           </div>
           <SavedViews
