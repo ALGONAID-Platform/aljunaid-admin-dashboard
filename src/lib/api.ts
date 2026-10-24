@@ -98,7 +98,7 @@ export function normalizeAxiosError(error: AxiosError): Error {
     const data = error.response.data as { message?: string | string[]; error?: string };
     const rawMessage = data?.message;
     const message = Array.isArray(rawMessage)
-      ? rawMessage[0]
+      ? rawMessage.join(', ')
       : (rawMessage ?? data?.error ?? `HTTP ${error.response.status}`);
     const err = new Error(message);
     (err as Error & { status: number; code?: string }).status = error.response.status;

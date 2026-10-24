@@ -7,11 +7,11 @@ import { courseService } from '../../../services/api/courses.api';
 
 type Assignment = { id: number; lessonId: number; title: string; description?: string; type: 'TASK' | 'QUIZ'; maxScore: number; lesson?: any; _count?: { submissions: number } };
 type Submission = { id: number; status: string; score?: number; content?: string; fileUrl?: string; submittedAt?: string; feedback?: string; feedbackImageUrl?: string; student?: any };
-type ReviewRow = { assignment: Assignment; lessonTitle: string; courseTitle: string; submissions: Submission[] };
+type ReviewRow = { assignment: Assignment; lessonTitle: string; courseTitle: string; courseId: string; submissions: Submission[] };
 const resultOf = (d: any) => d?.data ?? d;
 const errorOf = (e: any) => e?.response?.data?.message ?? e?.message ?? 'تعذر تحميل التسليمات.';
 
-export function AssignmentsPage() {
+export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId?: string; scopedLessonId?: string } = {}) {
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +29,8 @@ export function AssignmentsPage() {
       const [lessons, modules, courses] = await Promise.all([lessonService.getAll(), modulesService.getAll(), courseService.getAll()]);
       setLoadedLessonCount(lessons.length);
       const requestErrors: string[] = [];
-      const results = await Promise.all(lessons.map(async lesson => {
+      const relevantLessons = lessons.filter(lesson => !scopedLessonId || String(lesson.id) === String(scopedLessonId));
+      const results = await Promise.all(relevantLessons.map(async lesson => {
         try {
           const response = await api.get(`/assignments/lesson/${lesson.id}`);
           const assignment = resultOf(response.data) as Assignment | null;
@@ -42,16 +43,16 @@ export function AssignmentsPage() {
           }
           const module = modules.find(m => String(m.id) === String(lesson.courseId));
           const course = module && courses.find(c => String(c.id) === String(module.courseId));
-          return { assignment, lessonTitle: lesson.title, courseTitle: course?.title ?? lesson.courseName, submissions } as ReviewRow;
+          return { assignment, lessonTitle: lesson.title, courseTitle: course?.title ?? lesson.courseName, courseId: String(module?.courseId ?? ''), submissions } as ReviewRow;
         } catch (e) { requestErrors.push(`${lesson.title}: ${errorOf(e)}`); return null; }
       }));
-      const finalRows = results.filter((row): row is ReviewRow => row !== null);
+      const finalRows = results.filter((row): row is ReviewRow => row !== null && (!scopedCourseId || row.courseId === String(scopedCourseId)));
       setRows(finalRows);
       if (requestErrors.length) setLoadWarning(`تعذر تحميل بعض الواجبات أو التسليمات (${requestErrors.length}). ${requestErrors[0]}`);
       setGrades(Object.fromEntries(finalRows.flatMap(row => row.submissions.map(sub => [sub.id, { score: String(sub.score ?? ''), feedback: sub.feedback ?? '', feedbackImageUrl: sub.feedbackImageUrl ?? '', status: sub.status === 'RESUBMISSION_REQUESTED' ? 'RESUBMISSION_REQUESTED' : 'GRADED' }]))));
     } catch (e) { setError(errorOf(e)); }
     finally { setLoading(false); }
-  }, [status]);
+  }, [status, scopedCourseId, scopedLessonId]);
 
   useEffect(() => { void load(); }, [load]);
 

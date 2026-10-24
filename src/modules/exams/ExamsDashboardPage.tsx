@@ -9,7 +9,7 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { MarkdownQuestionEditor } from '../quizzes/components/MarkdownQuestionEditor';
 import type { AdminExam, ExamLeaderboard, ExamPayload, ExamQuestion, ExamStats, ExamType, RankingCriteria } from '../../types/exam.types';
 
-type DraftQuestion = Omit<ExamQuestion, 'id'> & { correctIndex: number };
+type DraftQuestion = Omit<ExamQuestion, 'id'> & { id?: number; correctIndex: number };
 type ExamForm = {
   examType: ExamType;
   courseId: string;
@@ -56,7 +56,7 @@ function examStatus(exam: AdminExam) {
   return exam.examType === 'CHALLENGE' ? 'جاري' : 'نشط';
 }
 
-export function ExamsDashboardPage() {
+export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedCourseId?: string; scopedLessonId?: string } = {}) {
   const { courses, fetchCourses } = useCoursesStore();
   const { lessons, fetchLessons } = useLessonsStore();
   const { modules, fetchModules } = useModulesStore();
@@ -70,7 +70,8 @@ export function ExamsDashboardPage() {
   const [editing, setEditing] = useState<AdminExam | null>(null);
   const [form, setForm] = useState<ExamForm>(emptyForm);
   const [questions, setQuestions] = useState<DraftQuestion[]>([newQuestion()]);
-  const [replaceQuestions, setReplaceQuestions] = useState(false);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [deletingQuestionId, setDeletingQuestionId] = useState<number | null>(null);
   const [formError, setFormError] = useState('');
   const [recentlySavedExamId, setRecentlySavedExamId] = useState<string | null>(null);
   const [assignmentLoaded, setAssignmentLoaded] = useState(true);
@@ -100,15 +101,15 @@ export function ExamsDashboardPage() {
 
   const filteredExams = useMemo(() => exams.filter((exam) => {
     const searchMatch = !search || [exam.title, exam.courseTitle, exam.lessonTitle].some((value) => value?.toLowerCase().includes(search.toLowerCase()));
-    return searchMatch && (!typeFilter || exam.examType === typeFilter);
-  }), [exams, search, typeFilter]);
+    return searchMatch && (!typeFilter || exam.examType === typeFilter) && (!scopedCourseId || String(exam.courseId) === String(scopedCourseId)) && (!scopedLessonId || String(exam.lessonId) === String(scopedLessonId));
+  }), [exams, search, typeFilter, scopedCourseId, scopedLessonId]);
 
   const openCreate = () => {
-    setEditing(null); setForm(emptyForm()); setQuestions([newQuestion()]); setReplaceQuestions(true); setAssignmentLoaded(true); setFormError(''); setFormOpen(true);
+    setEditing(null); setForm({ ...emptyForm(), courseId: scopedCourseId ?? '', lessonId: scopedLessonId ?? '' }); setQuestions([newQuestion()]); setAssignmentLoaded(true); setFormError(''); setFormOpen(true);
   };
 
   const openEdit = async (exam: AdminExam) => {
-    setEditing(exam); setFormError(''); setReplaceQuestions(false); setQuestions([newQuestion()]);
+    setEditing(exam); setFormError(''); setQuestions([]); setQuestionsLoading(true);
     setAssignmentLoaded(exam.examType !== 'LESSON_QUIZ' || !exam.lessonId);
     setForm({
       examType: exam.examType, courseId: exam.courseId ?? '', lessonId: exam.lessonId ?? '',
@@ -117,12 +118,28 @@ export function ExamsDashboardPage() {
       timeLimit: exam.timeLimit ? String(exam.timeLimit) : '', rankingCriteria: exam.rankingCriteria,
       startTime: localDateValue(exam.startTime), endTime: localDateValue(exam.endTime), asAssignment: false,
     });
+    setFormOpen(true);
+    try {
+      const details = await examManagementService.getById(exam.id);
+      setForm((current) => ({
+        ...current,
+        title: details.title, description: details.description ?? '', imageUrl: details.imageUrl ?? '',
+        passingScore: String(details.passingScore), maxAttempts: String(details.maxAttempts),
+        timeLimit: details.timeLimit ? String(details.timeLimit) : '', rankingCriteria: details.rankingCriteria,
+        startTime: localDateValue(details.startTime), endTime: localDateValue(details.endTime),
+      }));
+      setQuestions(details.questions.map((question) => {
+        const correctIndex = Math.max(0, question.options.findIndex((option) => option.isCorrect));
+        return { ...question, correctIndex };
+      }));
+    } catch (err) {
+      setFormError(resolveErrorMessage(err));
+    } finally { setQuestionsLoading(false); }
     if (exam.examType === 'LESSON_QUIZ' && exam.lessonId) {
       void examManagementService.getLessonAssignment(exam.lessonId)
         .then((asAssignment) => { setForm((current) => ({ ...current, asAssignment })); setAssignmentLoaded(true); })
         .catch(() => setFormError('تعذر قراءة حالة التكليف الحالية؛ لن أغيرها دون اختيارك.'));
     }
-    setFormOpen(true);
   };
 
   const openInsights = async (exam: AdminExam) => {
@@ -143,8 +160,8 @@ export function ExamsDashboardPage() {
 
   const uploadCover = async (file?: File) => {
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 5 * 1024 * 1024) {
-      setFormError('الصورة يجب أن تكون JPG أو PNG أو WEBP أو GIF وبحجم لا يتجاوز 5 ميجابايت.'); return;
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+      setFormError('الصورة يجب أن تكون JPG أو JPEG أو PNG أو WEBP أو GIF وبحجم لا يتجاوز 10 ميجابايت.'); return;
     }
     setUploadingImage(true); setFormError('');
     try {
@@ -158,7 +175,7 @@ export function ExamsDashboardPage() {
   const validate = () => {
     if (!form.title.trim()) return 'عنوان الاختبار مطلوب.';
     if (!form.courseId) return 'اختر المقرر المرتبط بالاختبار.';
-    if (form.examType === 'LESSON_QUIZ' && !form.lessonId) return 'اختر الدرس المرتبط بالاختبار.';
+    if (form.examType === 'LESSON_QUIZ' && !form.lessonId && !scopedLessonId) return 'اختر الدرس المرتبط بالاختبار.';
     if (editing && form.examType === 'LESSON_QUIZ' && !assignmentLoaded) return 'انتظر حتى يتم تحميل حالة التكليف الحالية قبل الحفظ.';
     if (form.examType === 'CHALLENGE') {
       if (!form.startTime || !form.endTime) return 'التحدي يتطلب وقت بداية ونهاية.';
@@ -167,7 +184,7 @@ export function ExamsDashboardPage() {
     if (!Number.isInteger(Number(form.passingScore)) || Number(form.passingScore) < 0 || Number(form.passingScore) > 100) return 'درجة النجاح يجب أن تكون عدداً صحيحاً بين 0 و100.';
     if (!Number.isInteger(Number(form.maxAttempts)) || Number(form.maxAttempts) < 1) return 'عدد المحاولات يجب أن يكون عدداً صحيحاً لا يقل عن 1.';
     if (form.timeLimit && (!Number.isInteger(Number(form.timeLimit)) || Number(form.timeLimit) < 1)) return 'الوقت المحدد يجب أن يكون عدداً صحيحاً موجباً.';
-    if (replaceQuestions && questions.some((question) => !question.text.trim() || question.options.length < 2 || question.options.some((option) => !option.text.trim()) || question.correctIndex < 0)) {
+    if (questions.some((question) => !question.text.trim() || question.options.length < 2 || question.options.some((option) => !option.text.trim()) || question.correctIndex < 0)) {
       return 'أكمل نص كل سؤال وخيارين على الأقل وحدد الإجابة الصحيحة لكل سؤال.';
     }
     if (!editing && questions.length === 0) return 'أضف سؤالاً واحداً على الأقل.';
@@ -178,8 +195,6 @@ export function ExamsDashboardPage() {
     event.preventDefault();
     const validationError = validate();
     if (validationError) { setFormError(validationError); return; }
-    if (editing && replaceQuestions && !window.confirm('سيتم استبدال كل أسئلة الاختبار الحالية بالأسئلة الجديدة. هل تريد المتابعة؟')) return;
-
     const payload: ExamPayload = {
       title: form.title.trim(), description: form.description.trim() || undefined,
       imageUrl: form.imageUrl || undefined, examType: form.examType, rankingCriteria: form.rankingCriteria,
@@ -191,7 +206,7 @@ export function ExamsDashboardPage() {
       ...(form.examType === 'CHALLENGE' ? {
         startTime: new Date(form.startTime).toISOString(), endTime: new Date(form.endTime).toISOString(),
       } : {}),
-      ...(replaceQuestions ? { questions: questions.map(({ correctIndex, ...question }) => ({
+      ...(!editing ? { questions: questions.map(({ correctIndex, ...question }) => ({
         ...question, imageUrl: question.imageUrl || undefined,
         options: question.options.map((option, index) => ({ ...option, isCorrect: index === correctIndex })),
       })) } : {}),
@@ -202,6 +217,16 @@ export function ExamsDashboardPage() {
       const savedExam = editing
         ? await examManagementService.update(editing.id, payload)
         : await examManagementService.create(payload);
+      const questionPayload = (question: DraftQuestion): Omit<ExamQuestion, 'id'> => ({
+        text: question.text.trim(), type: question.type, points: question.points,
+        imageUrl: question.imageUrl || undefined,
+        options: question.options.map((option, index) => ({ ...option, text: option.text.trim(), isCorrect: index === question.correctIndex })),
+      });
+      if (editing) {
+        await Promise.all(questions.map((question) => question.id
+          ? examManagementService.updateQuestion(question.id, questionPayload(question))
+          : examManagementService.addQuestion(savedExam.id, questionPayload(question))));
+      }
       const selectedCourse = courses.find((course) => String(course.id) === form.courseId);
       const selectedLesson = lessons.find((lesson) => String(lesson.id) === form.lessonId);
       const examForList: AdminExam = {
@@ -211,7 +236,7 @@ export function ExamsDashboardPage() {
         lessonId: savedExam.lessonId ?? (form.examType === 'LESSON_QUIZ' ? form.lessonId : null),
         courseTitle: savedExam.courseTitle ?? selectedCourse?.title,
         lessonTitle: savedExam.lessonTitle ?? selectedLesson?.title,
-        totalQuestions: savedExam.totalQuestions ?? (replaceQuestions ? questions.length : 0),
+        totalQuestions: questions.length,
       };
 
       setExams((current) => editing
@@ -230,6 +255,20 @@ export function ExamsDashboardPage() {
     if (!window.confirm(`حذف «${exam.title}» نهائياً مع محاولات الطلاب؟`)) return;
     try { await examManagementService.delete(exam.id); await reload(); }
     catch (err) { setError(resolveErrorMessage(err)); }
+  };
+
+  const removeQuestion = async (question: DraftQuestion, index: number) => {
+    if (question.id != null) {
+      if (!window.confirm('هل تريد حذف هذا السؤال نهائياً؟')) return;
+      setDeletingQuestionId(question.id);
+      try { await examManagementService.deleteQuestion(question.id); }
+      catch (err) { setFormError(resolveErrorMessage(err)); return; }
+      finally { setDeletingQuestionId(null); }
+      if (editing) setExams((current) => current.map((exam) => exam.id === editing.id
+        ? { ...exam, totalQuestions: Math.max(0, (exam.totalQuestions ?? questions.length) - 1) }
+        : exam));
+    }
+    setQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   if (loading && exams.length === 0) return <Loader fullPage />;
@@ -276,9 +315,9 @@ export function ExamsDashboardPage() {
         <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
           {formError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</div>}
           <section className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold">نوع الاختبار<select disabled={Boolean(editing)} value={form.examType} onChange={(event) => setExamType(event.target.value as ExamType)} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="LESSON_QUIZ">اختبار درس</option><option value="COURSE_QUIZ">اختبار نهائي للمقرر</option><option value="CHALLENGE">تحدي</option></select></label>
-            <label className="text-sm font-semibold">المقرر<select required disabled={Boolean(editing)} value={form.courseId} onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value, lessonId: '' }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">اختر المقرر</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}</select></label>
-            {form.examType === 'LESSON_QUIZ' && <label className="text-sm font-semibold">الدرس<select required disabled={Boolean(editing)} value={form.lessonId} onChange={(event) => setForm((current) => ({ ...current, lessonId: event.target.value }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">اختر الدرس</option>{filteredLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}</select></label>}
+            <label className="text-sm font-semibold">نوع الاختبار<select disabled={Boolean(editing || scopedLessonId)} value={form.examType} onChange={(event) => setExamType(event.target.value as ExamType)} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="LESSON_QUIZ">اختبار درس</option><option value="COURSE_QUIZ">اختبار نهائي للمقرر</option><option value="CHALLENGE">تحدي</option></select></label>
+            <label className="text-sm font-semibold">المقرر<select required disabled={Boolean(editing || scopedLessonId)} value={form.courseId} onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value, lessonId: '' }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">اختر المقرر</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}</select></label>
+            {form.examType === 'LESSON_QUIZ' && <label className="text-sm font-semibold">الدرس<select required disabled={Boolean(editing || scopedLessonId)} value={form.lessonId} onChange={(event) => setForm((current) => ({ ...current, lessonId: event.target.value }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">اختر الدرس</option>{filteredLessons.filter(lesson => !scopedLessonId || String(lesson.id) === String(scopedLessonId)).map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}</select></label>}
             <label className="text-sm font-semibold">عنوان الاختبار<input required value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal" /></label>
             <label className="text-sm font-semibold sm:col-span-2">الوصف<textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} rows={2} className="mt-1.5 w-full rounded-xl border p-3 font-normal" /></label>
             <label className="text-sm font-semibold">صورة غلاف (اختياري)<span className="mt-1.5 flex items-center gap-3 rounded-xl border p-2.5 font-normal"><FileImage size={18} className="text-slate-400"/><input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={uploadingImage} onChange={(event) => void uploadCover(event.target.files?.[0])} className="min-w-0 text-xs"/>{uploadingImage && <Loader2 size={16} className="animate-spin"/>}</span>{form.imageUrl && <img src={getImageUrl(form.imageUrl)} alt="معاينة الغلاف" className="mt-2 h-20 rounded-lg object-cover"/>}</label>
@@ -290,20 +329,19 @@ export function ExamsDashboardPage() {
             {form.examType === 'LESSON_QUIZ' && <label className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900 sm:col-span-2"><input type="checkbox" checked={form.asAssignment} onChange={(event) => setForm((current) => ({ ...current, asAssignment: event.target.checked }))} className="h-4 w-4 accent-emerald-600"/>تعيين كتكليف تلقائي للدرس</label>}
           </section>
 
-          {editing && <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><input type="checkbox" checked={replaceQuestions} onChange={(event) => { setReplaceQuestions(event.target.checked); if (event.target.checked) setQuestions([newQuestion()]); }} className="mt-0.5 h-4 w-4 accent-amber-600"/><span><b>استبدال بنك الأسئلة بالكامل</b><span className="block text-xs">واجهة API لا تعرض الأسئلة الحالية للتعديل؛ تفعيل هذا الخيار سيحذف الأسئلة الحالية ويستبدلها بما تضيفه أدناه.</span></span></label>}
-          {(!editing || replaceQuestions) && <section className="space-y-4 border-t pt-5"><div className="flex items-center justify-between"><h3 className="font-bold">الأسئلة</h3><button type="button" onClick={() => setQuestions((current) => [...current, newQuestion()])} className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700"><Plus size={15} className="inline"/> أضف سؤالاً</button></div>
-            {questions.map((question, qIndex) => <div key={qIndex} className="space-y-3 rounded-xl border p-4"><div className="flex items-center justify-between"><b>السؤال {qIndex + 1}</b><button type="button" disabled={questions.length === 1} onClick={() => setQuestions((current) => current.filter((_, index) => index !== qIndex))} className="text-red-600 disabled:opacity-40"><Trash2 size={16}/></button></div>
+          <section className="space-y-4 border-t pt-5"><div className="flex items-center justify-between"><h3 className="font-bold">الأسئلة</h3><button type="button" onClick={() => setQuestions((current) => [...current, newQuestion()])} className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700"><Plus size={15} className="inline"/> أضف سؤالاً</button></div>
+            {questionsLoading ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">جارٍ تحميل الأسئلة…</p> : questions.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">لا توجد أسئلة. أضف سؤالاً للبدء.</p> : questions.map((question, qIndex) => <div key={question.id ?? `new-${qIndex}`} className="space-y-3 rounded-xl border p-4"><div className="flex items-center justify-between"><b>السؤال {qIndex + 1}</b><button type="button" disabled={question.id != null && deletingQuestionId === question.id} onClick={() => void removeQuestion(question, qIndex)} className="text-red-600 disabled:opacity-40"><Trash2 size={16}/></button></div>
               <div className="grid gap-3 sm:grid-cols-[1fr_180px_100px]"><label className="text-xs font-semibold">نوع السؤال<select value={question.type} onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, type: event.target.value as DraftQuestion['type'], options: event.target.value === 'TRUE_FALSE' ? [{ text: 'صح', isCorrect: true }, { text: 'خطأ', isCorrect: false }] : ['', '', '', ''].map((text, optionIndex) => ({ text, isCorrect: optionIndex === 0 })), correctIndex: 0 } : item))} className="mt-1 block w-full rounded-lg border p-2"><option value="MULTIPLE_CHOICE">اختيار متعدد</option><option value="TRUE_FALSE">صح / خطأ</option></select></label>
                 <label className="text-xs font-semibold">النقاط<input type="number" min={1} step={1} value={question.points} onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, points: Number(event.target.value) } : item))} className="mt-1 block w-full rounded-lg border p-2"/></label>
-                <label className="text-xs font-semibold">صورة السؤال<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setUploadingImage(true); try { const imageUrl = await examManagementService.uploadImage(file); setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl } : item)); } catch (err) { setFormError(resolveErrorMessage(err)); } finally { setUploadingImage(false); } }} className="mt-1 block w-full text-xs"/>{question.imageUrl && <button type="button" onClick={() => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl: '' } : item))} className="mt-1 text-red-600">إزالة الصورة</button>}</label>
+                <label className="text-xs font-semibold">صورة السؤال<input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 10 * 1024 * 1024) { setFormError('الصورة يجب أن تكون JPG أو JPEG أو PNG أو WEBP أو GIF وبحجم لا يتجاوز 10 ميجابايت.'); return; } setUploadingImage(true); try { const imageUrl = await examManagementService.uploadImage(file); setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl } : item)); } catch (err) { setFormError(resolveErrorMessage(err)); } finally { setUploadingImage(false); } }} className="mt-1 block w-full text-xs"/>{question.imageUrl && <button type="button" onClick={() => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl: '' } : item))} className="mt-1 text-red-600">إزالة الصورة</button>}</label>
               </div>
               <MarkdownQuestionEditor value={question.text} onChange={(text) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, text } : item))} placeholder="نص السؤال"/>
               <div className="space-y-2">{question.options.map((option, optionIndex) => <div key={optionIndex} className="flex items-center gap-2"><input type="radio" name={`correct-${qIndex}`} checked={question.correctIndex === optionIndex} onChange={() => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, correctIndex: optionIndex, options: item.options.map((entry, i) => ({ ...entry, isCorrect: i === optionIndex })) } : item))} className="accent-emerald-600"/><input disabled={question.type === 'TRUE_FALSE'} value={option.text} onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, options: item.options.map((entry, i) => i === optionIndex ? { ...entry, text: event.target.value } : entry) } : item))} placeholder={`الخيار ${optionIndex + 1}`} className="flex-1 rounded-lg border p-2 text-sm disabled:bg-slate-50"/>{question.type === 'MULTIPLE_CHOICE' && question.options.length > 2 && <button type="button" onClick={() => setQuestions((current) => current.map((item, index) => { if (index !== qIndex) return item; const options = item.options.filter((_, i) => i !== optionIndex); const correctIndex = item.correctIndex === optionIndex ? 0 : item.correctIndex > optionIndex ? item.correctIndex - 1 : item.correctIndex; return { ...item, options, correctIndex }; }))} className="text-slate-400 hover:text-red-600"><X size={16}/></button>}</div>)}
                 {question.type === 'MULTIPLE_CHOICE' && <button type="button" onClick={() => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, options: [...item.options, { text: '', isCorrect: false }] } : item))} className="text-sm font-semibold text-emerald-700">+ إضافة خيار</button>}</div>
             </div>)}
-          </section>}
+          </section>
         </div>
-        <div className="flex justify-end gap-2 border-t bg-slate-50 p-4"><button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border bg-white px-4 py-2.5 font-semibold">إلغاء</button><button disabled={saving || uploadingImage} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 font-bold text-white disabled:opacity-60">{saving && <Loader2 size={16} className="animate-spin"/>}{editing ? 'حفظ التغييرات' : 'إنشاء الاختبار'}</button></div>
+        <div className="flex justify-end gap-2 border-t bg-slate-50 p-4"><button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border bg-white px-4 py-2.5 font-semibold">إلغاء</button><button disabled={saving || uploadingImage || questionsLoading} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 font-bold text-white disabled:opacity-60">{saving && <Loader2 size={16} className="animate-spin"/>}{editing ? 'حفظ التغييرات' : 'إنشاء الاختبار'}</button></div>
       </form>
     </div>}
 

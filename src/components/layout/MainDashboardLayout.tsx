@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect } from 'react';
 import {
-  LayoutDashboard, BookOpen, BookMarked, FileText,
-  ClipboardList, Send, LogOut, Menu, Activity, FileSpreadsheet, X, Image as ImageIcon, WalletCards, ClipboardCheck
+  LayoutDashboard, BookOpen, Megaphone,
+  Send, LogOut, Menu, Activity, X, Image as ImageIcon, WalletCards
 } from 'lucide-react';
 import { useUIStore, useAuthStore } from '../../store';
 import { useNavigate, useLocation } from 'react-router';
@@ -13,23 +13,16 @@ import logo from '../../assets/logo.png';
 const NAV_ITEMS = [
   { path: ROUTES.dashboard, icon: LayoutDashboard, label: 'الرئيسية' },
   { path: ROUTES.courses, icon: BookOpen, label: 'المقررات' },
-  { path: ROUTES.lessons, icon: BookMarked, label: 'الدروس' },
-
-  { path: ROUTES.quiz, icon: ClipboardList, label: 'الاختبارات' },
-  { path: ROUTES.examModels, icon: FileSpreadsheet, label: 'نماذج الامتحانات' },
   { path: ROUTES.publish, icon: Send, label: 'نشر الدروس' },
   { path: ROUTES.media, icon: ImageIcon, label: 'الوسائط' },
   { path: ROUTES.payments, icon: WalletCards, label: 'المدفوعات' },
-  { path: ROUTES.assignments, icon: ClipboardCheck, label: 'الواجبات' },
+  { path: ROUTES.notifications, icon: Megaphone, label: 'إشعارات الطلاب' },
   { path: ROUTES.progress, icon: Activity, label: 'التقدم الأكاديمي' },
 ];
 
 const MOBILE_BOTTOM_NAV = [
   { path: ROUTES.dashboard, icon: LayoutDashboard, label: 'الرئيسية' },
   { path: ROUTES.courses, icon: BookOpen, label: 'المقررات' },
-  { path: ROUTES.lessons, icon: BookMarked, label: 'الدروس' },
-  { path: ROUTES.quiz, icon: ClipboardList, label: 'الاختبارات' },
-  { path: ROUTES.examModels, icon: FileSpreadsheet, label: 'النماذج' },
 ];
 
 interface MainDashboardLayoutProps {
@@ -42,7 +35,8 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const currentNavItem = NAV_ITEMS.find((n) => n.path === location.pathname);
+  const isCourseWorkspace = location.pathname.startsWith(`${ROUTES.courses}/`);
+  const currentNavItem = NAV_ITEMS.find((n) => n.path === location.pathname) ?? (isCourseWorkspace ? NAV_ITEMS.find(item => item.path === ROUTES.courses) : undefined);
   const pageLabel = currentNavItem?.label ?? '';
 
   useEffect(() => {
@@ -123,7 +117,7 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
         {/* Navigation items */}
         <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto custom-scrollbar">
           {NAV_ITEMS.map((item) => {
-            const active = location.pathname === item.path;
+            const active = location.pathname === item.path || (item.path === ROUTES.courses && isCourseWorkspace);
             return (
               <button
                 key={item.path}

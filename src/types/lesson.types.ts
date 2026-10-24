@@ -1,5 +1,12 @@
 import type { ID } from './common.types';
 
+export interface LessonPdf {
+  id?: ID;
+  title: string;
+  url: string;
+  order: number;
+}
+
 export interface Lesson {
   id: ID;
   courseId: ID;
@@ -10,6 +17,7 @@ export interface Lesson {
   isPublished?: boolean;
   videoUrl?: string;
   pdfUrl?: string;
+  pdfFiles?: LessonPdf[];
   content?: string;
   type?: string;
   hasContent: boolean;
@@ -34,6 +42,7 @@ export interface CreateLessonPayload {
   order: number;
   videoUrl?: string;
   pdfUrl?: string;
+  pdfFiles?: LessonPdf[];
   content?: string;
   type?: string;
   isReading?: boolean;

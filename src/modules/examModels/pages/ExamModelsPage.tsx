@@ -20,7 +20,7 @@ import { ExamModelToolbar } from '../components/ExamModelToolbar';
 
 import type { ExamModel, CreateExamModelPayload } from '../../../types/examModel.types';
 
-export function ExamModelsPage() {
+export function ExamModelsPage({ scopedCourseId }: { scopedCourseId?: string } = {}) {
   const { 
     examModels, 
     fetchExamModels, 
@@ -80,9 +80,9 @@ export function ExamModelsPage() {
           (item.description && item.description.toLowerCase().includes(q)) ||
           (item.courseName && item.courseName.toLowerCase().includes(q));
       }
-      return matchesSearch;
+      return matchesSearch && (!scopedCourseId || String(item.courseId) === String(scopedCourseId));
     });
-  }, [examModels, searchQuery]);
+  }, [examModels, searchQuery, scopedCourseId]);
 
   const stats = useMemo(() => {
     return {
@@ -312,6 +312,7 @@ export function ExamModelsPage() {
         onClose={() => setShowFormModal(false)}
         editingModel={editingModel}
         onSave={handleSaveForm}
+        defaultCourseId={scopedCourseId}
       />
 
       {previewModel && (

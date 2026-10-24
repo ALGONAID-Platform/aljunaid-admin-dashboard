@@ -10,6 +10,7 @@ export { modulesService } from './modules.api';
 export { enrollmentService } from './enrollment.api';
 export { progressService } from './progress.api';
 export { usersService } from './users.api';
+export { notificationsService } from './notifications.api';
 
 export { api };
 export default api;

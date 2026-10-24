@@ -19,6 +19,11 @@ function adaptProfile(p: BackendProfile): User {
 }
 
 export const usersService = {
+  async setVerified(id: string, verified: boolean): Promise<boolean> {
+    const { data } = await api.patch<any>(`/users/${id}/verify`, { verified });
+    const response = data?.data ?? data;
+    return Boolean(response?.emailVerified ?? verified);
+  },
   async getProfile(): Promise<User> {
     const { data } = await api.get<BackendProfile | { data: BackendProfile }>('/users/profile');
     const profile = (data as { data?: BackendProfile }).data ?? (data as BackendProfile);

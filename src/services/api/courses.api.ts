@@ -25,14 +25,20 @@ import { mediaApi } from './media.api';
 // ─── Adapter: Backend Course → Frontend Course ────────────────────────────────
 
 function adaptCourse(bc: BackendCourse): Course {
+  const course = bc as BackendCourse & Record<string, any>;
   return {
     ...bc,
     id: String(bc.id),
     title: bc.title,
     description: bc.description ?? '',
     thumbnail: bc.thumbnail ?? undefined,
-    lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? bc._count?.modules ?? 0,
-    enrolledStudentsCount: bc._count?.enrollments,
+    lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? 0,
+    enrolledStudentsCount: course.enrollmentsCount ?? bc._count?.enrollments,
+    modulesCount: course.modulesCount ?? bc._count?.modules ?? 0,
+    practiceExamsCount: course.practiceExamsCount ?? 0,
+    examsCount: course.examsCount ?? 0,
+    isFull: course.isFull,
+    remainingSeats: course.remainingSeats,
     createdAt: bc.createdAt ?? new Date().toISOString(),
   };
 }
@@ -44,13 +50,36 @@ export const courseService = {
     await api.patch(`/courses/${id}/convert-to-recorded`, prices);
   },
   async getAll(): Promise<Course[]> {
-    const [freeResponse, paidResponse] = await Promise.all([
+    const [freeResponse, paidCourses] = await Promise.all([
       api.get<BackendCoursesListResponse | BackendCourse[]>('/courses'),
-      api.get<BackendCoursesListResponse | BackendCourse[]>('/courses/paid'),
+      this.getAdminPaidCourses(),
     ]);
     const asList = (data: BackendCoursesListResponse | BackendCourse[]) => Array.isArray(data) ? data : (data as BackendCoursesListResponse).data ?? [];
-    const merged = [...asList(freeResponse.data), ...asList(paidResponse.data)];
+    const merged = [...asList(freeResponse.data), ...paidCourses];
     return [...new Map(merged.map(course => [String(course.id), adaptCourse(course)])).values()];
+  },
+
+  /** Load every paid course using the admin endpoint and its page metadata. */
+  async getAdminPaidCourses(): Promise<BackendCourse[]> {
+    const limit = 100;
+    const readPage = async (page: number) => (await api.get<any>('/courses/admin/paid', { params: { page, limit } })).data;
+    const first = await readPage(1);
+    const unwrapPage = (response: any) => {
+      let body = response;
+      if (!Array.isArray(body) && body?.data && !Array.isArray(body.data) && body.data.data) body = body.data;
+      if (Array.isArray(body)) return { items: body as BackendCourse[], totalPages: 1, paginated: false };
+      return {
+        items: (Array.isArray(body?.data) ? body.data : []) as BackendCourse[],
+        totalPages: Math.max(1, Number(body?.meta?.totalPages) || 1),
+        paginated: Boolean(body?.meta),
+      };
+    };
+    const firstPage = unwrapPage(first);
+    if (!firstPage.paginated) return firstPage.items;
+
+    const totalPages = firstPage.totalPages;
+    const remaining = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => readPage(index + 2)));
+    return [firstPage.items, ...remaining.map((response) => unwrapPage(response).items)].flat();
   },
 
   async getMyCourses(): Promise<Course[]> {

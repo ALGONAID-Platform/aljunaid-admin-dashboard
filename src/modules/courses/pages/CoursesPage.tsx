@@ -21,6 +21,7 @@ import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import { PageGuide } from '../../../components/ui/PageGuide';
 import type { Course } from '../../../types';
 import { courseService } from '../../../services/api/courses.api';
+import { useNavigate } from 'react-router';
 
 // 🚀 دالة فولاذية قسرية موضوعة هنا لضمان قراءتها متجاوزة أي كاش
 const getCloudUrl = (img?: string | null) => {
@@ -116,6 +117,7 @@ function UploadProgressBar({ progress }: { progress: UploadProgress }) {
 }
 
 export function CoursesPage() {
+  const navigate = useNavigate();
   const { courses, addCourse, updateCourse, deleteCourse, fetchCourses, isLoading, error } = useCoursesStore();
   const { modules, fetchModules } = useModulesStore();
   const { lessons, fetchLessons } = useLessonsStore();
@@ -224,6 +226,7 @@ export function CoursesPage() {
     if (!form.thumbnailFile && form.thumbnailUrl && !form.thumbnailUrl.startsWith('http')) {
       e.thumbnailUrl = 'الرابط غير صالح. تأكد من أنه يبدأ بـ http:// أو https://';
     }
+    if (form.isPaid && (!form.price.trim() || !Number.isFinite(Number(form.price)) || Number(form.price) <= 0)) e.price = 'السعر الأساسي بالدولار مطلوب للمقررات المدفوعة';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -603,6 +606,7 @@ export function CoursesPage() {
                     <div className="mb-3 sm:mb-4">
                       <ProgressBar percent={cLessons.length ? Math.round((publishedCLessons.length / cLessons.length) * 100) : 0} label="نسبة النشر" />
                     </div>
+                    {publishedCLessons.length === 0 && <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">هذا المقرر غير متاح للطلاب حتى يُنشر درس واحد على الأقل. المسودات تبقى متاحة للإدارة.</p>}
 
                     <div className="grid grid-cols-2 gap-2 mt-auto">
                       <div className="flex items-center gap-1.5 text-slate-500 font-medium text-xs border border-slate-100 rounded-lg p-1.5 sm:p-2 bg-slate-50/50">
@@ -613,6 +617,7 @@ export function CoursesPage() {
                         {new Date(course.createdAt).toLocaleDateString('ar-SA')}
                       </span>
                     </div>
+                    <button onClick={() => navigate(`/admin/courses/${course.id}/lessons`)} className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-extrabold text-white transition-colors hover:bg-emerald-700">إدارة المقرر ومحتواه</button>
                     {(course as any).courseType === 'LIVE' && <button disabled={convertingCourseId === course.id} onClick={async () => { if (!window.confirm('تحويل هذا المعسكر إلى مقرر مسجل؟')) return; const priceInput = window.prompt('سعر المقرر المسجل بالدولار (اختياري، اتركه فارغاً للإبقاء على السعر الحالي):'); if (priceInput === null) return; const discountInput = window.prompt('سعر الخصم بالدولار (اختياري، اتركه فارغاً للإبقاء على السعر الحالي):'); if (discountInput === null) return; const prices: Record<string, number | undefined> = {}; if (priceInput.trim()) prices.price = Number(priceInput); if (discountInput.trim()) prices.discountedPrice = Number(discountInput); if (Object.values(prices).some(value => value !== undefined && (!Number.isFinite(value) || value < 0))) { window.alert('أدخل أسعاراً صحيحة غير سالبة.'); return; } setConvertingCourseId(course.id); try { await courseService.convertToRecorded(course.id, prices); await fetchCourses(); } catch (e: any) { window.alert(e?.response?.data?.message ?? e?.message ?? 'تعذر تحويل المقرر'); } finally { setConvertingCourseId(null); } }} className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 disabled:opacity-50">{convertingCourseId === course.id ? 'جارٍ التحويل…' : 'تحويل إلى مقرر مسجل'}</button>}
                   </div>
                 </div>
@@ -703,7 +708,7 @@ export function CoursesPage() {
                     <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.isPaid} onChange={e=>setForm(p=>({...p,isPaid:e.target.checked}))}/>مقرر مدفوع</label>
                     <label className="text-sm font-bold">نوع المقرر<select className={inputCls(false)} value={form.courseType} onChange={e=>setForm(p=>({...p,courseType:e.target.value as FormState['courseType']}))}><option value="RECORDED">مسجل</option><option value="LIVE">معسكر مباشر</option></select></label>
                   </div>
-                  {form.isPaid && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['priceYerOld','السعر ر.ي قديم'],['discountedPriceYerOld','سعر الخصم ر.ي قديم'],['priceYerNew','السعر ر.ي جديد'],['discountedPriceYerNew','سعر الخصم ر.ي جديد'],['priceSar','السعر ر.س'],['discountedPriceSar','سعر الخصم ر.س'],['price','السعر USD'],['discountedPrice','سعر الخصم USD']].map(([key,label])=><label key={key} className="text-xs font-bold text-slate-600">{label}<input type="number" min="0" value={form[key as keyof FormState] as string} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} className={`${inputCls(false)} mt-1`} /></label>)}</div>}
+                  {form.isPaid && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['price','Base price (USD) *'],['discountedPrice','Discounted price (USD)'],['priceSar','Price (SAR)'],['discountedPriceSar','Discounted price (SAR)'],['priceYerOld','Price (YER old)'],['discountedPriceYerOld','Discounted price (YER old)'],['priceYerNew','Price (YER new)'],['discountedPriceYerNew','Discounted price (YER new)']].map(([key,label])=><label key={key} className="text-xs font-bold text-slate-600">{label}{key === 'price' && <span className="mt-1 block font-normal leading-relaxed text-slate-500">This field is required for paid courses. It represents the base price in US dollars ($ USD) and is the primary reference for international students and payments through Karty and bank cards.</span>}<input type="number" min="0" required={key === 'price'} value={form[key as keyof FormState] as string} onChange={e=>{setForm(p=>({...p,[key]:e.target.value})); setErrors(p=>({...p,price:undefined}));}} className={`${inputCls(key === 'price' && !!errors.price)} mt-1`} />{key === 'price' && errors.price && <span className="text-red-600">{errors.price}</span>}</label>)}</div>}
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {([['maxStudents','الحد الأقصى للطلاب'],['durationWeeks','المدة بالأسابيع'],['certificateMinScore','حد درجة الشهادة %'],['certificateMinAttendance','حد الحضور للشهادة %']] as const).map(([key,label])=><label key={key} className="text-xs font-bold text-slate-600">{label}<input type="number" min="0" value={form[key]} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} placeholder={key==='maxStudents'?'غير محدود':''} className={`${inputCls(false)} mt-1`} /></label>)}
                     <label className="text-xs font-bold text-slate-600">تاريخ البداية<input type="date" value={form.startDate} onChange={e=>setForm(p=>({...p,startDate:e.target.value}))} className={`${inputCls(false)} mt-1`}/></label>

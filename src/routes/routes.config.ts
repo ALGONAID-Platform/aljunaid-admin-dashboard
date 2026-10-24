@@ -15,6 +15,7 @@ export const ROUTES = {
   media: '/admin/media',
   payments: '/admin/payments',
   assignments: '/admin/assignments',
+  notifications: '/admin/notifications',
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];
