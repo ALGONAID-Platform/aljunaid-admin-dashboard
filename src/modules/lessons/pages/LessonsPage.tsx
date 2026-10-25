@@ -1263,7 +1263,14 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-bold text-slate-600">أو ارفع فيديو للمقرر (MP4, MOV, AVI, MKV, WebM · حتى 1 GB)</span><button type="button" disabled={!form.courseId || videoUploadProgress?.percent !== undefined && videoUploadProgress.percent < 100} onClick={()=>videoInputRef.current?.click()} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">اختيار فيديو</button><input ref={videoInputRef} type="file" accept=".mp4,.mov,.avi,.mkv,.webm,video/*" className="hidden" onChange={e=>void uploadLessonVideo(e.target.files?.[0])}/></div>
                       {!form.courseId && <p className="text-xs text-amber-700">اختر المقرر أولاً لرفع الفيديو إلى مجلده.</p>}
-                      {videoUploadProgress && <div><div className="h-2 overflow-hidden rounded bg-slate-200"><div className="h-full bg-indigo-500" style={{width:`${videoUploadProgress.percent}%`}}/></div><p className="mt-1 text-xs text-slate-500">{videoUploadProgress.percent}% · {(videoUploadProgress.loaded/1024/1024).toFixed(1)} / {(videoUploadProgress.total/1024/1024).toFixed(1)} MB</p></div>}
+                      {videoUploadProgress && <div role="status" aria-live="polite"><div
+                        role="progressbar"
+                        aria-label="تقدم رفع الفيديو"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={videoUploadProgress.percent}
+                        className="h-2 overflow-hidden rounded bg-slate-200"
+                      ><div className="h-full rounded bg-indigo-600 transition-[width] duration-200" style={{width:`${videoUploadProgress.percent}%`}}/></div><p className="mt-1 text-xs font-medium text-slate-600">{videoUploadProgress.percent === 100 ? 'اكتمل رفع الفيديو' : 'جارٍ رفع الفيديو'} · {videoUploadProgress.percent}% · {(videoUploadProgress.loaded/1024/1024).toFixed(1)} / {(videoUploadProgress.total/1024/1024).toFixed(1)} MB</p></div>}
                       {videoFileInfo && <p className="break-all text-xs text-emerald-700">{videoFileInfo.name} · {(videoFileInfo.size/1024/1024).toFixed(1)} MB · {form.videoUrl}</p>}
                       {videoUploadError && <p role="alert" className="text-xs font-semibold text-red-600">{videoUploadError}</p>}
                     </div>

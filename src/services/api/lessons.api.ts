@@ -105,14 +105,36 @@ function buildLessonFormData(payload: {
 export const lessonService = {
   async getAllPages(params: { moduleId?: string } = {}): Promise<BackendLesson[]> {
     const limit = 100;
-    const firstResponse = await api.get<any>('/lessons/search', { params: { q: '', ...params, page: 1, limit } });
-    const firstPayload = firstResponse.data;
-    const firstItems: BackendLesson[] = Array.isArray(firstPayload) ? firstPayload : firstPayload?.data ?? [];
-    const totalPages = Math.max(1, Number(firstPayload?.meta?.totalPages) || 1);
-    const rest = await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) =>
-      api.get<any>('/lessons/search', { params: { q: '', ...params, page: index + 2, limit } })
-    ));
-    return [firstItems, ...rest.map(({ data }) => Array.isArray(data) ? data : data?.data ?? [])].flat();
+    const lessons: BackendLesson[] = [];
+    let page = 1;
+    let totalPages = 1;
+
+    // The API returns { data, meta: { total, page, limit, totalPages } }.
+    // Read pages in order so a large lesson library does not create a burst of
+    // concurrent requests (and tolerate the unpaginated array response).
+    do {
+      const { data: response } = await api.get<any>('/lessons/search', {
+        params: { q: '', ...params, page, limit },
+      });
+      let body = response;
+      // Some deployments wrap the standard response once more in `data`.
+      if (!Array.isArray(body) && body?.data && !Array.isArray(body.data) && body.data.data) {
+        body = body.data;
+      }
+      const items: BackendLesson[] = Array.isArray(body)
+        ? body
+        : Array.isArray(body?.data) ? body.data : [];
+      lessons.push(...items);
+
+      const meta = body?.meta;
+      totalPages = Math.max(1, Number(meta?.totalPages) || (meta?.total != null
+        ? Math.ceil(Number(meta.total) / (Number(meta.limit) || limit))
+        : 1));
+      if (!meta && items.length === limit) totalPages = page + 1;
+      page += 1;
+    } while (page <= totalPages);
+
+    return lessons;
   },
   async getPdfs(lessonId: string): Promise<Array<{ id: string; title?: string; url: string; order?: number }>> {
     const { data } = await api.get<any>(`/lessons/${lessonId}/pdfs`);

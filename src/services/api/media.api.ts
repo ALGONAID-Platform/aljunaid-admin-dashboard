@@ -100,7 +100,14 @@ export const mediaApi = {
     const body = new FormData(); body.append('file', file);
     const { data } = await api.post(`/media/courses/${courseId}/videos`, body, {
       timeout: 0,
-      onUploadProgress: event => { if (event.total && onProgress) onProgress({ percent: Math.round(event.loaded * 100 / event.total), loaded: event.loaded, total: event.total }); },
+      onUploadProgress: event => {
+        if (!onProgress) return;
+        // Some browsers/adapters omit `total`; the selected file size still
+        // gives us a useful estimate for upload progress.
+        const total = event.total || file.size;
+        const loaded = Math.min(event.loaded, total);
+        onProgress({ percent: Math.min(100, Math.round(loaded * 100 / total)), loaded, total });
+      },
     });
     return data as { url?: string; videoUrl?: string; originalName?: string; size?: number; fileName?: string };
   },
