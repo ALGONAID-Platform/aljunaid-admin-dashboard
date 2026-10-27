@@ -62,23 +62,28 @@ export function getImageUrl(path?: string | null): string {
 
   const cleanPath = path.trim();
 
-  // 2. إذا كان الرابط كاملاً أصلاً (سحابي أو محلي مؤقت blob)، نعيده كما هو
-  if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://') || cleanPath.startsWith('blob:')) {
+  // Preserve complete URLs returned by the API (including data/blob previews).
+  if (/^(https?:|blob:|data:)/i.test(cleanPath)) {
     return cleanPath;
   }
 
-  // 3. إذا كان الرابط عبارة عن UUID من Uploadcare (لا يبدأ بشرطة مائلة / )
-  if (!cleanPath.startsWith('/')) {
-    // نزيل أي شرطة مائلة زائدة في النهاية إن وجدت لتجنب تكرارها
-    const uuid = cleanPath.replace(/\/$/, '');
-    return `https://ucarecdn.com/${uuid}/`;
+  // Uploadcare can return its file UUID instead of a path or full URL.
+  if (/^[a-f\d]{32}$/i.test(cleanPath)) {
+    return `https://ucarecdn.com/${cleanPath}/`;
   }
 
-  // 4. معالجة المسارات النسبية للسيرفر (مع تجاوز خطأ TypeScript للـ env)
-  const meta = import.meta as any; // 🚀 الخدعة هنا لإسكات TypeScript
-  const configuredBaseUrl = (meta.env?.VITE_API_URL as string) || 'https://api.exchangesmangement.online/api/v1';
+  const configuredBaseUrl = import.meta.env.VITE_IMAGE_BASE_URL?.trim()
+    || import.meta.env.VITE_API_URL?.trim()
+    || 'https://api.exchangesmangement.online/api/v1';
 
-  // تنظيف رابط السيرفر الأساسي
-  const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
-  return `${baseUrl}${cleanPath}`;
+  try {
+    const imageBase = new URL(configuredBaseUrl);
+    // API endpoints often include /api/v1; media paths are rooted at the server.
+    imageBase.pathname = imageBase.pathname.replace(/\/api\/v\d+\/?$/, '').replace(/\/+$/, '');
+    const relativePath = cleanPath.replace(/^\/+/, '').replace(/^api\/v\d+\//, '');
+    return new URL(relativePath, `${imageBase.origin}${imageBase.pathname}/`).toString();
+  } catch {
+    // Keep a usable URL if a deployment provides a malformed base setting.
+    return cleanPath;
+  }
 }

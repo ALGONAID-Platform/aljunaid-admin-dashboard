@@ -18,28 +18,13 @@ import { StickyToolbar } from '../../../components/ui/StickyToolbar';
 import { GlobalSearch } from '../../../components/ui/GlobalSearch';
 import { SavedViews } from '../../../components/ui/SavedViews';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
+import { ModuleManagerModal } from '../../../components/ui/ModuleManagerModal';
 import { PageGuide } from '../../../components/ui/PageGuide';
 import type { Course } from '../../../types';
 import { courseService } from '../../../services/api/courses.api';
 import { useNavigate } from 'react-router';
+import { toast } from 'react-hot-toast';
 
-// 🚀 دالة فولاذية قسرية موضوعة هنا لضمان قراءتها متجاوزة أي كاش
-const getCloudUrl = (img?: string | null) => {
-  if (!img || img.trim() === '') {
-    return 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found';
-  }
-  const clean = img.trim();
-  if (clean.startsWith('http') || clean.startsWith('blob:')) return clean;
-
-  // استخراج المعرف النقي فقط
-  const uuidMatch = clean.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-  if (uuidMatch) {
-    // بناء الرابط القياسي المعتمد لعرض الصور في Uploadcare بدون شرطة مائلة نهائية قد تسبب 404
-    return `https://ucarecdn.com/${uuidMatch[0]}/-/preview/`;
-  }
-
-  return clean;
-};
 interface FormState {
   title: string;
   description: string;
@@ -57,6 +42,13 @@ const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thu
 const normalizeSearchText = (value: unknown) => String(value ?? '')
   .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
   .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').toLocaleLowerCase().trim();
+
+const matchesCourseSearch = (value: unknown, query: string) => {
+  const textTerms = normalizeSearchText(value).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const queryTerms = normalizeSearchText(query).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  if (!textTerms.length || !queryTerms.length) return false;
+  return textTerms.some((_, index) => queryTerms.every((term, offset) => textTerms[index + offset]?.startsWith(term)));
+};
 
 type FormError = Partial<Record<keyof FormState | 'submit', string>>;
 type SaveStatus = 'idle' | 'uploading' | 'loading' | 'success' | 'error';
@@ -129,10 +121,13 @@ export function CoursesPage() {
   const [convertingCourseId, setConvertingCourseId] = useState<string | null>(null);
 
   const [showModal, setShowModal] = useState(false);
+  const [showModuleManager, setShowModuleManager] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [searchQuery, setSearchQuery] = useState('');
+  const [apiMatchedCourseIds, setApiMatchedCourseIds] = useState<Set<string> | null>(null);
+  const [isCourseSearchLoading, setIsCourseSearchLoading] = useState(false);
   const [activeView, setActiveView] = useState('all');
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -143,6 +138,37 @@ export function CoursesPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setCurrentPage(1); setSelectedCourses([]); }, [searchQuery, activeView, itemsPerPage]);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setApiMatchedCourseIds(null);
+      setIsCourseSearchLoading(false);
+      return;
+    }
+
+    let active = true;
+    setApiMatchedCourseIds(null);
+    setIsCourseSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      void courseService.search(query)
+        .then(results => {
+          if (active) setApiMatchedCourseIds(new Set(results.filter(course => matchesCourseSearch(course.title, query)).map(course => String(course.id))));
+        })
+        .catch(() => {
+          // Keep the dashboard's local search working if the public API search is unavailable.
+          if (active) setApiMatchedCourseIds(null);
+        })
+        .finally(() => {
+          if (active) setIsCourseSearchLoading(false);
+        });
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   useEffect(() => {
     void fetchCourses();
@@ -191,22 +217,31 @@ export function CoursesPage() {
 
   const openCreate = () => { resetModal(); setShowModal(true); };
 
-  const openEdit = (course: Course) => {
+  const openEdit = async (course: Course) => {
+    let editableCourse: Course;
+    try {
+      // The public course list omits descriptions. Fetch the full course record
+      // before populating the edit form so the saved description is preserved.
+      editableCourse = { ...course, ...await courseService.getById(String(course.id)) };
+    } catch (err: any) {
+      toast.error(err?.message || 'تعذر تحميل بيانات المقرر للتعديل.');
+      return;
+    }
     resetModal();
-    setEditingId(course.id);
+    setEditingId(editableCourse.id);
     setForm({
       ...emptyForm,
-      title: course.title,
-      description: course.description,
-      thumbnailUrl: course.thumbnail || '',
+      title: editableCourse.title,
+      description: editableCourse.description ?? '',
+      thumbnailUrl: editableCourse.thumbnail || '',
       thumbnailFile: null,
-      isPaid: Boolean(course.isPaid),
-      courseType: (course.courseType as FormState['courseType']) ?? 'RECORDED',
-      ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, (course as any)[k] == null ? '' : String((course as any)[k])])) as Partial<FormState>,
-      startDate: course.startDate?.slice(0, 10) ?? '', endDate: course.endDate?.slice(0, 10) ?? '',
-      scheduleDaysText: String((course as any).scheduleDaysText ?? ''), objectives: Array.isArray((course as any).objectives) ? [...(course as any).objectives] : []
+      isPaid: Boolean(editableCourse.isPaid),
+      courseType: (editableCourse.courseType as FormState['courseType']) ?? 'RECORDED',
+      ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, (editableCourse as any)[k] == null ? '' : String((editableCourse as any)[k])])) as Partial<FormState>,
+      startDate: editableCourse.startDate?.slice(0, 10) ?? '', endDate: editableCourse.endDate?.slice(0, 10) ?? '',
+      scheduleDaysText: String((editableCourse as any).scheduleDaysText ?? ''), objectives: Array.isArray((editableCourse as any).objectives) ? [...(editableCourse as any).objectives] : []
     });
-    if (course.thumbnail) setPreviewUrl(course.thumbnail);
+    if (editableCourse.thumbnail) setPreviewUrl(editableCourse.thumbnail);
     setShowModal(true);
   };
 
@@ -262,8 +297,10 @@ export function CoursesPage() {
 
       if (editingId) {
         await updateCourse({ id: editingId, ...payload });
+        toast.success('تم تحديث المقرر بنجاح');
       } else {
         await addCourse(payload);
+        toast.success('تم إنشاء المقرر بنجاح');
       }
 
       setSaveStatus('success');
@@ -273,6 +310,7 @@ export function CoursesPage() {
         void fetchCourses();
       }, 1000);
     } catch (err) {
+      toast.error((err as any)?.response?.data?.message || (err as any)?.message || 'تعذر حفظ المقرر');
       setSaveStatus('error');
       const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'تعذر حفظ البيانات بسبب خطأ في النظام.';
       setErrors(prev => ({ ...prev, submit: Array.isArray(msg) ? msg[0] : msg }));
@@ -301,7 +339,9 @@ export function CoursesPage() {
       setSaveStatus('idle');
       setUploadProgress(null);
       setUploadError(null);
+      toast.success('تم رفع صورة المقرر بنجاح');
     } catch (err) {
+      toast.error(classifyUploadError(err).message || 'تعذر رفع الصورة');
       setUploadError(classifyUploadError(err));
       setSaveStatus('idle');
       setUploadProgress(null);
@@ -340,9 +380,11 @@ export function CoursesPage() {
     setDeleteStatus('loading');
     try {
       await deleteCourse(id);
+      toast.success('تم حذف المقرر');
       setDeleteConfirm(null);
       setDeleteStatus('idle');
     } catch {
+      toast.error('تعذر حذف المقرر');
       setDeleteStatus('error');
     }
   };
@@ -352,9 +394,9 @@ export function CoursesPage() {
   const filteredCourses = courses.filter(c => {
     const query = normalizeSearchText(searchQuery);
     const searchableValues = [c.title, c.description, c.objectives, c.keywords, c.tags];
-    const matchesSearch = !query || searchableValues.some(value => {
+    const matchesSearch = !query || apiMatchedCourseIds?.has(String(c.id)) || searchableValues.some(value => {
       const text = Array.isArray(value) ? value.join(' ') : value;
-      return normalizeSearchText(text).includes(query);
+      return matchesCourseSearch(text, query);
     });
     let matchesView = true;
     if (activeView === 'no_image') matchesView = !c.thumbnail;
@@ -393,8 +435,9 @@ export function CoursesPage() {
         }
       }
       setSelectedCourses([]);
+      toast.success(action === 'delete' ? 'تم حذف المقررات المحددة' : 'تم نسخ المقررات المحددة');
     } catch {
-      alert('حدث خطأ أثناء تنفيذ الإجراء المجمع.');
+      toast.error('حدث خطأ أثناء تنفيذ الإجراء المجمع.');
     } finally {
       setBulkActionLoading(false);
     }
@@ -460,9 +503,11 @@ export function CoursesPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث باسم المقرر أو وصفه أو أهدافه..."
+              aria-busy={isCourseSearchLoading}
+              placeholder="ابحث باسم المقرر أو الوحدة أو الدرس أو الوصف..."
               className="min-h-12 w-full min-w-0 pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
             />
+            {isCourseSearchLoading && <Loader2 aria-label="جارٍ البحث" className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-emerald-600" />}
           </div>
           <SavedViews
             activeView={activeView}
@@ -558,7 +603,13 @@ export function CoursesPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paginatedCourses.map(course => {
-              const cLessons = lessons.filter(l => String(l.courseId) === String(course.id) || String(modules.find(m => String(m.id) === String(l.courseId))?.courseId) === String(course.id));
+              const cLessons = lessons.filter(l => {
+                if (course.isPaid === true) return String(l.courseId) === String(course.id);
+                const lessonModule = modules.find(m => String(m.id) === String(l.courseId));
+                return lessonModule
+                  ? String(lessonModule.courseId) === String(course.id)
+                  : String(l.courseId) === String(course.id);
+              });
               const publishedCLessons = cLessons.filter(l => l.isPublished);
               const isSelected = selectedCourses.includes(course.id);
               const toggleSelect = () => setSelectedCourses(p => p.includes(course.id) ? p.filter(id => id !== course.id) : [...p, course.id]);
@@ -583,13 +634,10 @@ export function CoursesPage() {
                     </div>
                     {course.thumbnail ? (
                       <img
-                        src={getCloudUrl(course.thumbnail)}
+                        src={getImageUrl(course.thumbnail)}
                         alt={course.title}
                         className="w-full h-full object-cover"
                         onError={e => {
-                          // 🔍 أداة التجسس الهندسية لمعرفة ما يدور في الخفاء
-                          console.error('[THUMB DEBUG] raw value:', course.thumbnail, '| type:', typeof course.thumbnail, '| resolved URL:', getCloudUrl(course.thumbnail));
-
                           (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found';
                         }}
                       />
@@ -688,6 +736,17 @@ export function CoursesPage() {
               )}
 
               <div className="space-y-6">
+                {editingId && !form.isPaid && (
+                  <section className="flex flex-col gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-800">وحدات المقرر</h4>
+                      <p className="mt-1 text-xs text-slate-500">أضف وحدات هذا المقرر أو عدّلها.</p>
+                    </div>
+                    <button type="button" onClick={() => setShowModuleManager(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50">
+                      <Plus className="h-4 w-4" /> إدارة الوحدات
+                    </button>
+                  </section>
+                )}
                 <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-5 relative">
                   <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-100 text-xs font-bold text-emerald-600 shadow-sm flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -761,7 +820,7 @@ export function CoursesPage() {
                           </button>
                         </div>
                         <img
-                          src={previewUrl ? previewUrl : form.thumbnailUrl}
+                          src={previewUrl ? getImageUrl(previewUrl) : getImageUrl(form.thumbnailUrl)}
                           alt="معاينة الغلاف"
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           onError={e => { (e.target as HTMLImageElement).src = 'https://placehold.co/800x400/F8FAFC/94A3B8?text=Image+Not+Found'; }}
@@ -840,6 +899,11 @@ export function CoursesPage() {
           </div>
         </div>
       )}
+      {!form.isPaid && <ModuleManagerModal
+        isOpen={showModuleManager}
+        onClose={() => setShowModuleManager(false)}
+        initialCourseId={editingId ?? undefined}
+      />}
     </div>
   );
 }

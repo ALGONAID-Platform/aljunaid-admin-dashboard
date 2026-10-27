@@ -3,6 +3,7 @@ import { api } from '../../../lib/api';
 import { Check, X, RefreshCw, Plus, WalletCards, ReceiptText, History, Search, Zap, ShieldCheck } from 'lucide-react';
 import { Pagination } from '../../../components/ui/Pagination';
 import { getPaymentMethod } from '../utils/paymentType';
+import { toast } from 'react-hot-toast';
 
 type Account = { id: number | string; providerTitle: string; accountHolder: string; accountNumber: string; currency?: string; instructions?: string; qrCodeUrl?: string; isActive: boolean; order: number };
 type Payment = { id: number | string; status: string; amount?: number; currency?: string; transactionNumber?: string; paymentAccountId?: number | string; reviewedById?: number | string; receiptUrl?: string; receiptImageUrl?: string; notes?: string; createdAt?: string; reviewedAt?: string; rejectionReason?: string; student?: any; course?: any; paymentAccount?: Account; enrollment?: { status?: string } };
@@ -47,7 +48,7 @@ export function PaymentsPage() {
     setLoading(true);
     setMessage('');
     try {
-      const endpoint = tab === 'history' ? '/payments/admin/all' : '/payments/admin/pending';
+      const endpoint = tab === 'history' ? '/payments' : '/payments/pending';
       const response = await api.get(endpoint);
       let accountList: Account[] = [];
       try {
@@ -111,8 +112,9 @@ export function PaymentsPage() {
       await api.patch(`/payments/${payment.id}/${action}`, action === 'reject' ? { reason } : undefined);
       setMessage(action === 'approve' ? 'تم اعتماد الدفع وتفعيل التسجيل.' : 'تم رفض طلب الدفع.');
       setMessageKind('success');
+      toast.success(action === 'approve' ? 'تم اعتماد الدفع وتفعيل التسجيل' : 'تم رفض طلب الدفع');
       await loadPayments();
-    } catch (error) { setMessage(errorText(error)); setMessageKind('error'); }
+    } catch (error) { setMessage(errorText(error)); setMessageKind('error'); toast.error(errorText(error)); }
     finally { setBusy(null); }
   };
 
@@ -125,13 +127,13 @@ export function PaymentsPage() {
     try {
       if (editing) await api.patch(`/payments/accounts/${editing.id}`, form);
       else await api.post('/payments/accounts', form);
-      setEditing(null); setAccountFormOpen(false); setMessage('تم حفظ حساب الدفع.'); setMessageKind('success'); await loadAccounts();
-    } catch (error) { setMessage(errorText(error)); setMessageKind('error'); }
+      setEditing(null); setAccountFormOpen(false); setMessage('تم حفظ حساب الدفع.'); setMessageKind('success'); toast.success('تم حفظ حساب الدفع'); await loadAccounts();
+    } catch (error) { setMessage(errorText(error)); setMessageKind('error'); toast.error(errorText(error)); }
   };
   const updateAccount = async (account: Account, patch: Partial<Account>) => {
     setBusy(String(account.id)); setMessage('');
-    try { await api.patch(`/payments/accounts/${account.id}`, patch); await loadAccounts(); }
-    catch (error) { setMessage(errorText(error)); setMessageKind('error'); }
+    try { await api.patch(`/payments/accounts/${account.id}`, patch); await loadAccounts(); toast.success(patch.isActive === undefined ? 'تم تحديث حساب الدفع' : patch.isActive ? 'تم تفعيل حساب الدفع' : 'تم إيقاف حساب الدفع'); }
+    catch (error) { setMessage(errorText(error)); setMessageKind('error'); toast.error(errorText(error)); }
     finally { setBusy(null); }
   };
 

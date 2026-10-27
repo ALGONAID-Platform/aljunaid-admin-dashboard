@@ -11,6 +11,8 @@ export function DashboardHome() {
   const fetchCourses = useCoursesStore((s) => s.fetchCourses);
   const lessons = useLessonsStore((s) => s.lessons);
   const fetchLessons = useLessonsStore((s) => s.fetchLessons);
+  const lessonsError = useLessonsStore((s) => s.error);
+  const lessonsLoading = useLessonsStore((s) => s.isLoading);
   const quizzes = useQuizzesStore((s) => s.quizzes);
   const fetchQuizzes = useQuizzesStore((s) => s.fetchQuizzes);
   const isLoading = useCoursesStore((s) => s.isLoading);
@@ -146,6 +148,21 @@ export function DashboardHome() {
         />
       </div>
 
+      {lessonsError && (
+        <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+            <div>
+              <p className="font-bold text-red-800">تعذر تحميل الدروس</p>
+              <p className="text-sm text-red-700">{lessonsError}</p>
+            </div>
+          </div>
+          <button disabled={lessonsLoading} onClick={() => void fetchLessons()} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60">
+            {lessonsLoading ? 'جارٍ إعادة المحاولة…' : 'إعادة المحاولة'}
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
         {/* Activity Feed Section */}
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full">
@@ -205,7 +222,6 @@ export function DashboardHome() {
             </div>
           ) : (
             <div className="flex flex-col h-full">
-              {/* Progress Chart Widget */}
               <div className="p-6 pb-4 border-b border-slate-100">
                 <div className="flex justify-between items-end mb-3">
                   <div>
@@ -218,51 +234,31 @@ export function DashboardHome() {
                     </svg>
                   </div>
                 </div>
-
                 <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-4 shadow-inner">
-                  <div
-                    className="h-full rounded-full transition-all duration-1000 ease-out"
-                    style={{ width: `${completionPercentage}%`, background: 'linear-gradient(90deg, #10B981, #059669)' }}
-                  />
+                  <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${completionPercentage}%`, background: 'linear-gradient(90deg, #10B981, #059669)' }} />
                 </div>
-
                 <div className="flex gap-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div className="flex-1 flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />
-                      <span className="text-slate-500 text-xs font-bold">متاح للطلاب</span>
-                    </div>
+                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" /><span className="text-slate-500 text-xs font-bold">متاح للطلاب</span></div>
                     <span className="text-slate-800 font-black pl-4">{publishedLessons.length} درس</span>
                   </div>
-                  <div className="w-px bg-slate-200"></div>
+                  <div className="w-px bg-slate-200" />
                   <div className="flex-1 flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-slate-300 shadow-sm" />
-                      <span className="text-slate-500 text-xs font-bold">قيد المراجعة</span>
-                    </div>
+                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-slate-300 shadow-sm" /><span className="text-slate-500 text-xs font-bold">قيد المراجعة</span></div>
                     <span className="text-slate-800 font-black pl-4">{unpublishedLessons.length} مسودة</span>
                   </div>
                 </div>
               </div>
-
-              {/* Mini List */}
               <div className="p-2 flex-1 overflow-y-auto max-h-[220px] custom-scrollbar">
                 {lessons.slice(0, 5).map((lesson) => (
                   <div key={lesson.id} className="interactive-surface px-4 py-3 flex items-center justify-between hover:bg-slate-50 rounded-xl transition-colors mx-2 my-1 group">
                     <div className="flex items-center gap-3 min-w-0">
                       {lesson.isPublished
                         ? <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100"><CheckCircle2 className="w-4 h-4" /></div>
-                        : <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 border border-slate-200"><Clock className="w-4 h-4" /></div>
-                      }
+                        : <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 border border-slate-200"><Clock className="w-4 h-4" /></div>}
                       <span className="text-slate-700 font-bold text-sm truncate group-hover:text-emerald-600 transition-colors">{lesson.title}</span>
                     </div>
-                    <span
-                      className="text-[10px] font-bold px-2.5 py-1 rounded-md flex-shrink-0 ml-2"
-                      style={lesson.isPublished
-                        ? { background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' }
-                        : { background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }
-                      }
-                    >
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-md flex-shrink-0 ml-2" style={lesson.isPublished ? { background: '#ECFDF5', color: '#059669', border: '1px solid #A7F3D0' } : { background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}>
                       {lesson.isPublished ? 'نشط' : 'مسودة'}
                     </span>
                   </div>

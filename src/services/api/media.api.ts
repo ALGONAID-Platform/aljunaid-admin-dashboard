@@ -1,5 +1,6 @@
 import { api } from '../../lib/api';
 import { UploadMediaResponse } from '../../types/media.types';
+import { createUploadProgressReporter } from '../../utils/uploadProgress';
 
 export interface UploadProgress {
   percent: number;
@@ -98,18 +99,21 @@ export const mediaApi = {
     if (!allowed.includes(ext)) throw new Error('صيغة الفيديو غير مدعومة. استخدم MP4 أو MOV أو AVI أو MKV أو WebM.');
     if (file.size > 1024 * 1024 * 1024) throw new Error('حجم الفيديو يتجاوز الحد الأقصى 1 GB.');
     const body = new FormData(); body.append('file', file);
+    const reportProgress = createUploadProgressReporter(onProgress, file.size);
     const { data } = await api.post(`/media/courses/${courseId}/videos`, body, {
       timeout: 0,
-      onUploadProgress: event => {
-        if (!onProgress) return;
-        // Some browsers/adapters omit `total`; the selected file size still
-        // gives us a useful estimate for upload progress.
-        const total = event.total || file.size;
-        const loaded = Math.min(event.loaded, total);
-        onProgress({ percent: Math.min(100, Math.round(loaded * 100 / total)), loaded, total });
-      },
+      onUploadProgress: event => reportProgress(event.loaded, event.total),
     });
-    return data as { url?: string; videoUrl?: string; originalName?: string; size?: number; fileName?: string };
+    // Admin endpoints may wrap successful payloads in `{ data: ... }`.
+    // Normalize here so callers always receive the actual URL-bearing object.
+    let result: any = data;
+    for (let depth = 0; depth < 4 && result && typeof result === 'object'; depth += 1) {
+      if (result.videoUrl || result.url) break;
+      if (result.data && typeof result.data === 'object') result = result.data;
+      else if (result.file && typeof result.file === 'object') result = result.file;
+      else break;
+    }
+    return result as { url?: string; videoUrl?: string; originalName?: string; size?: number; fileName?: string };
   },
   /**
    * Upload an image to the VPS canonical endpoint
@@ -126,20 +130,13 @@ export const mediaApi = {
 
     const formData = new FormData();
     formData.append('file', file);
+    const reportProgress = createUploadProgressReporter(onProgress, file.size);
 
     try {
       const response = await api.post<UploadMediaResponse>('/media/images', formData, {
         timeout: 0,
         headers: { Accept: 'application/json' },
-        onUploadProgress: (evt) => {
-          if (onProgress && evt.total) {
-            onProgress({
-              percent: Math.round((evt.loaded * 100) / evt.total),
-              loaded: evt.loaded,
-              total: evt.total,
-            });
-          }
-        },
+        onUploadProgress: (evt) => reportProgress(evt.loaded, evt.total),
       });
 
       return response.data;

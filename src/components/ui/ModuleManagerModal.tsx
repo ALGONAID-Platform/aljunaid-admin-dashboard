@@ -21,7 +21,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
   onModuleSelected,
 }) => {
   const { courses, fetchCourses } = useCoursesStore();
-  const { modules, fetchModules, addModule, updateModule } = useModulesStore();
+  const { modules, fetchModules, fetchModulesByCourse, addModule, updateModule } = useModulesStore();
   const { lessons } = useLessonsStore();
   const { content } = useContentStore();
   const { examModels, fetchExamModels } = useExamModelsStore();
@@ -51,21 +51,26 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       void fetchCourses();
-      void fetchModules();
       void fetchExamModels();
       if (initialCourseId) {
         setSelectedCourseId(initialCourseId);
         setTargetCourseId(initialCourseId);
+        void fetchModulesByCourse(initialCourseId);
       } else if (courses.length > 0 && !targetCourseId) {
         setTargetCourseId(String(courses[0].id));
+        void fetchModules();
+      } else {
+        void fetchModules();
       }
     }
-  }, [isOpen, initialCourseId, fetchCourses, fetchModules, fetchExamModels]);
+  }, [isOpen, initialCourseId, fetchCourses, fetchModules, fetchModulesByCourse, fetchExamModels]);
 
   if (!isOpen) return null;
 
   const filteredModules = modules.filter(m => {
-    const matchesCourse = selectedCourseId === 'all' || String(m.courseId) === String(selectedCourseId);
+    const matchesCourse = initialCourseId
+      ? String(m.courseId) === String(initialCourseId)
+      : selectedCourseId === 'all' || String(m.courseId) === String(selectedCourseId);
     const matchesSearch = m.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (m.description && m.description.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesCourse && matchesSearch;
@@ -79,7 +84,9 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
     setImageUrl('');
     setFormError(null);
     setFormSuccess(null);
-    if (selectedCourseId !== 'all') {
+    if (initialCourseId) {
+      setTargetCourseId(initialCourseId);
+    } else if (selectedCourseId !== 'all') {
       setTargetCourseId(selectedCourseId);
     } else if (courses.length > 0) {
       setTargetCourseId(String(courses[0].id));
@@ -206,17 +213,23 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   المقرر المرجعي <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={targetCourseId}
-                  onChange={e => setTargetCourseId(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 transition-colors"
-                >
-                  <option value="" disabled>اختر المقرر...</option>
-                  {courses.map(c => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
+                {initialCourseId ? (
+                  <div className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
+                    {courses.find(course => String(course.id) === String(initialCourseId))?.title || 'المقرر الحالي'}
+                  </div>
+                ) : (
+                  <select
+                    value={targetCourseId}
+                    onChange={e => setTargetCourseId(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 transition-colors"
+                  >
+                    <option value="" disabled>اختر المقرر...</option>
+                    {courses.map(c => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -348,7 +361,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                 />
               </div>
 
-              <div className="w-full sm:w-48">
+              {!initialCourseId && <div className="w-full sm:w-48">
                 <select
                   value={selectedCourseId}
                   onChange={e => setSelectedCourseId(e.target.value)}
@@ -359,7 +372,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                     <option key={c.id} value={c.id}>{c.title}</option>
                   ))}
                 </select>
-              </div>
+              </div>}
             </div>
 
             {/* Modules List Container */}

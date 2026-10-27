@@ -79,6 +79,7 @@ export default function MediaPage() {
       
       if (finalResult && finalResult.url) {
         setUploadResult(finalResult);
+        toast.success('تم رفع الصورة بنجاح');
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -88,13 +89,15 @@ export default function MediaPage() {
     } catch (err: any) {
       console.error("❌ فشل الرفع:", err);
       setErrorMsg(err.message || 'فشل رفع الصورة');
+      toast.error(err.message || 'فشل رفع الصورة');
     }
   };
 
   const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopySuccess(id);
-    setTimeout(() => setCopySuccess(null), 2000);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopySuccess(id);
+      setTimeout(() => setCopySuccess(null), 2000);
+    }).catch(() => setErrorMsg('تعذر النسخ إلى الحافظة'));
   };
 
   return (

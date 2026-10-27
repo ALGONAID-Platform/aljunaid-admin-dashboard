@@ -153,6 +153,8 @@ npm install
 Create a `.env` file in the root directory:
 ```env
 VITE_API_URL=https://algonaid-api.onrender.com/api/v1
+# Optional: origin/base path serving uploaded images (defaults to API server origin)
+VITE_IMAGE_BASE_URL=https://algonaid-api.onrender.com
 ```
 
 ### 4. Running Locally
@@ -180,6 +182,7 @@ npm run preview
 | Variable | Required | Description | Default |
 | :--- | :---: | :--- | :--- |
 | `VITE_API_URL` | Yes | Root endpoint URL for backend NestJS REST API | `https://algonaid-api.onrender.com/api/v1` |
+| `VITE_IMAGE_BASE_URL` | No | Base URL for relative uploaded image paths; defaults to the API server origin | — |
 
 ---
 

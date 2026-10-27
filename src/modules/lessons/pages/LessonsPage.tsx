@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, FileText, FileType2, Upload, Link
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, FileText, FileType2, Link
 } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
@@ -9,8 +9,6 @@ import { BulkActionBar } from '../../../components/ui/BulkActionBar';
 import { LessonPreviewModal } from '../../../components/ui/LessonPreviewModal';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { ActivityLog } from '../../../components/ui/ActivityLog';
-import { HealthScore } from '../../../components/ui/HealthScore';
-import { AIMagicButton } from '../../../components/ui/AIMagicButton';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { Breadcrumbs } from '../../../components/ui/Breadcrumbs';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
@@ -21,7 +19,6 @@ import { GlobalSearch } from '../../../components/ui/GlobalSearch';
 import { AdvancedFilters } from '../../../components/ui/AdvancedFilters';
 import { SavedViews } from '../../../components/ui/SavedViews';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
-import { ModuleManagerModal } from '../../../components/ui/ModuleManagerModal';
 import { PageGuide } from '../../../components/ui/PageGuide';
 import { Layers } from 'lucide-react';
 import type { BackendModule } from '../../../types/api';
@@ -29,6 +26,7 @@ import { lessonService } from '../../../services/api/lessons.api';
 import { mediaApi, type UploadProgress } from '../../../services/api/media.api';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
+import { toast } from 'react-hot-toast';
 
 const normalizeSearchText = (value: unknown) => String(value ?? '')
   .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
@@ -125,6 +123,7 @@ interface FormState {
   moduleId: string;
   title: string;
   description: string;
+  objectives: string[];
   order: string;
   type: LocalContentType;
   videoUrl: string;
@@ -138,7 +137,7 @@ interface FormState {
   liveStatus: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED';
   status: 'DRAFT' | 'PUBLISHED';
 }
-const emptyLessonForm: FormState = { courseId: '', moduleId: '', title: '', description: '', order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '', scheduledAt: '', durationMinutes: '', dayNumber: '', isMandatory: true, isFreePreview: false, liveStatus: 'SCHEDULED', status: 'DRAFT' };
+const emptyLessonForm: FormState = { courseId: '', moduleId: '', title: '', description: '', objectives: [''], order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '', scheduledAt: '', durationMinutes: '', dayNumber: '', isMandatory: true, isFreePreview: false, liveStatus: 'SCHEDULED', status: 'DRAFT' };
 
 type FormError = Partial<Record<keyof FormState | 'submit', string>>;
 type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -147,13 +146,12 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const navigate = useNavigate();
   const { courses, fetchCourses } = useCoursesStore();
   const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, error, isLoading } = useLessonsStore();
-  const { modules: allModules, fetchModules, addModule: createModule, updateModule: editModule, deleteModule: removeModule } = useModulesStore();
+  const { modules: allModules, fetchModules, fetchModulesByCourse } = useModulesStore();
 
   const [showModal, setShowModal] = useState(false);
-  const [showModuleManager, setShowModuleManager] = useState(false);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'lesson' | 'module'; id: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'lesson'; id: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [courseFilter, setCourseFilter] = useState<string>(scopedCourseId || 'all');
@@ -174,8 +172,9 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   useEffect(() => {
     void fetchCourses();
     void fetchLessons();
-    void fetchModules();
-  }, [fetchCourses, fetchLessons, fetchModules]);
+    if (scopedCourseId) void fetchModulesByCourse(scopedCourseId);
+    else void fetchModules();
+  }, [fetchCourses, fetchLessons, fetchModules, fetchModulesByCourse, scopedCourseId]);
 
   useEffect(() => {
     const syncStatuses = () => {
@@ -200,17 +199,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [form, setForm] = useState<FormState>(emptyLessonForm);
   const [errors, setErrors] = useState<FormError>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  
-  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
-  const [pdfUploadProgress, setPdfUploadProgress] = useState(0);
-
-  const [activeTab, setActiveTab] = useState<'details' | 'content'>('details');
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [formStep, setFormStep] = useState<1 | 2 | 3>(1);
   const [lessonPdfs, setLessonPdfs] = useState<Array<{ id: string; title?: string; url: string; order?: number }>>([]);
   const [newPdfUrl, setNewPdfUrl] = useState('');
   const [newPdfTitle, setNewPdfTitle] = useState('');
   const [pdfManagementError, setPdfManagementError] = useState('');
   const [pdfManagementLoading, setPdfManagementLoading] = useState(false);
+  const [pdfManagementProgress, setPdfManagementProgress] = useState<UploadProgress | null>(null);
   const [pdfListLoadFailed, setPdfListLoadFailed] = useState(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoUploadProgress, setVideoUploadProgress] = useState<UploadProgress | null>(null);
@@ -243,8 +238,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     }
   }, [form, showModal, editingLessonId]);
 
-  const filteredModules = allModules.filter(m => String(m.courseId) === String(form.courseId));
-  const selectedCourse = courses.find(course => String(course.id) === String(form.courseId));
+  const filteredModules = scopedCourseId
+    ? allModules.filter(module => String(module.courseId) === String(scopedCourseId))
+    : allModules;
+  const selectedCourse = courses.find(course => String(course.id) === String(scopedCourseId ?? form.courseId));
+  const isNonModuleCourse = selectedCourse?.isPaid === true;
   const modulesLoading = false;
   const [modulesError, setModulesError] = useState<string | null>(null);
 
@@ -256,56 +254,24 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     setSelectedLessons([]);
   });
   useKeyboardShortcut('s', true, (e) => {
-    if (showModal && isFormValid && saveStatus !== 'loading' && saveStatus !== 'success') {
+    if (showModal && formStep === 3 && saveStatus !== 'loading' && saveStatus !== 'success') {
       e.preventDefault();
       void handleSave();
     }
   });
-
-  // Inline Module Creation
-  const [isCreatingModule, setIsCreatingModule] = useState(false);
-  const [newModuleTitle, setNewModuleTitle] = useState('');
-  const [newModuleDesc, setNewModuleDesc] = useState('');
-  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
-  const [moduleCreateLoading, setModuleCreateLoading] = useState(false);
-
-  const [aiLoading, setAiLoading] = useState<'title' | 'desc' | null>(null);
-
-  const handleGenerateTitle = () => {
-    setAiLoading('title');
-    setTimeout(() => {
-      setForm(p => ({ ...p, title: 'الدرس ' + (form.order || 1) + ': استكشاف متقدم في ' + (courses.find(c => String(c.id) === form.courseId)?.name || 'المادة') }));
-      setAiLoading(null);
-    }, 800);
-  };
-
-  const handleGenerateDesc = () => {
-    setAiLoading('desc');
-    setTimeout(() => {
-      setForm(p => ({ ...p, description: 'ستتعلم في هذا الدرس المفاهيم الأساسية والتطبيق العملي بخطوات واضحة، مع التركيز على المخرجات التعليمية الحديثة لبناء فهم عميق ومستدام.' }));
-      setAiLoading(null);
-    }, 1000);
-  };
 
   const resetModal = useCallback(() => {
     setForm(emptyLessonForm);
     setErrors({});
     setSaveStatus('idle');
     setModulesError(null);
-    setIsCreatingModule(false);
-    setNewModuleTitle('');
-    setNewModuleDesc('');
-    setEditingModuleId(null);
     setEditingLessonId(null);
-    setPdfFile(null);
-    setLessonPdfs([]); setNewPdfUrl(''); setNewPdfTitle(''); setPdfManagementError(''); setPdfManagementLoading(false); setPdfListLoadFailed(false);
+    setLessonPdfs([]); setNewPdfUrl(''); setNewPdfTitle(''); setPdfManagementError(''); setPdfManagementLoading(false); setPdfManagementProgress(null); setPdfListLoadFailed(false);
     setVideoUploadProgress(null);
     setVideoUploadError('');
     setVideoFileInfo(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
-    setActiveTab('details');
-    setPdfUploadProgress(0);
-    setIsUploadingPdf(false);
+    setFormStep(1);
   }, []);
 
   useEffect(() => {
@@ -319,13 +285,14 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
   const openModal = () => {
     resetModal();
-    if (scopedCourseId) setForm({ ...emptyLessonForm, courseId: scopedCourseId });
+    const isScopedNonModuleCourse = courses.find(course => String(course.id) === String(scopedCourseId))?.isPaid === true;
+    if (scopedCourseId) setForm({ ...emptyLessonForm, courseId: scopedCourseId, ...(isScopedNonModuleCourse ? { moduleId: scopedCourseId } : {}) });
     const saved = sessionStorage.getItem('create_lesson_form_state');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         // Only restore state for new lessons
-        setForm({ ...emptyLessonForm, ...parsed, ...(scopedCourseId ? { courseId: scopedCourseId } : {}) });
+        setForm({ ...emptyLessonForm, ...parsed, ...(scopedCourseId ? { courseId: scopedCourseId, ...(isScopedNonModuleCourse ? { moduleId: scopedCourseId } : {}) } : {}) });
       } catch (e) {
         console.error('Failed to parse saved lesson form state', e);
       }
@@ -347,12 +314,17 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     setEditingLessonId(lesson.id);
     setShowModal(true);
     const parentModule = allModules.find(m => String(m.id) === String(lesson.courseId));
-    if (parentModule) {
+    const directCourse = courses.find(course => String(course.id) === String(lesson.courseId));
+    const lessonCourseId = scopedCourseId ?? String(directCourse?.isPaid ? directCourse.id : parentModule?.courseId ?? lesson.courseId);
+    const lessonCourse = courses.find(course => String(course.id) === String(lessonCourseId));
+    const lessonIsNonModule = lessonCourse?.isPaid === true;
+    if (parentModule && !lessonIsNonModule) {
       setForm({
-        courseId: String(parentModule.courseId),
+        courseId: String(lessonCourseId),
         moduleId: lesson.courseId,
         title: lesson.title,
         description: lesson.description || '',
+        objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
         type: (lesson as any).type || 'video',
         videoUrl: (lesson as any).videoUrl || '',
@@ -365,12 +337,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         status: (lesson as any).isPublished ? 'PUBLISHED' : 'DRAFT',
       });
     } else {
-      setModulesError('تعذر تحميل الوحدة المرتبطة بهذا الدرس.');
+      if (!lessonIsNonModule) setModulesError('تعذر تحميل الوحدة المرتبطة بهذا الدرس.');
       setForm({
-        courseId: '',
-        moduleId: lesson.courseId,
+        courseId: String(lessonCourseId),
+        moduleId: lessonIsNonModule ? String(lessonCourseId) : lesson.courseId,
         title: lesson.title,
         description: lesson.description || '',
+        objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
         type: (lesson as any).type || 'video',
         videoUrl: (lesson as any).videoUrl || '',
@@ -426,40 +399,6 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     return lessons.filter(l => l.courseId === form.moduleId).length + 1; // Backend maps moduleId to courseId temporarily in the list 
   };
 
-  const handleCreateModule = async () => {
-    if (!newModuleTitle.trim() || !newModuleDesc.trim() || !form.courseId) return;
-    setModuleCreateLoading(true);
-    try {
-      if (editingModuleId) {
-        await editModule(editingModuleId, {
-          courseId: form.courseId as any,
-          title: newModuleTitle.trim(),
-          description: newModuleDesc.trim(),
-        });
-        setForm(p => ({ ...p, moduleId: String(editingModuleId) }));
-      } else {
-        const newMod = await createModule({
-          courseId: form.courseId as any,
-          title: newModuleTitle.trim(),
-          description: newModuleDesc.trim(),
-        });
-        setForm(p => ({ ...p, moduleId: String(newMod.id) }));
-      }
-      setIsCreatingModule(false);
-      setNewModuleTitle('');
-      setNewModuleDesc('');
-      setEditingModuleId(null);
-    } catch (err) {
-      setModulesError('فشل حفظ الوحدة. يرجى المحاولة مرة أخرى.');
-    } finally {
-      setModuleCreateLoading(false);
-    }
-  };
-
-  const handleDeleteModule = (moduleId: number | string) => {
-    setDeleteTarget({ type: 'module', id: String(moduleId) });
-  };
-
   const handleAttachPdfUrl = async () => {
     let parsedUrl: URL;
     try { parsedUrl = new URL(newPdfUrl.trim()); } catch { setPdfManagementError('أدخل رابط PDF صحيحاً.'); return; }
@@ -478,36 +417,45 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     finally { setPdfManagementLoading(false); }
   };
 
-  const validate = (): boolean => {
+  const validate = (step: 1 | 2 | 3 = formStep): boolean => {
     const e: FormError = {};
-    if (!form.courseId) e.courseId = 'يرجى اختيار المقرر المرجعي';
-    if (!form.moduleId) e.moduleId = 'يرجى تحديد الوحدة التي ينتمي لها الدرس';
-    if (!form.title.trim()) e.title = 'عنوان الدرس مطلوب';
-    else if (form.title.trim().length < 2) e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
-    if (!form.order.trim()) e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
-    else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = 'يجب أن يكون الترتيب رقماً موجباً';
+    if (step === 1 || step === 3) {
+      if (!form.courseId) e.moduleId = 'تعذر تحديد المقرر المرتبط بهذا الدرس';
+      else if (!isNonModuleCourse && !form.moduleId) e.moduleId = 'يرجى اختيار الوحدة التي ينتمي لها الدرس';
+      if (!form.title.trim()) e.title = 'عنوان الدرس مطلوب';
+      else if (form.title.trim().length < 2) e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
+      if (!form.order.trim()) e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
+      else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = 'يجب أن يكون الترتيب رقماً موجباً';
+    }
 
-    if (activeTab === 'content' || editingLessonId) {
+    if (step === 3) {
       if (form.type === 'video' && !form.videoUrl.trim()) e.videoUrl = 'رابط الفيديو مطلوب';
-      if (form.type === 'pdf' && !pdfFile && !form.pdfUrl && !lessonPdfs.length) e.pdfUrl = 'يرجى اختيار ملف PDF';
+      if (form.type === 'pdf' && !form.pdfUrl && !lessonPdfs.length) e.pdfUrl = 'يرجى اختيار ملف PDF';
     }
     setErrors(e);
+    if (step === 3 && (e.moduleId || e.title || e.order)) setFormStep(1);
     return Object.keys(e).length === 0;
   };
 
 
   const handleSave = async () => {
     if (pdfManagementLoading || pdfListLoadFailed) return;
-    if (!validate()) return;
+    if (!validate(3)) return;
     setSaveStatus('loading');
-    const course = courses.find(c => c.id === form.courseId)!;
+    const course = courses.find(c => String(c.id) === String(form.courseId));
+    if (!course) {
+      setSaveStatus('error');
+      setErrors(previous => ({ ...previous, submit: 'تعذر تحديد المقرر المرتبط بهذا الدرس.' }));
+      return;
+    }
     try {
 
       const payload = {
-        courseId: form.moduleId,
+        courseId: isNonModuleCourse ? form.courseId : form.moduleId,
         courseName: course.title,
         title: form.title.trim(),
         description: form.description.trim() || undefined,
+        objectives: form.objectives.map(objective => objective.trim()).filter(Boolean),
         order: Number(form.order),
         type: form.type, // إرسال النوع الحقيقي للباكاند بدون تحايل
         videoUrl: (form.type === 'video' || form.type === 'live') && form.videoUrl.trim() ? form.videoUrl.trim() : undefined,
@@ -524,27 +472,31 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : undefined,
         dayNumber: form.dayNumber ? Number(form.dayNumber) : undefined,
         isMandatory: form.isMandatory,
+        // Persist the form value explicitly, including `false`; the API service
+        // sends this flag as JSON because multipart boolean parsing is unreliable.
         isFreePreview: form.isFreePreview,
         liveStatus: form.liveStatus,
       };
 
       if (editingLessonId) {
         await updateLesson({ id: editingLessonId, ...payload });
+        toast.success('تم تحديث الدرس بنجاح');
       } else {
         await addLesson(payload);
+        toast.success('تم إنشاء الدرس بنجاح');
         sessionStorage.removeItem('create_lesson_form_state');
       }
       setSaveStatus('success');
-      setTimeout(() => {
+      window.setTimeout(() => {
         setShowModal(false);
         resetModal();
       }, 1000);
     } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || 'تعذر حفظ الدرس');
       setSaveStatus('error');
-      const backendMessage = err?.response?.data?.message || err?.message || 'تعذر حفظ الدرس. تأكد من حجم الملف (أقل من 50MB)';
+      const backendMessage = err?.response?.data?.message || err?.message || 'تعذر حفظ الدرس. تحقق من بيانات الدرس والملفات المرفقة.';
       const errorMsg = Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage;
       setErrors(prev => ({ ...prev, submit: `خطأ من الخادم: ${errorMsg}` }));
-      window.alert(`خطأ: ${errorMsg}`);
     }
   };
 
@@ -552,7 +504,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     setDeleteTarget({ type: 'lesson', id: lessonId });
   };
 
-  const isFormValid = form.courseId && form.moduleId && form.title.trim() && form.order.trim();
+  const goToNextStep = () => {
+    if (formStep === 1 && !validate(1)) return;
+    setFormStep(current => current === 1 ? 2 : 3);
+    setErrors(current => ({ ...current, submit: undefined }));
+  };
 
   const handleBulkAction = async (action: 'publish' | 'archive' | 'delete' | 'duplicate') => {
     if (selectedLessons.length === 0) return;
@@ -569,9 +525,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
           if (l) await addLesson({ courseId: l.courseId, courseName: l.courseName, title: l.title + ' (نسخة)', description: l.description, order: l.order + 1 });
         }
       }
+      const successMessage = { publish: 'تم نشر الدروس المحددة', archive: 'تمت أرشفة الدروس المحددة', delete: 'تم حذف الدروس المحددة', duplicate: 'تم نسخ الدروس المحددة' }[action];
+      toast.success(successMessage);
       setSelectedLessons([]);
     } catch {
-      alert('حدث خطأ أثناء تنفيذ الإجراء المجمع.');
+      toast.error('حدث خطأ أثناء تنفيذ الإجراء المجمع.');
     } finally {
       setBulkActionLoading(false);
     }
@@ -587,7 +545,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     // Lesson.courseId is the module ID in this dashboard's backend adapter.
     // Comparing it directly to a course ID leaks lessons when IDs happen to overlap.
     const lessonModule = allModules.find(module => String(module.id) === String(l.courseId));
-    const matchesCourse = courseFilter === 'all' || String(lessonModule?.courseId ?? '') === courseFilter;
+    const matchesCourse = courseFilter === 'all'
+      || String(lessonModule?.courseId ?? l.courseId) === courseFilter;
 
     let matchesView = true;
     if (activeView === 'published') matchesView = !!l.isPublished;
@@ -597,12 +556,19 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     return matchesSearch && matchesStatus && matchesCourse && matchesView && (!scopedLessonId || String(l.id) === String(scopedLessonId));
   });
 
+  const courseLessons = scopedCourseId
+    ? lessons.filter(lesson => {
+        const lessonModule = allModules.find(module => String(module.id) === String(lesson.courseId));
+        return String(lessonModule?.courseId ?? lesson.courseId) === String(scopedCourseId);
+      })
+    : lessons;
+
   const stats = {
-    total: lessons.length,
-    published: lessons.filter(l => l.isPublished).length,
-    drafts: lessons.filter(l => !l.isPublished).length,
-    missingContent: lessons.filter(l => !l.hasContent).length,
-    healthScore: lessons.length ? Math.round((lessons.filter(l => l.hasContent && l.isPublished).length / lessons.length) * 100) : 0
+    total: courseLessons.length,
+    published: courseLessons.filter(l => l.isPublished).length,
+    drafts: courseLessons.filter(l => !l.isPublished).length,
+    missingContent: courseLessons.filter(l => !l.hasContent).length,
+    healthScore: courseLessons.length ? Math.round((courseLessons.filter(l => l.hasContent && l.isPublished).length / courseLessons.length) * 100) : 0
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -640,18 +606,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
             إدارة الدروس والمحتوى
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 font-medium">
-            تصفح، أضف، ونظّم {lessons.length} درس مسجّل. قم ببناء الهيكل التعليمي لمقرراتك.
+            تصفح، أضف، ونظّم {courseLessons.length} درس مسجّل{scopedCourseId ? ' في هذا المقرر' : '. قم ببناء الهيكل التعليمي لمقرراتك'}.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <button
-            onClick={() => setShowModuleManager(true)}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-indigo-700 hover:bg-indigo-50 border-2 border-indigo-100 rounded-xl font-bold text-sm transition-all shadow-sm"
-          >
-            <Layers className="w-4 h-4 text-indigo-600" />
-            إدارة الوحدات التعليمية
-          </button>
           <button
             onClick={openModal}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
@@ -700,21 +659,23 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
               className="min-h-12 w-full min-w-0 pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
             />
           </div>
-          <div className="w-full min-w-0">
-          <AdvancedFilters
-            filters={[
-              {
-                id: 'course',
-                value: courseFilter,
-                onChange: setCourseFilter,
-                options: [
-                  { label: 'جميع المقررات', value: 'all' },
-                  ...courses.map(c => ({ label: c.title, value: String(c.id) }))
-                ]
-              }
-            ]}
-          />
-          </div>
+          {!scopedCourseId && (
+            <div className="w-full min-w-0">
+              <AdvancedFilters
+                filters={[
+                  {
+                    id: 'course',
+                    value: courseFilter,
+                    onChange: setCourseFilter,
+                    options: [
+                      { label: 'جميع المقررات', value: 'all' },
+                      ...courses.map(c => ({ label: c.title, value: String(c.id) }))
+                    ]
+                  }
+                ]}
+              />
+            </div>
+          )}
         </div>
 
         <SavedViews
@@ -730,15 +691,14 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       </StickyToolbar>
 
       {/* Performance Monitoring Widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <HealthScore score={stats.healthScore} />
+      <div className="grid grid-cols-1 gap-4 mb-8">
         <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
           <div className="text-slate-500 text-xs font-bold flex items-center gap-2 mb-1"><Layers className="w-4 h-4 text-indigo-500" /> إجمالي الدروس</div>
           <div className="text-2xl font-black text-slate-800">{stats.total}</div>
         </div>
       </div>
 
-      {error && lessons.length === 0 ? (
+      {error && courseLessons.length === 0 && lessons.length === 0 ? (
         <div className="bg-white rounded-3xl border border-red-100 p-12 text-center shadow-xl shadow-red-500/5 flex flex-col items-center">
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-5 border-4 border-white shadow-inner">
             <AlertCircle className="w-10 h-10 text-red-500" />
@@ -749,12 +709,12 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
             إعادة المحاولة
           </button>
         </div>
-      ) : lessons.length === 0 ? (
+      ) : courseLessons.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-2">
           <EmptyState
             icon={BookMarked}
-            title="لا توجد دروس حالياً"
-            description="لم تُرجع الواجهة أي دروس منشورة. واجهة API الحالية لا تعرض المسودات في قائمة الدروس؛ تحقق من نشر الدروس أو أضف درساً جديداً."
+            title="لا توجد دروس حالياً لهذا المقرر"
+            description="أضف درساً جديداً ليظهر هنا."
             action={
               <button onClick={openModal} className="px-6 py-3 mt-2 text-white rounded-xl transition-all shadow-md hover:shadow-lg" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', fontWeight: 700 }}>
                 إنشاء الدرس الأول
@@ -843,6 +803,12 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                         <span>{lesson.type === 'video' || lesson.videoUrl ? 'فيديو' : lesson.type === 'pdf' || lesson.pdfUrl ? 'ملف PDF' : lesson.content ? 'مقال' : 'درس'}</span>
                       </div>
                     </div>
+                    {lesson.videoUrl && (
+                      <a href={lesson.videoUrl} target="_blank" rel="noreferrer" dir="ltr" className="inline-flex max-w-full items-center gap-1.5 self-start break-all text-xs font-semibold text-blue-700 hover:underline">
+                        <Link className="h-3.5 w-3.5 shrink-0" />
+                        <span className="break-all">{lesson.videoUrl}</span>
+                      </a>
+                    )}
 
                     {/* Footer: Health & Actions */}
                     <div className="flex items-center justify-between pt-3 border-t border-slate-100">
@@ -926,15 +892,18 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                       ]} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {lesson.hasContent ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100 shadow-sm">
-                          <PlayCircle className="w-3.5 h-3.5" /> مادة علمية متوفرة
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-500 font-semibold border border-slate-200">
-                          <AlertCircle className="w-3.5 h-3.5" /> قيد الإعداد
-                        </span>
-                      )}
+                      <div className="flex flex-col items-start gap-2">
+                        {lesson.hasContent ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100 shadow-sm">
+                            <PlayCircle className="w-3.5 h-3.5" /> مادة علمية متوفرة
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-500 font-semibold border border-slate-200">
+                            <AlertCircle className="w-3.5 h-3.5" /> قيد الإعداد
+                          </span>
+                        )}
+                        {lesson.videoUrl && <a href={lesson.videoUrl} target="_blank" rel="noreferrer" dir="ltr" title={lesson.videoUrl} className="inline-flex max-w-[220px] items-center gap-1 text-xs font-semibold text-blue-700 hover:underline"><Link className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{lesson.videoUrl}</span></a>}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-2">
@@ -1023,7 +992,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                 </div>
                 <div>
                   <h3 className="text-base sm:text-xl font-bold text-slate-800">{editingLessonId ? 'تعديل بيانات الدرس' : 'صياغة درس جديد'}</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">أدخل تفاصيل الدرس واربطه بالوحدة التعليمية المناسبة.</p>
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">أكمل بيانات الدرس عبر الخطوات الثلاث.</p>
                 </div>
               </div>
               <button onClick={closeModal} className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 bg-slate-50 rounded-xl transition-all border border-slate-100 touch-target shrink-0">
@@ -1033,44 +1002,30 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
             {/* Modal Body */}
             <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-8">
+              <div className="grid grid-cols-3 gap-2" aria-label="خطوات إنشاء الدرس">
+                {(['تفاصيل الدرس', 'الجدولة', 'محتوى الدرس'] as const).map((label, index) => {
+                  const number = (index + 1) as 1 | 2 | 3;
+                  const active = formStep === number;
+                  const complete = formStep > number;
+                  return <div key={label} aria-current={active ? 'step' : undefined} className={`flex items-center justify-center gap-2 rounded-xl px-2 py-2 text-center text-xs font-bold sm:text-sm ${active ? 'bg-emerald-600 text-white' : complete ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}><span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${active ? 'bg-white/20' : complete ? 'bg-emerald-100' : 'bg-white'}`}>{number}</span><span>{label}</span></div>;
+                })}
+              </div>
               {errors.submit && (
                 <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
                   <span className="text-sm font-bold">{errors.submit}</span>
                 </div>
               )}
+              {formStep === 1 && <>
               {/* Section 1: Relational Structure */}
-              <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-5 relative">
+              {!isNonModuleCourse && <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-5 relative">
                 <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-100 text-xs font-bold text-emerald-600 shadow-sm flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   المسار التنظيمي
                 </div>
 
-                <Field label="المقرر المرجعي" required error={errors.courseId} helperText="اختر المقرر الذي سيحتوي على هذا الدرس.">
-                  {courses.length === 0 ? (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 flex items-center gap-2 font-bold text-sm">
-                      <AlertCircle className="w-5 h-5" /> لم تقم بإنشاء أي مقررات بعد. يرجى البدء بإنشاء مقرر.
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <Filter className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none z-10" />
-                      <PortalSelect
-                        value={form.courseId}
-                        onChange={(val: string) => { setForm(p => ({ ...p, courseId: val })); setErrors(p => { const x = { ...p }; delete x.courseId; return x; }); }}
-                        className={`${inputCls(!!errors.courseId)} pr-11 font-medium bg-white`}
-                        placeholder="الرجاء اختيار المقرر..."
-                        options={courses.map(c => ({ value: c.id, label: c.title }))}
-                      />
-                    </div>
-                  )}
-                </Field>
-
-                <Field label="الوحدة التعليمية" required error={errors.moduleId} helperText="تتكون المقررات من وحدات، وكل وحدة تحتوي على دروس.">
-                  {!form.courseId ? (
-                    <div className="p-4 bg-slate-100/50 border border-slate-200 rounded-xl text-slate-400 text-sm font-medium flex items-center justify-center border-dashed">
-                      قم باختيار المقرر أولاً لاستعراض وحداته
-                    </div>
-                  ) : modulesLoading ? (
+                <Field label="اختر الوحدة" required error={errors.moduleId} helperText="اختر الوحدة التي سينتمي إليها هذا الدرس.">
+                  {modulesLoading ? (
                     <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-600 flex items-center gap-2 text-sm font-bold animate-pulse">
                       <Loader2 className="w-4 h-4 animate-spin" /> جاري سحب بيانات الوحدات من الخادم...
                     </div>
@@ -1078,86 +1033,36 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-bold flex items-center gap-2">
                       <AlertCircle className="w-4 h-4" /> {modulesError}
                     </div>
-                  ) : isCreatingModule ? (
-                    <div className="p-5 border-2 border-emerald-200 bg-emerald-50 rounded-2xl shadow-sm space-y-4 animate-in slide-in-from-top-2">
-                      <div className="flex items-center gap-2 text-emerald-700 font-bold pb-2 border-b border-emerald-200/50">
-                        <Plus className="w-4 h-4" /> {editingModuleId ? 'تعديل الوحدة الهيكلية' : 'صياغة وحدة هيكلية جديدة'}
-                      </div>
-                      <div className="space-y-3">
-                        <input value={newModuleTitle} onChange={e => setNewModuleTitle(e.target.value)} placeholder="اسم الوحدة (مثال: الوحدة الأولى: الجبر والمقادير الجبرية)" className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 text-sm font-semibold bg-white" />
-                        <textarea value={newModuleDesc} onChange={e => setNewModuleDesc(e.target.value)} placeholder="شرح مبسط لمخرجات هذه الوحدة..." rows={2} className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 text-sm resize-none bg-white leading-relaxed" />
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <button type="button" onClick={handleCreateModule} disabled={moduleCreateLoading || !newModuleTitle.trim() || !newModuleDesc.trim()} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
-                          {moduleCreateLoading && <Loader2 className="w-4 h-4 animate-spin" />} {moduleCreateLoading ? 'جاري الحفظ...' : editingModuleId ? 'حفظ الوحدة' : 'اعتماد الوحدة'}
-                        </button>
-                        <button type="button" onClick={() => { setIsCreatingModule(false); setEditingModuleId(null); setNewModuleTitle(''); setNewModuleDesc(''); }} className="px-6 py-2 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 rounded-xl text-sm font-bold transition-colors">
-                          تراجع
-                        </button>
-                      </div>
-                    </div>
                   ) : filteredModules.length === 0 ? (
                     <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 shadow-sm">
-                      <div className="flex items-center gap-2 mb-3 font-bold text-sm">
-                        <AlertCircle className="w-5 h-5 text-amber-500" /> لم يتم تأسيس أي وحدات بعد تحت هذا المقرر.
+                      <div className="flex items-center gap-2 font-bold text-sm">
+                        <AlertCircle className="w-5 h-5 text-amber-500" /> لا توجد وحدات متاحة للاختيار.
                       </div>
-                      <button type="button" onClick={() => setIsCreatingModule(true)} className="px-4 py-2.5 bg-amber-100 hover:bg-amber-200 hover:shadow-sm text-amber-900 rounded-xl text-sm font-bold transition-all flex items-center gap-2 border border-amber-200/50">
-                        <Plus className="w-4 h-4" strokeWidth={3} /> ابدأ بتأسيس الوحدة الأولى
-                      </button>
                     </div>
                   ) : (
-                    <div className="space-y-3 w-full min-w-0">
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <div className="relative flex-1 min-w-0">
-                          <select
-                            value={form.moduleId}
-                            onChange={e => { setForm(p => ({ ...p, moduleId: e.target.value })); setErrors(p => { const x = { ...p }; delete x.moduleId; return x; }); }}
-                            className={`w-full ${inputCls(!!errors.moduleId)} pr-11 font-medium appearance-none`}
-                            style={{ backgroundPosition: 'left 1rem center', backgroundSize: '1.5em 1.5em', backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat' }}
-                          >
-                            <option value="" disabled>الرجاء تحديد الوحدة...</option>
-                            {filteredModules.map(m => <option key={m.id} value={String(m.id)}>{m.title}</option>)}
-                          </select>
-                        </div>
-                        <button type="button" onClick={() => setShowModuleManager(true)} title="إدارة وتأسيس الوحدات" className="shrink-0 px-4 py-3 bg-white text-indigo-600 rounded-xl hover:bg-indigo-50 hover:text-indigo-700 font-bold transition-all border-2 border-indigo-100 shadow-sm flex items-center gap-2 text-sm">
-                          <Layers className="w-4 h-4 text-indigo-600" /> إدارة الوحدات
-                        </button>
-                      </div>
-                      <div className="flex flex-col gap-2 w-full min-w-0">
-                        {filteredModules.map(module => (
-                          <div key={module.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 w-full min-w-0">
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-slate-700 truncate">{module.title}</div>
-                              {module.description && <div className="text-xs text-slate-400 truncate">{module.description}</div>}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingModuleId(String(module.id));
-                                setNewModuleTitle(module.title);
-                                setNewModuleDesc(module.description ?? '');
-                                setIsCreatingModule(true);
-                              }}
-                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title="Edit Module"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDeleteModule(module.id)}
-                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete Module"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="relative w-full min-w-0">
+                      <select
+                        value={form.moduleId}
+                        onChange={e => {
+                          const moduleId = e.target.value;
+                          const selectedModule = allModules.find(module => String(module.id) === moduleId);
+                          const courseId = scopedCourseId ?? String(selectedModule?.courseId ?? '');
+                          setForm(p => ({ ...p, moduleId, courseId }));
+                          setErrors(p => { const x = { ...p }; delete x.moduleId; delete x.courseId; return x; });
+                        }}
+                        className={`w-full ${inputCls(!!errors.moduleId)} pr-11 font-medium appearance-none`}
+                        style={{ backgroundPosition: 'left 1rem center', backgroundSize: '1.5em 1.5em', backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat' }}
+                      >
+                        <option value="" disabled>الرجاء تحديد الوحدة...</option>
+                        {filteredModules.map(m => {
+                          const courseTitle = courses.find(course => String(course.id) === String(m.courseId))?.title;
+                          return <option key={m.id} value={String(m.id)}>{courseTitle ? `${courseTitle} — ${m.title}` : m.title}</option>;
+                        })}
+                      </select>
                     </div>
                   )}
                 </Field>
-              </div>
+              </div>}
 
               {/* Section 2: Lesson Specifics */}
               <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 relative">
@@ -1169,26 +1074,55 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   label="عنوان الدرس"
                   required
                   error={errors.title}
-                  action={<AIMagicButton onClick={handleGenerateTitle} loading={aiLoading === 'title'} label="اقتراح عنوان" />}
                 >
                   <input value={form.title} onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setErrors(p => { const x = { ...p }; delete x.title; return x; }); }} placeholder="مثال: حل المعادلات من الدرجة الأولى" className={inputCls(!!errors.title, 'font-semibold')} />
                 </Field>
 
-                {form.type !== 'markdown' && form.type !== 'pdf' && (
-                  <Field
-                    label="وصف الدرس"
-                    error={errors.description}
-                    action={<AIMagicButton onClick={handleGenerateDesc} loading={aiLoading === 'desc'} label="اقتراح وصف" />}
-                  >
-                    <textarea
-                      value={form.description}
-                      onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
-                      placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
-                      rows={3}
-                      className={`${inputCls(!!errors.description)} resize-none font-medium leading-relaxed`}
-                    />
-                  </Field>
-                )}
+                <Field label="وصف الدرس" error={errors.description}>
+                  <textarea
+                    value={form.description}
+                    onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
+                    placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
+                    rows={3}
+                    className={`${inputCls(!!errors.description)} resize-none font-medium leading-relaxed`}
+                  />
+                </Field>
+
+                <Field label="أهداف الدرس" helperText="اختياري — يمكنك إضافة أهداف لمساعدة الطالب على معرفة ما سيحققه من هذا الدرس.">
+                  <div className="space-y-2">
+                    {form.objectives.map((objective, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          value={objective}
+                          onChange={event => {
+                            const value = event.target.value;
+                            setForm(current => ({ ...current, objectives: current.objectives.map((item, itemIndex) => itemIndex === index ? value : item) }));
+                            setErrors(current => { const next = { ...current }; delete next.objectives; return next; });
+                          }}
+                          placeholder={`الهدف ${index + 1}`}
+                          className={inputCls(!!errors.objectives)}
+                        />
+                        {form.objectives.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm(current => ({ ...current, objectives: current.objectives.filter((_, itemIndex) => itemIndex !== index) }));
+                              setErrors(current => { const next = { ...current }; delete next.objectives; return next; });
+                            }}
+                            className="shrink-0 rounded-xl border border-slate-200 px-3 py-2.5 text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                            aria-label={`حذف الهدف ${index + 1}`}
+                            title="حذف الهدف"
+                          >×</button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setForm(current => ({ ...current, objectives: [...current.objectives, ''] }))}
+                      className="rounded-lg px-2 py-1 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                    >+ إضافة هدف</button>
+                  </div>
+                </Field>
 
                 <Field label="حالة النشر" helperText="يمكن حفظ الدرس كمسودة ثم نشره عندما يصبح جاهزاً.">
                   <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as FormState['status'] }))} className={inputCls(false)}>
@@ -1208,7 +1142,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     )}
                   </div>
                 </Field>
-                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-3">
+              </div>
+              </>}
+
+              {formStep === 2 && <div className="rounded-3xl border border-indigo-100 bg-indigo-50/50 p-6">
+                <div className="space-y-3">
                   <div><h4 className="font-bold text-slate-800">جدولة الدرس</h4><p className="text-xs text-slate-500">تُفتح الدروس المجدولة حسب الموعد المحدد. إذا كانت الدورة تمتد 30 يوماً، يمكن ضبط day number والموعد لكل درس.</p></div>
                   {selectedCourse?.startDate && <p className="text-xs text-indigo-800">فترة المقرر: {new Date(selectedCourse.startDate).toLocaleDateString('ar')} {selectedCourse.endDate ? `– ${new Date(selectedCourse.endDate).toLocaleDateString('ar')}` : ''}</p>}
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1217,12 +1155,22 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     <label className="text-sm font-semibold">المدة بالدقائق<input type="number" min={1} value={form.durationMinutes} onChange={e=>setForm(p=>({...p,durationMinutes:e.target.value}))} placeholder="مثلاً 60" className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
                     <label className="text-sm font-semibold">حالة المحاضرة<select value={form.liveStatus} onChange={e=>setForm(p=>({...p,liveStatus:e.target.value as FormState['liveStatus']}))} className="mt-1 w-full rounded-xl border bg-white p-3"><option value="SCHEDULED">مجدولة</option><option value="LIVE_NOW">مباشرة الآن</option><option value="COMPLETED">انتهت</option></select></label>
                     <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.isMandatory} onChange={e=>setForm(p=>({...p,isMandatory:e.target.checked}))}/>درس إلزامي للشهادة</label>
-                    <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.isFreePreview} onChange={e=>setForm(p=>({...p,isFreePreview:e.target.checked}))}/>معاينة مجانية</label>
+                    {isNonModuleCourse && <div className="space-y-2 sm:col-span-2">
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-white p-3">
+                        <div><p className="text-sm font-bold text-slate-800">معاينة مجانية للدرس</p><p className="text-xs text-slate-500">السماح لغير المشتركين بمشاهدة هذا الدرس في المقررات المدفوعة.</p></div>
+                        <button type="button" role="switch" aria-checked={form.isFreePreview} onClick={() => setForm(current => ({ ...current, isFreePreview: !current.isFreePreview }))} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${form.isFreePreview ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${form.isFreePreview ? '-translate-x-6' : 'translate-x-0'}`} />
+                          <span className="sr-only">{form.isFreePreview ? 'مفعّلة' : 'غير مفعّلة'}</span>
+                        </button>
+                        <span className={`text-xs font-bold ${form.isFreePreview ? 'text-emerald-700' : 'text-slate-500'}`}>{form.isFreePreview ? 'مفعّلة' : 'غير مفعّلة'}</span>
+                      </div>
+                    </div>}
                   </div>
                   {form.scheduledAt && form.durationMinutes && <p className="text-xs font-semibold text-indigo-800">وقت الانتهاء المحسوب: {new Date(new Date(form.scheduledAt).getTime()+Number(form.durationMinutes)*60000).toLocaleString('ar')}</p>}
                 </div>
-              </div>
+              </div>}
 
+              {formStep === 3 && <>
               {/* Section 3: Knowledge Content */}
               <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 relative">
                 <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
@@ -1313,126 +1261,46 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     <input value={newPdfUrl} onChange={e => setNewPdfUrl(e.target.value)} placeholder="رابط PDF موجود" className={inputCls(false)} dir="ltr" />
                     <button type="button" disabled={!newPdfUrl.trim() || pdfManagementLoading} onClick={() => void handleAttachPdfUrl()} className="rounded-lg bg-emerald-600 px-3 font-bold text-white disabled:opacity-50">إضافة رابط</button>
                   </div>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">{pdfManagementLoading ? 'جارٍ تجهيز الملف…' : 'رفع ملف PDF'}<input type="file" accept="application/pdf,.pdf" multiple className="hidden" disabled={pdfManagementLoading} onChange={async e => {
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">{pdfManagementLoading ? 'جارٍ رفع ملف PDF…' : 'رفع ملف PDF'}<input type="file" accept="application/pdf,.pdf" multiple className="hidden" disabled={pdfManagementLoading} onChange={async e => {
                     const files = Array.from(e.target.files ?? []); e.target.value = ''; let nextOrder = lessonPdfs.length;
                     for (const file of files) {
                       if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { setPdfManagementError(`الملف ${file.name} ليس بصيغة PDF`); continue; }
                       setPdfManagementLoading(true);
+                      setPdfManagementProgress({ percent: 0, loaded: 0, total: file.size });
                       try {
                         const title = file.name.replace(/\.pdf$/i, '');
-                        if (editingLessonId) { await lessonService.addPdf(editingLessonId, { file, title, order: nextOrder++ }); setLessonPdfs(await lessonService.getPdfs(editingLessonId)); }
-                        else { const { uploadService } = await import('../../../services/api/upload.api'); const url = await uploadService.uploadPdf(file); setLessonPdfs(p => [...p, { title, url, order: p.length }]); }
+                        if (editingLessonId) { await lessonService.addPdf(editingLessonId, { file, title, order: nextOrder++ }, setPdfManagementProgress); setLessonPdfs(await lessonService.getPdfs(editingLessonId)); }
+                        else { const { uploadService } = await import('../../../services/api/upload.api'); const url = await uploadService.uploadPdf(file, setPdfManagementProgress); setLessonPdfs(p => [...p, { title, url, order: p.length }]); }
                         setPdfManagementError('');
                       } catch (err: any) { setPdfManagementError(err?.message || `تعذر رفع ${file.name}`); } finally { setPdfManagementLoading(false); }
                     }
                   }} /></label>
+                  {pdfManagementProgress && <div role="status" aria-live="polite" className="space-y-1">
+                    <div role="progressbar" aria-label="تقدم رفع ملف PDF" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pdfManagementProgress.percent} className="h-2 overflow-hidden rounded bg-slate-200">
+                      <div className="h-full rounded bg-emerald-600 transition-[width] duration-200" style={{ width: `${pdfManagementProgress.percent}%` }} />
+                    </div>
+                    <p className="text-xs text-slate-600">{pdfManagementLoading ? 'جارٍ رفع ملف PDF' : 'اكتمل رفع ملف PDF'} · {pdfManagementProgress.percent}% · {(pdfManagementProgress.loaded / 1024 / 1024).toFixed(1)} / {(pdfManagementProgress.total / 1024 / 1024).toFixed(1)} MB</p>
+                  </div>}
                   {pdfManagementError && <p role="alert" className="text-xs text-red-600">{pdfManagementError}</p>}
                 </div>
 
-                {(form.type === 'pdf' || form.type === 'video') && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <Field label={form.type === 'video' ? "مستند PDF إضافي (اختياري)" : "مستند الدرس (ملف PDF)"} error={errors.pdfUrl} required={form.type === 'pdf'}>
-                      <div className="space-y-3">
-                        {form.pdfUrl && !pdfFile && !isUploadingPdf && (
-                          <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
-                            <FileType2 className="w-5 h-5 text-red-500" />
-                            <a href={form.pdfUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm font-medium text-red-700 hover:underline truncate dir-ltr text-left">
-                              {form.pdfUrl}
-                            </a>
-                            <button type="button" onClick={() => setForm(p => ({ ...p, pdfUrl: '' }))} className="p-1.5 hover:bg-red-100 text-red-500 rounded-lg transition-colors">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
-
-                        {isUploadingPdf && (
-                          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl animate-in fade-in duration-300">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
-                                <span className="text-sm font-bold text-emerald-700">جاري رفع الملف...</span>
-                              </div>
-                              <span className="text-sm font-bold text-emerald-700">{pdfUploadProgress}%</span>
-                            </div>
-                            <div className="w-full bg-emerald-200/50 rounded-full h-2 overflow-hidden">
-                              <div className="bg-emerald-500 h-2 rounded-full transition-all duration-300" style={{ width: `${pdfUploadProgress}%` }}></div>
-                            </div>
-                          </div>
-                        )}
-
-                        {pdfFile && (
-                          <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                            <FileType2 className="w-5 h-5 text-emerald-500" />
-                            <div className="flex-1 text-sm font-medium text-emerald-700 truncate dir-ltr text-left">
-                              {pdfFile.name} ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
-                            </div>
-                            <button type="button" onClick={() => setPdfFile(null)} className="p-1.5 hover:bg-emerald-100 text-emerald-500 rounded-lg transition-colors">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
-
-                        {!pdfFile && !isUploadingPdf && (
-                          <label className={`flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all ${errors.pdfUrl ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300'
-                            }`}>
-                            <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center">
-                              <Upload className="w-5 h-5 text-slate-400" />
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm font-bold text-slate-700">انقر هنا لرفع ملف PDF من جهازك</p>
-                              <p className="text-xs text-slate-500 mt-1">الحد الأقصى 50MB</p>
-                            </div>
-                            <input
-                              type="file"
-                              accept="application/pdf"
-                              className="hidden"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  if (file.size > 50 * 1024 * 1024) {
-                                    setErrors(p => ({ ...p, pdfUrl: 'حجم الملف يتجاوز 50MB' }));
-                                    return;
-                                  }
-                                  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-                                    setErrors(p => ({ ...p, pdfUrl: 'يجب أن يكون الملف بصيغة PDF' }));
-                                    return;
-                                  }
-                                  setErrors(p => { const x = { ...p }; delete x.pdfUrl; return x; });
-                                  setIsUploadingPdf(true);
-                                  setPdfUploadProgress(0);
-                                  try {
-                                    const { uploadService } = await import('../../../services/api/upload.api');
-                                    const url = await uploadService.uploadPdf(file, (p) => setPdfUploadProgress(p.percent));
-                                    setForm(p => ({ ...p, pdfUrl: url }));
-                                    setLessonPdfs(p => [...p, { title: file.name.replace(/\.pdf$/i, ''), url, order: p.length }]);
-                                    setPdfFile(file); // Keep for UI display only
-                                  } catch (err: any) {
-                                    setErrors(p => ({ ...p, pdfUrl: err.message || 'فشل الرفع' }));
-                                  } finally {
-                                    setIsUploadingPdf(false);
-                                  }
-                                }
-                              }}
-                            />
-                          </label>
-                        )}
-                      </div>
-                    </Field>
-                  </div>
-                )}
               </div>
+              </>}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2rem] flex flex-col sm:flex-row items-center justify-end gap-3 shrink-0">
-              <button onClick={closeModal} disabled={isUploadingPdf} className="w-full sm:w-auto px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all focus:ring-2 focus:ring-slate-200 order-2 sm:order-1 disabled:opacity-50">
+            <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2rem] flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <button onClick={closeModal} className="w-full sm:w-auto px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 transition-all focus:ring-2 focus:ring-slate-200 order-2 sm:order-1">
                 إلغاء الأمر
               </button>
-              <button onClick={handleSave} disabled={!isFormValid || saveStatus === 'loading' || saveStatus === 'success' || isUploadingPdf || pdfManagementLoading || pdfListLoadFailed} className="w-full sm:w-auto px-8 py-3 text-white rounded-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 order-1 sm:order-2" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
-                {(saveStatus === 'loading' || isUploadingPdf) && <Loader2 className="w-5 h-5 animate-spin" />}
+              <div className="flex w-full gap-2 sm:w-auto">
+                {formStep > 1 && <button type="button" onClick={() => setFormStep(current => current === 3 ? 2 : 1)} disabled={saveStatus === 'loading'} className="w-full rounded-xl border border-slate-200 bg-white px-6 py-3 font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-60 sm:w-auto">السابق</button>}
+                {formStep < 3 ? <button type="button" onClick={goToNextStep} disabled={saveStatus === 'loading' || saveStatus === 'success'} className="w-full rounded-xl px-8 py-3 font-bold text-white shadow-md disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>التالي</button> : <button onClick={handleSave} disabled={saveStatus === 'loading' || saveStatus === 'success' || pdfManagementLoading || pdfListLoadFailed} className="w-full rounded-xl px-8 py-3 font-bold text-white shadow-md transition-all hover:shadow-lg focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto" style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
+                {saveStatus === 'loading' && <Loader2 className="w-5 h-5 animate-spin" />}
                 {saveStatus === 'success' && <CheckCircle className="w-5 h-5 animate-bounce" />}
                 {saveStatus === 'loading' ? 'جاري المعالجة...' : saveStatus === 'success' ? 'تم الحفظ!' : editingLessonId ? 'حفظ تعديلات الدرس' : 'حفظ الدرس الجديد'}
-              </button>
+                </button>}
+              </div>
             </div>
 
           </div>
@@ -1443,12 +1311,6 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         targetType={deleteTarget?.type || 'lesson'}
         targetId={deleteTarget?.id || ''}
         onClose={() => setDeleteTarget(null)}
-      />
-      <ModuleManagerModal
-        isOpen={showModuleManager}
-        onClose={() => setShowModuleManager(false)}
-        initialCourseId={form.courseId}
-        onModuleSelected={(modId) => setForm(p => ({ ...p, moduleId: modId }))}
       />
     </div>
   );

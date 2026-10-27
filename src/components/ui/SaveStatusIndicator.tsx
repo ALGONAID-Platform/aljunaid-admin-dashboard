@@ -25,7 +25,7 @@ export const SaveStatusIndicator: React.FC = () => {
 
   return (
     <div 
-      className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
+      className={`flex items-center gap-2 px-2 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
         status === 'saving' ? 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse' :
         status === 'saved' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
         status === 'retrying' ? 'bg-blue-50 text-blue-800 border border-blue-200' :
@@ -38,7 +38,7 @@ export const SaveStatusIndicator: React.FC = () => {
       {status === 'retrying' && <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />}
       {status === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-600" />}
       
-      <span>
+      <span className="hidden sm:inline">
         {status === 'saving' && 'جاري الحفظ تلقائياً...'}
         {status === 'saved' && 'تم الحفظ في قاعدة البيانات'}
         {status === 'retrying' && 'جاري إعادة المحاولة والتزامن...'}

@@ -19,6 +19,7 @@ import { ExamModelFilters } from '../components/ExamModelFilters';
 import { ExamModelToolbar } from '../components/ExamModelToolbar';
 
 import type { ExamModel, CreateExamModelPayload } from '../../../types/examModel.types';
+import { toast } from 'react-hot-toast';
 
 export function ExamModelsPage({ scopedCourseId }: { scopedCourseId?: string } = {}) {
   const { 
@@ -126,10 +127,17 @@ export function ExamModelsPage({ scopedCourseId }: { scopedCourseId?: string } =
   };
 
   const handleSaveForm = async (payload: CreateExamModelPayload & { id?: string }, onUploadProgress?: (p: any) => void) => {
-    if (payload.id) {
-      await updateExamModel({ id: payload.id, ...payload }, onUploadProgress);
-    } else {
-      await addExamModel(payload, onUploadProgress);
+    try {
+      if (payload.id) {
+        await updateExamModel({ id: payload.id, ...payload }, onUploadProgress);
+        toast.success('تم تحديث نموذج الامتحان');
+      } else {
+        await addExamModel(payload, onUploadProgress);
+        toast.success('تم إنشاء نموذج الامتحان');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر حفظ نموذج الامتحان');
+      throw error;
     }
   };
 
@@ -144,8 +152,9 @@ export function ExamModelsPage({ scopedCourseId }: { scopedCourseId?: string } =
     try {
       if (action === 'delete') await bulkDelete(selectedIds);
       setSelectedIds([]);
+      toast.success('تم حذف نماذج الامتحان المحددة');
     } catch {
-      alert('حدث خطأ أثناء تنفيذ الإجراء المجمع.');
+      toast.error('حدث خطأ أثناء تنفيذ الإجراء المجمع.');
     } finally {
       setBulkLoading(false);
     }

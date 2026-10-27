@@ -193,7 +193,7 @@ export function AcademicProgressPage() {
         {/* Left Column: Needs Action */}
         {(activeFilter === 'all' || activeFilter === 'needs_action') && (
           <div className="space-y-6">
-            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-4 bg-red-50 p-3 rounded-xl w-max border border-red-100">
+            <h3 className="text-xl font-bold text-slate-800 flex flex-wrap items-center gap-2 mb-4 bg-red-50 p-3 rounded-xl w-full sm:w-fit max-w-full border border-red-100">
               <AlertCircle className="w-6 h-6 text-red-500" />
               تتطلب إجراء سريع
             </h3>
@@ -260,7 +260,7 @@ export function AcademicProgressPage() {
         <div className="space-y-6">
           {(activeFilter === 'all' || activeFilter === 'ready' || activeFilter === 'needs_action') && (
             <>
-              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-4 bg-amber-50 p-3 rounded-xl w-max border border-amber-100">
+              <h3 className="text-xl font-bold text-slate-800 flex flex-wrap items-center gap-2 mb-4 bg-amber-50 p-3 rounded-xl w-full sm:w-fit max-w-full border border-amber-100">
                 <Send className="w-6 h-6 text-amber-500" />
                 مسودات وجاهزة للتقديم
               </h3>
@@ -291,7 +291,7 @@ export function AcademicProgressPage() {
 
           {(activeFilter === 'all' || activeFilter === 'published') && (
             <>
-              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 mt-10 mb-4 bg-emerald-50 p-3 rounded-xl w-max border border-emerald-100">
+              <h3 className="text-xl font-bold text-slate-800 flex flex-wrap items-center gap-2 mt-10 mb-4 bg-emerald-50 p-3 rounded-xl w-full sm:w-fit max-w-full border border-emerald-100">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500" />
                 المحتوى المنشور للطلاب
               </h3>
@@ -389,7 +389,7 @@ function ProgressList({ title, items, icon: Icon, searchQuery, sortOption, onNav
               {item.subtitle && <div className="text-xs font-medium text-slate-500 truncate" title={item.subtitle}>المرجع: {item.subtitle}</div>}
             </div>
             
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 shrink-0">
               {item.error && (
                 <span className="text-[11px] font-bold px-2.5 py-1 bg-red-50 border border-red-100 text-red-600 rounded-lg flex items-center gap-1.5 shadow-sm">
                   <XCircle className="w-3.5 h-3.5"/> {item.error}

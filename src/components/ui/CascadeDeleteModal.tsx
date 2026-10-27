@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { calculateDeletionImpact, type EntityType, type DeletionImpact } from '../../services/deletion/deletionTree.service';
 import { executeCascadeDelete, type CascadeDeleteResult } from '../../services/deletion/cascadeDelete.service';
+import { toast } from 'react-hot-toast';
 
 interface CascadeDeleteModalProps {
   isOpen: boolean;
@@ -73,10 +74,13 @@ export const CascadeDeleteModal: React.FC<CascadeDeleteModalProps> = ({
     setIsDeleting(false);
 
     if (result.success) {
+      toast.success(`تم حذف ${TYPE_NAMES[targetType]} ومحتوياته بنجاح`);
       if (onSuccess) onSuccess(result.impact);
       onClose();
     } else {
-      setError(result.error || 'حدث خطأ أثناء تنفيذ الحذف النهائي.');
+      const message = result.error || 'حدث خطأ أثناء تنفيذ الحذف النهائي.';
+      setError(message);
+      toast.error(message);
     }
   };
 

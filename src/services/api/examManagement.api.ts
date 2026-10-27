@@ -117,23 +117,14 @@ export const examManagementService = {
   async uploadImage(file: File): Promise<string> {
     const formData = new FormData();
     formData.append('image', file);
-    try {
-      const { data } = await api.post<{
+    const { data } = await api.post<{
       imageUrl?: string;
       url?: string;
       data?: { imageUrl?: string; url?: string };
-      }>('/exams/upload-image', formData, { timeout: 0 });
-      const imageUrl = data.imageUrl ?? data.url ?? data.data?.imageUrl ?? data.data?.url;
-      if (!imageUrl) throw new Error('لم يُرجع الخادم رابط الصورة.');
-      return imageUrl;
-    } catch (error) {
-      const fallback = new FormData();
-      fallback.append('file', file);
-      const { data } = await api.post<any>('/exams/upload-image', fallback, { timeout: 0 });
-      const imageUrl = data.imageUrl ?? data.url ?? data.data?.imageUrl ?? data.data?.url;
-      if (!imageUrl) throw error;
-      return imageUrl;
-    }
+      }>('/exams/upload-image', formData, { timeout: 60_000 });
+    const imageUrl = data.imageUrl ?? data.url ?? data.data?.imageUrl ?? data.data?.url;
+    if (!imageUrl) throw new Error('لم يُرجع الخادم رابط الصورة.');
+    return imageUrl;
   },
 
   async getStats(id: string): Promise<ExamStats> {

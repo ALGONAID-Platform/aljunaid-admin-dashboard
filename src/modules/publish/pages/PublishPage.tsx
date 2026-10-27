@@ -11,6 +11,7 @@ import { courseService, lessonService, contentService, quizService } from '../..
 import { modulesService } from '../../../services/api/modules.api';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { resolveErrorMessage } from '../../../lib/errors';
+import { toast } from 'react-hot-toast';
 import { ROUTES } from '../../../routes/routes.config';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import type { Lesson, ContentItem, Quiz } from '../../../types';
@@ -193,9 +194,10 @@ export function PublishPage() {
 
       setPublishStatus(p => ({ ...p, [lessonId]: 'success' }));
       setSuccessModal(lessonId);
+      toast.success('تم نشر الدرس بنجاح');
     } catch (err: any) {
       console.error('Publish Error:', err);
-      alert(`فشل النشر: ${err.message || 'حدث خطأ غير متوقع'}`);
+      toast.error(resolveErrorMessage(err));
       setPublishStatus(p => ({ ...p, [lessonId]: 'error' }));
       setPublishError(p => ({ ...p, [lessonId]: resolveErrorMessage(err) }));
     }
@@ -207,9 +209,11 @@ export function PublishPage() {
     try {
       await updateLesson({ id: lessonId, isPublished: false });
       setPublishStatus(p => ({ ...p, [lessonId]: 'idle' }));
+      toast.success('تم إلغاء نشر الدرس');
     } catch (err) {
       setPublishStatus(p => ({ ...p, [lessonId]: 'error' }));
       setPublishError(p => ({ ...p, [lessonId]: resolveErrorMessage(err) }));
+      toast.error(resolveErrorMessage(err));
     }
   };
 

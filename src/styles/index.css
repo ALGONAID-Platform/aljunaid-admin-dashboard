@@ -2,3 +2,8 @@
 @import './tailwind.css';
 @import './theme.css';
 @import 'katex/dist/katex.min.css';
+
+/* Scale rem-based typography down across the app on narrow screens. */
+@media (max-width: 639px) {
+  html { font-size: 13px; }
+}

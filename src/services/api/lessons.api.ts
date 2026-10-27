@@ -24,10 +24,38 @@ import { api } from '../../lib/api';
 import type { BackendLesson, BackendModule } from '../../types/api';
 import type { Lesson, CreateLessonPayload, UpdateLessonPayload } from '../../types';
 
+type LessonPage = { items: BackendLesson[]; totalPages: number | null };
+
+/** Unwrap legacy and current paginated admin API responses. */
+function readLessonPage(response: unknown, pageSize: number): LessonPage {
+  let body: any = response;
+  let metadata: any;
+
+  for (let depth = 0; depth < 5 && body && typeof body === 'object' && !Array.isArray(body); depth += 1) {
+    metadata ??= body.meta ?? body.pagination;
+    if (Array.isArray(body.items)) { body = body.items; break; }
+    if (Array.isArray(body.results)) { body = body.results; break; }
+    if (Array.isArray(body.lessons)) { body = body.lessons; break; }
+    if (!('data' in body)) break;
+    body = body.data;
+  }
+
+  const items = Array.isArray(body) ? body as BackendLesson[] : [];
+  const reportedPages = Number(metadata?.totalPages ?? metadata?.lastPage ?? metadata?.pages);
+  const total = Number(metadata?.total ?? metadata?.totalItems ?? metadata?.count);
+  const responsePageSize = Number(metadata?.limit ?? metadata?.perPage ?? metadata?.pageSize) || pageSize;
+  const totalPages = Number.isFinite(reportedPages) && reportedPages > 0
+    ? Math.ceil(reportedPages)
+    : Number.isFinite(total) && total > 0 ? Math.ceil(total / responsePageSize) : null;
+
+  return { items, totalPages };
+}
+
 // ─── Adapter ──────────────────────────────────────────────────────────────────
 
 function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; title?: string; courseTitle?: string; courseId?: number }): Lesson {
   const isPub = bl.status === 'PUBLISHED' || bl.isPublished === true;
+  const rawPdfs = (bl as any).pdfFiles ?? (bl as any).pdfs ?? [];
   return {
     id: String(bl.id),
     courseId: String(bl.moduleId),
@@ -36,10 +64,10 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; 
     description: bl.description ?? '',
     order: bl.order ?? 0,
     isPublished: isPub,
-    hasContent: !!(bl.videoUrl ?? bl.pdfUrl ?? bl.content ?? (bl.isReading ? bl.description : undefined)),
+    hasContent: !!(bl.videoUrl ?? bl.pdfUrl ?? bl.content ?? (Array.isArray(rawPdfs) && rawPdfs.length) ?? (bl.isReading ? bl.description : undefined)),
     videoUrl: bl.videoUrl ?? undefined,
     pdfUrl: bl.pdfUrl ?? undefined,
-    pdfFiles: ((bl as any).pdfFiles ?? []).map((pdf: any, index: number) => ({ id: pdf.id == null ? undefined : String(pdf.id), title: pdf.title ?? `PDF ${index + 1}`, url: pdf.url, order: pdf.order ?? index })).sort((a: any, b: any) => a.order - b.order),
+    pdfFiles: (Array.isArray(rawPdfs) ? rawPdfs : []).map((pdf: any, index: number) => ({ id: pdf.id == null ? undefined : String(pdf.id), title: pdf.title ?? `PDF ${index + 1}`, url: pdf.url, order: pdf.order ?? index })).filter((pdf: any) => !!pdf.url).sort((a: any, b: any) => a.order - b.order),
     content: (bl.isReading && !bl.pdfUrl) ? (bl.description ?? undefined) : (bl.content ?? undefined),
     type: bl.videoUrl ? 'video' : (bl.pdfUrl ? 'pdf' : (bl.isReading ? 'markdown' : 'video')),
     createdAt: bl.createdAt ?? new Date().toISOString(),
@@ -90,6 +118,9 @@ function buildLessonFormData(payload: {
   if (payload.pdfUrl !== undefined) fd.append('pdfUrl', payload.pdfUrl);
   if (payload.order !== undefined) fd.append('order', String(payload.order));
   if (payload.moduleId !== undefined) fd.append('moduleId', String(payload.moduleId));
+  // Send only the enabled value through multipart (Boolean('false') is true
+  // under class-transformer); the JSON follow-up patch handles disabling it.
+  if (payload.isFreePreview === true) fd.append('isFreePreview', 'true');
   if (payload.pdf instanceof File) fd.append('pdf', payload.pdf);
   if (payload.status !== undefined) {
     fd.append('status', payload.status);
@@ -107,7 +138,8 @@ export const lessonService = {
     const limit = 100;
     const lessons: BackendLesson[] = [];
     let page = 1;
-    let totalPages = 1;
+    let totalPages: number | null = null;
+    const seenPageSignatures = new Set<string>();
 
     // The API returns { data, meta: { total, page, limit, totalPages } }.
     // Read pages in order so a large lesson library does not create a burst of
@@ -116,37 +148,41 @@ export const lessonService = {
       const { data: response } = await api.get<any>('/lessons/search', {
         params: { q: '', ...params, page, limit },
       });
-      let body = response;
-      // Some deployments wrap the standard response once more in `data`.
-      if (!Array.isArray(body) && body?.data && !Array.isArray(body.data) && body.data.data) {
-        body = body.data;
-      }
-      const items: BackendLesson[] = Array.isArray(body)
-        ? body
-        : Array.isArray(body?.data) ? body.data : [];
+      const { items, totalPages: reportedTotalPages } = readLessonPage(response, limit);
       lessons.push(...items);
 
-      const meta = body?.meta;
-      totalPages = Math.max(1, Number(meta?.totalPages) || (meta?.total != null
-        ? Math.ceil(Number(meta.total) / (Number(meta.limit) || limit))
-        : 1));
-      if (!meta && items.length === limit) totalPages = page + 1;
+      const signature = items.map(item => String(item.id)).join(',');
+      if (page > 1 && signature && seenPageSignatures.has(signature)) break;
+      if (signature) seenPageSignatures.add(signature);
+
+      totalPages = reportedTotalPages;
+      // Older deployments omit pagination metadata. Read another page only when
+      // the previous one was full, and stop if it repeats.
+      if (totalPages === null) totalPages = items.length === limit ? page + 1 : page;
       page += 1;
     } while (page <= totalPages);
 
-    return lessons;
+    return [...new Map(lessons.map(lesson => [String(lesson.id), lesson])).values()];
   },
   async getPdfs(lessonId: string): Promise<Array<{ id: string; title?: string; url: string; order?: number }>> {
     const { data } = await api.get<any>(`/lessons/${lessonId}/pdfs`);
-    const list = Array.isArray(data) ? data : data.data ?? [];
+    const body = data?.data ?? data;
+    const list = Array.isArray(body) ? body : body?.items ?? body?.pdfs ?? body?.files ?? [];
     return list.map((pdf: any, index: number) => ({ ...pdf, id: String(pdf.id), title: pdf.title ?? `PDF ${index + 1}`, order: pdf.order ?? index })).sort((a: any, b: any) => a.order - b.order);
   },
-  async addPdf(lessonId: string, input: { file?: File; title?: string; url?: string; order?: number }): Promise<void> {
+  async addPdf(lessonId: string, input: { file?: File; title?: string; url?: string; order?: number }, onProgress?: (progress: { percent: number; loaded: number; total: number }) => void): Promise<void> {
     if (input.file) {
       const body = new FormData(); body.append('file', input.file);
       if (input.title) body.append('title', input.title);
       if (input.order !== undefined) body.append('order', String(input.order));
-      await api.post(`/lessons/${lessonId}/pdfs`, body);
+      await api.post(`/lessons/${lessonId}/pdfs`, body, {
+        onUploadProgress: event => {
+          if (!onProgress) return;
+          const total = event.total || input.file!.size;
+          const loaded = Math.min(event.loaded, total);
+          onProgress({ percent: Math.min(100, Math.round(loaded * 100 / total)), loaded, total });
+        },
+      });
     } else {
       await api.post(`/lessons/${lessonId}/pdfs`, { title: input.title, url: input.url, order: input.order });
     }
@@ -199,6 +235,7 @@ export const lessonService = {
       order: payload.order,
       moduleId: Number(payload.courseId),
       pdf: (payload as any).pdf,
+      isFreePreview: (payload as any).isFreePreview,
       status,
       isPublished: payload.isPublished ?? true,
       pdfFiles: (payload as any).pdfFiles,
@@ -208,11 +245,18 @@ export const lessonService = {
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
     // Send isReading explicitly via JSON to bypass FormData boolean/string strict validation in backend
-    const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives','pdfFiles'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
+    const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
     const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
     if (Object.keys(extraPayload).length) {
       const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${lesson.id}`, extraPayload);
       lesson = (updatedData as { data?: BackendLesson }).data ?? (updatedData as BackendLesson);
+    }
+
+    // PDF attachment rows are managed by their dedicated endpoint. The lesson
+    // create/update DTO does not reliably persist a `pdfFiles` array.
+    for (const [index, pdf] of (((payload as any).pdfFiles ?? []) as Array<{ title?: string; url: string; order?: number }>).entries()) {
+      if (!pdf?.url) continue;
+      await this.addPdf(String(lesson.id), { title: pdf.title, url: pdf.url, order: pdf.order ?? index });
     }
 
     // The API updates the PDF relation after forming its PATCH response. Reload
@@ -237,7 +281,7 @@ export const lessonService = {
     const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd, { onUploadProgress, timeout: 0 });
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
-    const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives','pdfFiles'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
+    const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
     const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
     if (Object.keys(extraPayload).length) {
       const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, extraPayload);

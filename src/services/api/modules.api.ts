@@ -17,7 +17,7 @@ export const modulesService = {
   /** GET /modules — all modules */
   async getAll(): Promise<BackendModule[]> {
     const { data } = await api.get<BackendModule[] | { data: BackendModule[] }>('/modules');
-    return Array.isArray(data) ? data : (data as { data: BackendModule[] }).data ?? [];
+    return unwrapModules(data);
   },
 
   /** GET /modules/course/{courseId} */
@@ -25,7 +25,7 @@ export const modulesService = {
     const { data } = await api.get<BackendModule[] | { data: BackendModule[] }>(
       `/modules/course/${courseId}`
     );
-    return Array.isArray(data) ? data : (data as { data: BackendModule[] }).data ?? [];
+    return unwrapModules(data);
   },
 
   /** GET /modules/{id} */
@@ -51,3 +51,9 @@ export const modulesService = {
     await api.delete(`/modules/${id}`);
   },
 };
+
+function unwrapModules(response: any): BackendModule[] {
+  let body = response;
+  while (!Array.isArray(body) && body && typeof body === 'object' && body.data !== undefined) body = body.data;
+  return Array.isArray(body) ? body : Array.isArray(body?.items) ? body.items : [];
+}

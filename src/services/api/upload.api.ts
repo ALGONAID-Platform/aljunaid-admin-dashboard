@@ -9,6 +9,8 @@
  */
 
 import { api } from '../../lib/api';
+import { getImageUrl } from '../../utils/helpers';
+import { createUploadProgressReporter } from '../../utils/uploadProgress';
 
 export interface UploadResponse {
   url: string;
@@ -125,6 +127,7 @@ export const uploadService = {
 
     const formData = new FormData();
     formData.append('file', file);
+    const reportProgress = createUploadProgressReporter(onProgress, file.size);
 
     try {
       const { data } = await api.post<UploadResponse>('/upload/image', formData, {
@@ -132,15 +135,7 @@ export const uploadService = {
         headers: {
           Accept: 'application/json',
         },
-        onUploadProgress: (evt) => {
-          if (onProgress && evt.total) {
-            onProgress({
-              percent: Math.round((evt.loaded * 100) / evt.total),
-              loaded: evt.loaded,
-              total: evt.total,
-            });
-          }
-        },
+        onUploadProgress: (evt) => reportProgress(evt.loaded, evt.total),
       });
 
       let rawUrl = '';
@@ -162,13 +157,7 @@ export const uploadService = {
       }
       rawUrl = rawUrl.trim();
 
-      if (/^https?:\/\//i.test(rawUrl)) {
-        return rawUrl;
-      }
-
-      const configuredBaseUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'https://api.exchangesmangement.online/api/v1';
-      const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
-      return `${baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+      return getImageUrl(rawUrl);
     } catch (err) {
       console.error('Upload Error:', err);
       const classified = classifyUploadError(err);
@@ -195,6 +184,7 @@ export const uploadService = {
 
     const formData = new FormData();
     formData.append('file', file);
+    const reportProgress = createUploadProgressReporter(onProgress, file.size);
 
     try {
       // Backend uses the same endpoint for all uploadcare uploads
@@ -203,15 +193,7 @@ export const uploadService = {
         headers: {
           Accept: 'application/json',
         },
-        onUploadProgress: (evt) => {
-          if (onProgress && evt.total) {
-            onProgress({
-              percent: Math.round((evt.loaded * 100) / evt.total),
-              loaded: evt.loaded,
-              total: evt.total,
-            });
-          }
-        },
+        onUploadProgress: (evt) => reportProgress(evt.loaded, evt.total),
       });
 
       let rawUrl = '';

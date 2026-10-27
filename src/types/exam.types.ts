@@ -1,6 +1,6 @@
 import type { ID } from './common.types';
 
-export type ExamType = 'LESSON_QUIZ' | 'COURSE_QUIZ' | 'CHALLENGE';
+export type ExamType = 'LESSON_QUIZ' | 'COURSE_QUIZ' | 'CHALLENGE' | 'FINAL_EXAM';
 export type RankingCriteria = 'BOTH' | 'SCORE' | 'SPEED';
 export type ExamQuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
 

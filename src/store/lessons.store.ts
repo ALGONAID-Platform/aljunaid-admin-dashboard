@@ -3,6 +3,9 @@ import { lessonService } from '../services/lesson.service';
 import { resolveErrorMessage } from '../lib/errors';
 import type { Lesson, CreateLessonPayload, UpdateLessonPayload } from '../types';
 
+let latestFetchRequest = 0;
+let lessonsMutationVersion = 0;
+
 interface LessonsState {
   lessons: Lesson[];
   isLoading: boolean;
@@ -22,12 +25,18 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
   error: null,
 
   fetchLessons: async () => {
+    const request = ++latestFetchRequest;
+    const mutationVersion = lessonsMutationVersion;
     set({ isLoading: true, error: null });
     try {
       const backendLessons = await lessonService.getAll();
-      set({ lessons: backendLessons, isLoading: false });
+      if (request === latestFetchRequest && mutationVersion === lessonsMutationVersion) {
+        set({ lessons: backendLessons, isLoading: false });
+      }
     } catch (err) {
-      set({ error: resolveErrorMessage(err), isLoading: false });
+      if (request === latestFetchRequest && mutationVersion === lessonsMutationVersion) {
+        set({ error: resolveErrorMessage(err), isLoading: false });
+      }
     }
   },
 
@@ -35,6 +44,7 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const newLesson = await lessonService.create(payload, onUploadProgress);
+      lessonsMutationVersion += 1;
       set(state => ({ lessons: [newLesson, ...state.lessons], isLoading: false }));
       return newLesson;
     } catch (err) {
@@ -47,6 +57,7 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const updated = await lessonService.update(payload, onUploadProgress);
+      lessonsMutationVersion += 1;
       set(state => ({
         lessons: state.lessons.map(l => String(l.id) === String(payload.id) ? updated : l),
         isLoading: false
@@ -61,6 +72,7 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await lessonService.delete(id);
+      lessonsMutationVersion += 1;
       set(state => ({
         lessons: state.lessons.filter(l => String(l.id) !== String(id)),
         isLoading: false
@@ -75,6 +87,7 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const updated = await lessonService.togglePublish(id);
+      lessonsMutationVersion += 1;
       set(state => ({
         lessons: state.lessons.map(l => String(l.id) === String(id) ? updated : l),
         isLoading: false

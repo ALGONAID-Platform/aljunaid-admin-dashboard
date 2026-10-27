@@ -7,7 +7,8 @@ import { AuthLayout } from '../components/layout/AuthLayout';
 import { Loader } from '../components/feedback/Loader';
 import { useAppData } from '../hooks/useAppData';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../store';
-import { BookOpen, ClipboardCheck, ClipboardList } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Layers } from 'lucide-react';
+import { ModuleManagerModal } from '../components/ui/ModuleManagerModal';
 
 // Lazy-loaded page components
 const LoginPage = lazy(() =>
@@ -51,6 +52,7 @@ const NotificationBroadcastPage = lazy(() =>
 function CourseWorkspace() {
   const { courseId = '' } = useParams();
   const navigate = useNavigate();
+  const [isModuleManagerOpen, setIsModuleManagerOpen] = useState(false);
   const { courses, fetchCourses } = useCoursesStore();
   useEffect(() => { if (!courses.length) void fetchCourses(); }, [courses.length, fetchCourses]);
   const selectedCourse = courses.find(course => String(course.id) === String(courseId));
@@ -71,8 +73,14 @@ function CourseWorkspace() {
       </label>
     </header>
     <nav aria-label="أقسام المقرر" className="flex flex-wrap gap-2 rounded-2xl border bg-white p-3">
-      {tabs.map(tab => <NavLink key={tab.path} to={tab.path} className={({ isActive }) => `rounded-xl px-4 py-2 text-sm font-bold ${isActive ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{tab.label}</NavLink>)}
+      {tabs.map(tab => <NavLink key={tab.path} to={tab.path} className={({ isActive }) => `rounded-xl px-4 py-2 text-sm font-bold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${isActive ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'}`}>{tab.label}</NavLink>)}
+      {selectedCourse && !selectedCourse.isPaid && (
+        <button type="button" onClick={() => setIsModuleManagerOpen(true)} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-slate-600 transition-colors duration-150 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">
+          <Layers size={16} /> إدارة الوحدات التعليمية
+        </button>
+      )}
     </nav>
+    {selectedCourse && !selectedCourse.isPaid && <ModuleManagerModal isOpen={isModuleManagerOpen} onClose={() => setIsModuleManagerOpen(false)} initialCourseId={courseId} />}
     <Outlet />
   </section>;
 }
@@ -89,12 +97,11 @@ function LessonWorkspace() {
   useEffect(() => { if (!lessons.length) void fetchLessons(); }, [lessons.length, fetchLessons]);
   const lesson = lessons.find(item => String(item.id) === String(lessonId));
   const tabs = [
-    { path: 'content', label: 'محتوى الدرس', icon: BookOpen },
     { path: 'exam', label: 'الاختبار', icon: ClipboardList },
     { path: 'assignment', label: 'الواجب', icon: ClipboardCheck },
   ];
   return <section dir="rtl" className="space-y-5">
-    <header className="rounded-2xl border bg-white p-4"><button onClick={() => navigate(-1)} className="mb-2 text-sm font-bold text-emerald-700">العودة إلى الدروس</button><h2 className="text-xl font-black text-slate-900">{lesson?.title ?? `الدرس ${lessonId}`}</h2><p className="mt-1 text-sm text-slate-500">إدارة محتوى الدرس واختباره وواجبه من مكان واحد.</p></header>
+    <header className="rounded-2xl border bg-white p-4"><button onClick={() => navigate(-1)} className="mb-2 text-sm font-bold text-emerald-700">العودة إلى الدروس</button><h2 className="text-xl font-black text-slate-900">{lesson?.title ?? `الدرس ${lessonId}`}</h2><p className="mt-1 text-sm text-slate-500">إدارة اختبار الدرس وواجبه من مكان واحد.</p></header>
     <nav aria-label="أقسام الدرس" className="flex flex-wrap gap-2 rounded-2xl border bg-white p-3">
       {tabs.map(tab => <NavLink key={tab.path} to={tab.path} className={({ isActive }) => `inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold ${isActive ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}><tab.icon size={16}/>{tab.label}</NavLink>)}
     </nav>
@@ -102,7 +109,6 @@ function LessonWorkspace() {
   </section>;
 }
 
-function LessonContentRoute() { const { lessonId = '' } = useParams(); return <LessonsPage key={lessonId} scopedLessonId={lessonId} />; }
 function LessonExamRoute() { const { lessonId = '' } = useParams(); return <LessonExamPage lessonId={lessonId} />; }
 function LessonAssignmentRoute() { const { lessonId = '' } = useParams(); return <AssignmentsPage key={lessonId} scopedLessonId={lessonId} />; }
 
@@ -158,9 +164,10 @@ function DashboardRoutes() {
             <Route path="assignments" element={<CourseAssignmentsRoute />} />
             <Route path="exam-models" element={<CourseExamModelsRoute />} />
           </Route>
+          <Route path="lessons/new" element={<Navigate to="/admin/lessons" replace />} />
           <Route path="lessons/:lessonId" element={<LessonWorkspace />}>
-            <Route index element={<Navigate to="content" replace />} />
-            <Route path="content" element={<LessonContentRoute />} />
+            <Route index element={<Navigate to="exam" replace />} />
+            <Route path="content" element={<Navigate to="../exam" replace />} />
             <Route path="exam" element={<LessonExamRoute />} />
             <Route path="assignment" element={<LessonAssignmentRoute />} />
           </Route>
