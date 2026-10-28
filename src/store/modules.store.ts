@@ -3,6 +3,8 @@ import { modulesService } from '../services/api/modules.api';
 import { resolveErrorMessage } from '../lib/errors';
 import type { BackendModule, CreateModuleDto, UpdateModuleDto } from '../types/api';
 
+let latestModulesRequest = 0;
+
 interface ModulesState {
   modules: BackendModule[];
   isLoading: boolean;
@@ -23,21 +25,27 @@ export const useModulesStore = create<ModulesState>()((set, get) => ({
   error: null,
 
   fetchModules: async () => {
+    const request = ++latestModulesRequest;
     set({ isLoading: true, error: null });
     try {
       const backendModules = await modulesService.getAll();
+      if (request !== latestModulesRequest) return;
       set({ modules: backendModules, isLoading: false });
     } catch (err) {
+      if (request !== latestModulesRequest) return;
       set({ error: resolveErrorMessage(err), isLoading: false });
     }
   },
 
   fetchModulesByCourse: async (courseId: number | string) => {
+    const request = ++latestModulesRequest;
     set({ isLoading: true, error: null });
     try {
       const courseModules = await modulesService.getByCourse(courseId);
+      if (request !== latestModulesRequest) return;
       set({ modules: courseModules, isLoading: false });
     } catch (err) {
+      if (request !== latestModulesRequest) return;
       set({ error: resolveErrorMessage(err), isLoading: false });
     }
   },

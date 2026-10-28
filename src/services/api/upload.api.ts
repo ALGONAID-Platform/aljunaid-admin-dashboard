@@ -55,8 +55,11 @@ export function classifyUploadError(err: unknown): UploadError {
   if (e.message?.includes('timeout') || e.message?.includes('ECONNABORTED')) {
     return { type: 'network', message: 'انتهت مهلة الرفع. الملف قد يكون كبيراً جداً أو الاتصال بطيء.' };
   }
-  if (e.status === 413 || e.message?.includes('too large') || e.message?.includes('file size')) {
-    return { type: 'size', message: 'حجم الملف يتجاوز الحد الأقصى المسموح به (50 MB).', maxMB: 50 };
+  if (e.status === 413) {
+    return { type: 'size', message: 'رفض الخادم الملف بسبب حدود حجم الرفع. تحقق من الحد المسموح على الخادم.', maxMB: MAX_PDF_MB };
+  }
+  if (e.message?.toLowerCase().includes('too large') || e.message?.toLowerCase().includes('file size')) {
+    return { type: 'size', message: e.message, maxMB: MAX_PDF_MB };
   }
   if (e.status === 415 || e.message?.includes('unsupported') || e.message?.includes('mime')) {
     return { type: 'format', message: 'نوع الملف غير مدعوم.', allowed: ALLOWED_IMAGE_EXTS };

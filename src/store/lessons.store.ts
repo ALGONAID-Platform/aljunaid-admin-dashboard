@@ -30,11 +30,18 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const backendLessons = await lessonService.getAll();
-      if (request === latestFetchRequest && mutationVersion === lessonsMutationVersion) {
-        set({ lessons: backendLessons, isLoading: false });
+      if (request !== latestFetchRequest) return;
+      // A save may finish while this paginated fetch is in flight. Discarding
+      // that response without retrying leaves the list stale until navigation.
+      if (mutationVersion !== lessonsMutationVersion) {
+        void get().fetchLessons();
+        return;
       }
+      set({ lessons: backendLessons, isLoading: false });
     } catch (err) {
-      if (request === latestFetchRequest && mutationVersion === lessonsMutationVersion) {
+      if (request === latestFetchRequest && mutationVersion !== lessonsMutationVersion) {
+        void get().fetchLessons();
+      } else if (request === latestFetchRequest) {
         set({ error: resolveErrorMessage(err), isLoading: false });
       }
     }

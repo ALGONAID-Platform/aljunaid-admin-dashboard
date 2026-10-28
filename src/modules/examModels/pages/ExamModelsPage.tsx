@@ -171,10 +171,10 @@ export function ExamModelsPage({ scopedCourseId }: { scopedCourseId?: string } =
         <div>
           <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1 flex items-center gap-2.5">
             <FileSpreadsheet className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" />
-            إدارة نماذج الامتحانات (Practice Exams)
+            {scopedCourseId ? 'إضافة مراجع أو كتب' : 'إدارة نماذج الامتحانات (Practice Exams)'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 font-medium">
-            نماذج امتحانات واختبارات تطبيقية للمقررات والمراحل.
+            {scopedCourseId ? 'إدارة المراجع والكتب المرتبطة بهذا المقرر.' : 'نماذج امتحانات واختبارات تطبيقية للمقررات والمراحل.'}
           </p>
         </div>
 
@@ -191,8 +191,8 @@ export function ExamModelsPage({ scopedCourseId }: { scopedCourseId?: string } =
       </div>
 
       <PageGuide
-        title="دليل نماذج الامتحانات"
-        description="كيفية إدارة النماذج الامتحانية والمراجع"
+        title={scopedCourseId ? 'دليل إضافة المراجع والكتب' : 'دليل نماذج الامتحانات'}
+        description={scopedCourseId ? 'كيفية إضافة المراجع والكتب وإدارتها لهذا المقرر' : 'كيفية إدارة النماذج الامتحانية والمراجع'}
         steps={[
           {
             title: "إضافة نموذج جديد",

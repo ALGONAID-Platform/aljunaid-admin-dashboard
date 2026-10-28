@@ -245,13 +245,13 @@ export function ContentPage() {
                     {(item as any).pdfUrl && (
                       <div className="text-xs font-semibold text-red-600 flex items-center gap-1.5 min-w-0 max-w-full overflow-hidden" dir="ltr">
                         <FileType2 className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <span className="truncate flex-1 min-w-0">{(item as any).pdfUrl}</span>
+                        <span className="truncate flex-1 min-w-0">{item.fileName || (item as any).pdfUrl}</span>
                       </div>
                     )}
                     {item.url && !((item as any).videoUrl) && (
                       <div className="text-xs font-semibold text-blue-600 flex items-center gap-1.5 min-w-0 max-w-full overflow-hidden" dir="ltr">
                         <Link className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                        <span className="truncate flex-1 min-w-0">{item.url}</span>
+                        <span className="truncate flex-1 min-w-0">{item.fileName || item.url}</span>
                       </div>
                     )}
                     {!item.url && !((item as any).videoUrl) && !((item as any).pdfUrl) && (

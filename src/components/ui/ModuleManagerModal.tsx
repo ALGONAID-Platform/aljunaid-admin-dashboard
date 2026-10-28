@@ -6,6 +6,7 @@ import { useCoursesStore, useModulesStore, useLessonsStore, useContentStore, use
 import { useMediaStore } from '../../store/media.store';
 import { CascadeDeleteModal } from './CascadeDeleteModal';
 import type { BackendModule } from '../../types/api';
+import { getImageUrl } from '../../utils/helpers';
 
 interface ModuleManagerModalProps {
   isOpen: boolean;
@@ -266,7 +267,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                 <div className="flex items-center gap-4">
                   {imageUrl ? (
                     <div className="relative w-24 h-16 rounded-lg overflow-hidden border border-slate-200 group shrink-0">
-                      <img src={imageUrl} alt="Module cover" className="w-full h-full object-cover" />
+                      <img src={getImageUrl(imageUrl)} alt="Module cover" className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setImageUrl('')}
@@ -402,7 +403,7 @@ export const ModuleManagerModal: React.FC<ModuleManagerModalProps> = ({
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 flex-1">
                           {mod.imageUrl ? (
-                            <img src={mod.imageUrl} alt={mod.title} className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover shrink-0 border border-slate-200 mt-1" />
+                            <img src={getImageUrl(mod.imageUrl)} alt={mod.title} className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover shrink-0 border border-slate-200 mt-1" />
                           ) : (
                             <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
                               <Layers className="w-5 h-5 sm:w-6 sm:h-6" />

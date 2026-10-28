@@ -42,6 +42,9 @@ const MediaPage = lazy(() =>
 const PaymentsPage = lazy(() =>
   import('../modules/payments/pages/PaymentsPage').then((m) => ({ default: m.PaymentsPage }))
 );
+const UnverifiedUsersPage = lazy(() =>
+  import('../modules/users/pages/UnverifiedUsersPage').then((m) => ({ default: m.UnverifiedUsersPage }))
+);
 const AssignmentsPage = lazy(() =>
   import('../modules/assignments/pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage }))
 );
@@ -60,7 +63,7 @@ function CourseWorkspace() {
     { path: 'lessons', label: 'الدروس' },
     { path: 'exams', label: 'الاختبارات' },
     { path: 'assignments', label: 'الواجبات والتسليمات' },
-    { path: 'exam-models', label: 'نماذج الامتحانات' },
+    { path: 'exam-models', label: 'إضافة مراجع أو كتب' },
   ];
   return <section dir="rtl" className="space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-4">
@@ -156,6 +159,7 @@ function DashboardRoutes() {
           <Route path="progress" element={<AcademicProgressPage />} />
           <Route path="media" element={<MediaPage />} />
           <Route path="payments" element={<PaymentsPage />} />
+          <Route path="account-verification" element={<UnverifiedUsersPage />} />
           <Route path="assignments" element={<AssignmentsPage />} />
           <Route path="courses/:courseId" element={<CourseWorkspace />}>
             <Route index element={<Navigate to="lessons" replace />} />

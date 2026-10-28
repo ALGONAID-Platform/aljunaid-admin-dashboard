@@ -8,6 +8,7 @@ import { Exam, ExamType } from '../../types';
 import CreateExamModal from './components/CreateExamModal';
 import EditExamModal from './components/EditExamModal';
 import DeleteConfirmModal from '../../components/DeleteConfirmModal/DeleteConfirmModal';
+import { getImageUrl } from '../../utils/helpers';
 import './ExamsPage.css';
 
 const examTypeLabels: Record<ExamType, string> = {
@@ -89,7 +90,7 @@ const ExamsPage = () => {
             render: (title: string, record: Exam) => (
                 <div className="exam-title-cell">
                     {record.imageUrl ? (
-                        <Avatar shape="square" size={40} src={record.imageUrl} className="exam-thumbnail" />
+                        <Avatar shape="square" size={40} src={getImageUrl(record.imageUrl)} className="exam-thumbnail" />
                     ) : (
                         <Avatar shape="square" size={40} icon={<TrophyOutlined />} className="exam-thumbnail" style={{ backgroundColor: 'var(--primary-light)' }} />
                     )}

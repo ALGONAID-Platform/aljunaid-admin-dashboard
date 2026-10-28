@@ -14,6 +14,7 @@ export const ROUTES = {
   progress: '/admin/progress',
   media: '/admin/media',
   payments: '/admin/payments',
+  accountVerification: '/admin/account-verification',
   assignments: '/admin/assignments',
   notifications: '/admin/notifications',
 } as const;

@@ -5,12 +5,13 @@ interface PaginationProps {
   currentPage: number;
   totalItems: number;
   itemsPerPage: number;
+  totalPages?: number;
   onPageChange: (page: number) => void;
   onItemsPerPageChange?: (items: number) => void;
 }
 
-export function Pagination({ currentPage, totalItems, itemsPerPage, onPageChange, onItemsPerPageChange }: PaginationProps) {
-  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+export function Pagination({ currentPage, totalItems, itemsPerPage, totalPages: reportedTotalPages, onPageChange, onItemsPerPageChange }: PaginationProps) {
+  const totalPages = reportedTotalPages ?? (Math.ceil(totalItems / itemsPerPage) || 1);
   
   if (totalItems === 0) return null;
 

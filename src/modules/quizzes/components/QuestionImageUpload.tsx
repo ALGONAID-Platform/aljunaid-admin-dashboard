@@ -1,18 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { UploadCloud, Image as ImageIcon, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { mediaApi } from '../../../services/api/media.api';
+import { getImageUrl } from '../../../utils/helpers';
 
 interface Props {
   imageUrl?: string;
   onImageUploaded: (url: string) => void;
   onImageRemoved: () => void;
-}
-
-function resolveImageSrc(url: string): string {
-  if (/^(https?:|blob:|data:)/i.test(url)) return url;
-  const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://api.exchangesmangement.online/api/v1';
-  const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
-  return `${baseUrl}/${url.replace(/^\/+/, '')}`;
 }
 
 export function QuestionImageUpload({ imageUrl, onImageUploaded, onImageRemoved }: Props) {
@@ -82,7 +76,7 @@ export function QuestionImageUpload({ imageUrl, onImageUploaded, onImageRemoved 
 
       {imageUrl && !isUploading ? (
         <div className="relative group border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center p-2" style={{ maxHeight: 200 }}>
-          <img src={resolveImageSrc(imageUrl)} alt="Question visual" className="max-h-40 object-contain rounded-lg" />
+          <img src={getImageUrl(imageUrl)} alt="Question visual" className="max-h-40 object-contain rounded-lg" />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
             <button onClick={() => fileInputRef.current?.click()} className="p-2 bg-white text-slate-700 rounded-full hover:bg-emerald-50 hover:text-emerald-600 transition-colors" title="استبدال الصورة">
               <RefreshCw className="w-4 h-4" />

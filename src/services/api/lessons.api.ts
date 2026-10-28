@@ -118,9 +118,7 @@ function buildLessonFormData(payload: {
   if (payload.pdfUrl !== undefined) fd.append('pdfUrl', payload.pdfUrl);
   if (payload.order !== undefined) fd.append('order', String(payload.order));
   if (payload.moduleId !== undefined) fd.append('moduleId', String(payload.moduleId));
-  // Send only the enabled value through multipart (Boolean('false') is true
-  // under class-transformer); the JSON follow-up patch handles disabling it.
-  if (payload.isFreePreview === true) fd.append('isFreePreview', 'true');
+  // Free preview is sent in the JSON follow-up patch so false stays boolean.
   if (payload.pdf instanceof File) fd.append('pdf', payload.pdf);
   if (payload.status !== undefined) {
     fd.append('status', payload.status);
@@ -176,6 +174,7 @@ export const lessonService = {
       if (input.title) body.append('title', input.title);
       if (input.order !== undefined) body.append('order', String(input.order));
       await api.post(`/lessons/${lessonId}/pdfs`, body, {
+        timeout: 0,
         onUploadProgress: event => {
           if (!onProgress) return;
           const total = event.total || input.file!.size;
@@ -184,7 +183,7 @@ export const lessonService = {
         },
       });
     } else {
-      await api.post(`/lessons/${lessonId}/pdfs`, { title: input.title, url: input.url, order: input.order });
+      await api.post(`/lessons/${lessonId}/pdfs`, { title: input.title, url: input.url, order: input.order }, { timeout: 0 });
     }
   },
   async deletePdf(lessonId: string, pdfId: string): Promise<void> {
@@ -217,7 +216,13 @@ export const lessonService = {
   async getById(id: string): Promise<Lesson> {
     const { data } = await api.get<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`);
     const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
-    return adaptLesson(lesson);
+    const adapted = adaptLesson(lesson);
+    try {
+      const pdfFiles = await this.getPdfs(id);
+      return { ...adapted, pdfFiles };
+    } catch {
+      return adapted;
+    }
   },
 
   /**
@@ -254,9 +259,15 @@ export const lessonService = {
 
     // PDF attachment rows are managed by their dedicated endpoint. The lesson
     // create/update DTO does not reliably persist a `pdfFiles` array.
-    for (const [index, pdf] of (((payload as any).pdfFiles ?? []) as Array<{ title?: string; url: string; order?: number }>).entries()) {
-      if (!pdf?.url) continue;
-      await this.addPdf(String(lesson.id), { title: pdf.title, url: pdf.url, order: pdf.order ?? index });
+    const attachedPdfKeys = new Set<string>();
+    for (const [index, pdf] of (((payload as any).pdfFiles ?? []) as Array<{ title?: string; url?: string; file?: File; order?: number }>).entries()) {
+      if (!pdf?.url && !pdf?.file) continue;
+      const key = pdf.file
+        ? `${pdf.file.name.toLocaleLowerCase()}-${pdf.file.size}-${pdf.file.lastModified}`
+        : `url:${pdf.url}`;
+      if (attachedPdfKeys.has(key)) continue;
+      attachedPdfKeys.add(key);
+      await this.addPdf(String(lesson.id), { title: pdf.title, url: pdf.url, file: pdf.file, order: pdf.order ?? index });
     }
 
     // The API updates the PDF relation after forming its PATCH response. Reload

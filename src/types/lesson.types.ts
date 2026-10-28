@@ -4,6 +4,7 @@ export interface LessonPdf {
   id?: ID;
   title: string;
   url: string;
+  file?: File;
   order: number;
 }
 

@@ -15,6 +15,7 @@
 import { api } from '../../lib/api';
 import type { BackendLesson } from '../../types/api';
 import type { ContentItem, CreateContentPayload } from '../../types';
+import { lessonService } from './lessons.api';
 
 // ─── Adapter: BackendLesson → ContentItem[] ───────────────────────────────────
 
@@ -34,7 +35,8 @@ function extractContentItems(lesson: BackendLesson): ContentItem[] {
     });
   }
 
-  if (lesson.pdfUrl) {
+  const pdfFiles = ((lesson as any).pdfFiles ?? (lesson as any).pdfs ?? []) as Array<{ id?: string | number; title?: string; url?: string; order?: number }>;
+  if (lesson.pdfUrl && !pdfFiles.some(pdf => pdf.url === lesson.pdfUrl)) {
     items.push({
       id: `lesson-${lesson.id}-pdf`,
       lessonId: String(lesson.id),
@@ -47,6 +49,21 @@ function extractContentItems(lesson: BackendLesson): ContentItem[] {
       createdAt: lesson.createdAt ?? new Date().toISOString(),
     });
   }
+
+  pdfFiles.forEach((pdf, index) => {
+    if (!pdf.url) return;
+    items.push({
+      id: `lesson-${lesson.id}-pdf-${pdf.id ?? index}`,
+      lessonId: String(lesson.id),
+      lessonTitle: lesson.title,
+      title: pdf.title || pdf.url.split('/').pop() || `PDF ${index + 1}`,
+      type: 'pdf',
+      fileName: pdf.title || pdf.url.split('/').pop(),
+      url: pdf.url,
+      status: 'ready',
+      createdAt: lesson.createdAt ?? new Date().toISOString(),
+    });
+  });
 
   if (lesson.content) {
     let type: 'word' | 'image' | 'link' = 'word';
@@ -67,6 +84,15 @@ function extractContentItems(lesson: BackendLesson): ContentItem[] {
   }
 
   return items;
+}
+
+async function withLessonPdfs(lesson: BackendLesson): Promise<BackendLesson> {
+  if ((lesson as any).pdfFiles?.length || (lesson as any).pdfs?.length) return lesson;
+  try {
+    return { ...lesson, pdfFiles: await lessonService.getPdfs(String(lesson.id)) } as BackendLesson;
+  } catch {
+    return lesson;
+  }
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -98,14 +124,15 @@ export const contentService = {
       })
     );
 
-    return lessonArrays.flat().flatMap(extractContentItems);
+    const lessons = await Promise.all(lessonArrays.flat().map(withLessonPdfs));
+    return lessons.flatMap(extractContentItems);
   },
 
   /** Filter content by lessonId */
   async getByLesson(lessonId: string): Promise<ContentItem[]> {
     const { data } = await api.get<BackendLesson | { data: BackendLesson }>(`/lessons/${lessonId}`);
     const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
-    return extractContentItems(lesson);
+    return extractContentItems(await withLessonPdfs(lesson));
   },
 
   /**

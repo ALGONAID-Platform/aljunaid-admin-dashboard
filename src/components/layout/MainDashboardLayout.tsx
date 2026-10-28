@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect } from 'react';
 import {
   LayoutDashboard, BookOpen, Megaphone,
-  Send, LogOut, Menu, Activity, X, Image as ImageIcon, WalletCards
+  Send, LogOut, Menu, Activity, X, Image as ImageIcon, WalletCards, UserRoundCheck
 } from 'lucide-react';
 import { useUIStore, useAuthStore } from '../../store';
 import { useNavigate, useLocation } from 'react-router';
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { path: ROUTES.publish, icon: Send, label: 'نشر الدروس' },
   { path: ROUTES.media, icon: ImageIcon, label: 'الوسائط' },
   { path: ROUTES.payments, icon: WalletCards, label: 'المدفوعات' },
+  { path: ROUTES.accountVerification, icon: UserRoundCheck, label: 'توثيق الحسابات' },
   { path: ROUTES.notifications, icon: Megaphone, label: 'إشعارات الطلاب' },
   { path: ROUTES.progress, icon: Activity, label: 'التقدم الأكاديمي' },
 ];

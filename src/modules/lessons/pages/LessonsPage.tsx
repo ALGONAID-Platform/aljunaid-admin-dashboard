@@ -163,7 +163,6 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<any>(null);
   const autoPreviewOpened = useRef(false);
-  const syncedLiveStatuses = useRef(new Set<string>());
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setCurrentPage(1); setSelectedLessons([]); }, [searchQuery, courseFilter, activeView, itemsPerPage]);
@@ -176,37 +175,19 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     else void fetchModules();
   }, [fetchCourses, fetchLessons, fetchModules, fetchModulesByCourse, scopedCourseId]);
 
-  useEffect(() => {
-    const syncStatuses = () => {
-      const now = Date.now();
-      const scheduled = lessons.filter(lesson => lesson.scheduledAt && Number(lesson.durationMinutes) > 0);
-      const updates = scheduled.flatMap(lesson => {
-        const start = new Date(lesson.scheduledAt!).getTime();
-        const end = start + Number(lesson.durationMinutes) * 60000;
-        const desired: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED' = now < start ? 'SCHEDULED' : now < end ? 'LIVE_NOW' : 'COMPLETED';
-        const syncKey = `${lesson.id}:${desired}`;
-        if (desired === lesson.liveStatus || syncedLiveStatuses.current.has(syncKey)) return [];
-        syncedLiveStatuses.current.add(syncKey);
-        return [lessonService.updateLiveStatus(lesson.id, desired).then(() => true, () => false)];
-      });
-      if (updates.length) void Promise.all(updates).then(results => { if (results.some(Boolean)) void fetchLessons(); });
-    };
-    syncStatuses();
-    const timer = window.setInterval(syncStatuses, 60_000);
-    return () => window.clearInterval(timer);
-  }, [lessons, fetchLessons]);
-
   const [form, setForm] = useState<FormState>(emptyLessonForm);
   const [errors, setErrors] = useState<FormError>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [formStep, setFormStep] = useState<1 | 2 | 3>(1);
-  const [lessonPdfs, setLessonPdfs] = useState<Array<{ id: string; title?: string; url: string; order?: number }>>([]);
+  const [lessonPdfs, setLessonPdfs] = useState<Array<{ id?: string; title?: string; url?: string; file?: File; order?: number }>>([]);
   const [newPdfUrl, setNewPdfUrl] = useState('');
   const [newPdfTitle, setNewPdfTitle] = useState('');
   const [pdfManagementError, setPdfManagementError] = useState('');
   const [pdfManagementLoading, setPdfManagementLoading] = useState(false);
   const [pdfManagementProgress, setPdfManagementProgress] = useState<UploadProgress | null>(null);
   const [pdfListLoadFailed, setPdfListLoadFailed] = useState(false);
+  const pdfUploadInFlightRef = useRef(false);
+  const saveInFlightRef = useRef(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoUploadProgress, setVideoUploadProgress] = useState<UploadProgress | null>(null);
   const [videoUploadError, setVideoUploadError] = useState('');
@@ -396,7 +377,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
   const suggestedOrder = (): number => {
     if (!form.moduleId) return 1;
-    return lessons.filter(l => l.courseId === form.moduleId).length + 1; // Backend maps moduleId to courseId temporarily in the list 
+    return lessons.filter(l => l.courseId === form.moduleId).length + 1; // Backend maps moduleId to courseId temporarily in the list
   };
 
   const handleAttachPdfUrl = async () => {
@@ -439,11 +420,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
 
   const handleSave = async () => {
-    if (pdfManagementLoading || pdfListLoadFailed) return;
+    if (saveInFlightRef.current || pdfManagementLoading || pdfListLoadFailed) return;
     if (!validate(3)) return;
+    saveInFlightRef.current = true;
     setSaveStatus('loading');
     const course = courses.find(c => String(c.id) === String(form.courseId));
     if (!course) {
+      saveInFlightRef.current = false;
       setSaveStatus('error');
       setErrors(previous => ({ ...previous, submit: 'تعذر تحديد المقرر المرتبط بهذا الدرس.' }));
       return;
@@ -460,9 +443,9 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         type: form.type, // إرسال النوع الحقيقي للباكاند بدون تحايل
         videoUrl: (form.type === 'video' || form.type === 'live') && form.videoUrl.trim() ? form.videoUrl.trim() : undefined,
         content: form.content.trim() || undefined,
-        pdfUrl: (form.type === 'pdf' || form.type === 'video') ? (lessonPdfs[0]?.url || form.pdfUrl.trim() || undefined) : undefined,
+        pdfUrl: (form.type === 'pdf' || form.type === 'video') ? (lessonPdfs.find(pdf => pdf.url)?.url || form.pdfUrl.trim() || undefined) : undefined,
         pdfFiles: lessonPdfs.length
-          ? lessonPdfs.map((pdf, index) => ({ title: pdf.title || `PDF ${index + 1}`, url: pdf.url, order: index }))
+          ? lessonPdfs.map((pdf, index) => ({ title: pdf.title || `PDF ${index + 1}`, url: pdf.url || '', file: pdf.file, order: index }))
           : form.pdfUrl.trim() ? [{ title: form.pdfUrl.trim().split('/').pop() || form.title.trim(), url: form.pdfUrl.trim(), order: 0 }] : [],
         pdf: undefined,
         // إرسال true بشكل صريح للـ PDF والنص
@@ -497,6 +480,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       const backendMessage = err?.response?.data?.message || err?.message || 'تعذر حفظ الدرس. تحقق من بيانات الدرس والملفات المرفقة.';
       const errorMsg = Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage;
       setErrors(prev => ({ ...prev, submit: `خطأ من الخادم: ${errorMsg}` }));
+    } finally {
+      saveInFlightRef.current = false;
     }
   };
 
@@ -1262,18 +1247,28 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     <button type="button" disabled={!newPdfUrl.trim() || pdfManagementLoading} onClick={() => void handleAttachPdfUrl()} className="rounded-lg bg-emerald-600 px-3 font-bold text-white disabled:opacity-50">إضافة رابط</button>
                   </div>
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">{pdfManagementLoading ? 'جارٍ رفع ملف PDF…' : 'رفع ملف PDF'}<input type="file" accept="application/pdf,.pdf" multiple className="hidden" disabled={pdfManagementLoading} onChange={async e => {
+                    if (pdfUploadInFlightRef.current) { e.target.value = ''; return; }
+                    pdfUploadInFlightRef.current = true;
                     const files = Array.from(e.target.files ?? []); e.target.value = ''; let nextOrder = lessonPdfs.length;
+                    const batchKeys = new Set<string>();
                     for (const file of files) {
                       if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { setPdfManagementError(`الملف ${file.name} ليس بصيغة PDF`); continue; }
+                      const fileKey = `${file.name.toLocaleLowerCase()}-${file.size}-${file.lastModified}`;
+                      if (batchKeys.has(fileKey) || lessonPdfs.some(pdf => pdf.file && `${pdf.file.name.toLocaleLowerCase()}-${pdf.file.size}-${pdf.file.lastModified}` === fileKey) || (editingLessonId && lessonPdfs.some(pdf => pdf.title?.toLocaleLowerCase() === file.name.toLocaleLowerCase()))) {
+                        setPdfManagementError(`الملف ${file.name} مرفق بالفعل.`);
+                        continue;
+                      }
+                      batchKeys.add(fileKey);
                       setPdfManagementLoading(true);
                       setPdfManagementProgress({ percent: 0, loaded: 0, total: file.size });
                       try {
-                        const title = file.name.replace(/\.pdf$/i, '');
+                        const title = file.name;
                         if (editingLessonId) { await lessonService.addPdf(editingLessonId, { file, title, order: nextOrder++ }, setPdfManagementProgress); setLessonPdfs(await lessonService.getPdfs(editingLessonId)); }
-                        else { const { uploadService } = await import('../../../services/api/upload.api'); const url = await uploadService.uploadPdf(file, setPdfManagementProgress); setLessonPdfs(p => [...p, { title, url, order: p.length }]); }
+                        else { setLessonPdfs(p => [...p, { title, file, order: p.length }]); }
                         setPdfManagementError('');
                       } catch (err: any) { setPdfManagementError(err?.message || `تعذر رفع ${file.name}`); } finally { setPdfManagementLoading(false); }
                     }
+                    pdfUploadInFlightRef.current = false;
                   }} /></label>
                   {pdfManagementProgress && <div role="status" aria-live="polite" className="space-y-1">
                     <div role="progressbar" aria-label="تقدم رفع ملف PDF" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pdfManagementProgress.percent} className="h-2 overflow-hidden rounded bg-slate-200">

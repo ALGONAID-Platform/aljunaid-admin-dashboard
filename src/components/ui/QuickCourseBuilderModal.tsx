@@ -9,6 +9,7 @@ import { resolveErrorMessage } from '../../lib/errors';
 import { courseService, lessonService, contentService, quizService, publishService } from '../../services';
 import { mediaApi } from '../../services/api/media.api';
 import { uploadService } from '../../services/api/upload.api';
+import { getImageUrl } from '../../utils/helpers';
 import { MarkdownQuestionEditor } from '../../modules/quizzes/components/MarkdownQuestionEditor';
 import type { Course, Lesson, ContentItem, Quiz, Question } from '../../types';
 
@@ -684,7 +685,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                         />
                         {courseImagePreview && (
                           <div className="relative rounded-2xl overflow-hidden border h-36 bg-slate-100">
-                            <img src={courseImagePreview} alt="معاينة الغلاف" className="w-full h-full object-cover" />
+                            <img src={getImageUrl(courseImagePreview)} alt="معاينة الغلاف" className="w-full h-full object-cover" />
                           </div>
                         )}
                       </div>
@@ -729,7 +730,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                         />
                         <label htmlFor="course-thumbnail-upload-enhanced" className="cursor-pointer flex flex-col items-center gap-2">
                           {courseImagePreview ? (
-                            <img src={courseImagePreview} alt="غلاف" className="h-32 object-cover rounded-xl shadow-md border" />
+                            <img src={getImageUrl(courseImagePreview)} alt="غلاف" className="h-32 object-cover rounded-xl shadow-md border" />
                           ) : (
                             <>
                               <Upload className="w-8 h-8 text-emerald-600 mb-1" />
