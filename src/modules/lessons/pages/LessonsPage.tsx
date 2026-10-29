@@ -570,9 +570,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     const matchesStatus = true;
     // Lesson.courseId is the module ID in this dashboard's backend adapter.
     // Comparing it directly to a course ID leaks lessons when IDs happen to overlap.
+    const isCoursePaid = (c: any) => Boolean(c?.isPaid || c?.isPaid === 1 || c?.isPaid === 'true' || (c?.price !== undefined && Number(c?.price) > 0));
     const lessonModule = allModules.find(module => String(module.id) === String(l.courseId));
-    const directPaidCourse = courses.find(course => course.isPaid && String(course.id) === String(l.courseId));
+    const directPaidCourse = courses.find(course => isCoursePaid(course) && String(course.id) === String(l.courseId));
     const matchesCourse = courseFilter === 'all'
+      || String(l.courseId) === courseFilter
       || String(directPaidCourse?.id ?? lessonModule?.courseId ?? l.courseId) === courseFilter;
 
     let matchesView = true;
@@ -584,9 +586,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       && (!scopedLessonId || String(l.id) === String(scopedLessonId));
   });
 
+  const isCoursePaid = (c: any) => Boolean(c?.isPaid || c?.isPaid === 1 || c?.isPaid === 'true' || (c?.price !== undefined && Number(c?.price) > 0));
   const courseLessons = scopedCourseId
     ? lessons.filter(lesson => {
-        const directPaidCourse = courses.find(course => course.isPaid && String(course.id) === String(lesson.courseId));
+        if (String(lesson.courseId) === String(scopedCourseId)) return true;
+        const directPaidCourse = courses.find(course => isCoursePaid(course) && String(course.id) === String(lesson.courseId));
         const lessonModule = allModules.find(module => String(module.id) === String(lesson.courseId));
         return String(directPaidCourse?.id ?? lessonModule?.courseId ?? lesson.courseId) === String(scopedCourseId);
       })

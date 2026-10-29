@@ -244,16 +244,28 @@ export const lessonService = {
     return result;
   },
 
-  /** Fetch only the lessons belonging to modules in a course. */
+  /** Fetch only the lessons belonging to modules in a course or directly to the course. */
   async getByCourseId(courseId: string): Promise<Lesson[]> {
-    const modules = await modulesService.getByCourse(courseId);
-    const moduleIds = [...new Set(modules.map(module => String(module.id)))];
-    console.info(`[Course ${courseId}] Course modules`, modules);
+    const [all, modules] = await Promise.all([
+      this.getAll().catch(() => []),
+      modulesService.getByCourse(courseId).catch(() => []),
+    ]);
+    const moduleIds = new Set(modules.map(m => String(m.id)));
+    const matching = all.filter(l =>
+      String(l.courseId) === String(courseId) ||
+      moduleIds.has(String(l.courseId)) ||
+      Boolean((l as any).moduleId && moduleIds.has(String((l as any).moduleId)))
+    );
+
+    if (matching.length > 0 || modules.length === 0) {
+      return matching;
+    }
+
+    // Fallback: try module-by-module if not found in all
     const moduleById = new Map(modules.map(module => [String(module.id), module]));
-    const lessonPages = await Promise.all(moduleIds.map(moduleId => this.getByModuleId(moduleId, moduleById.get(moduleId))));
-    const adaptedLessons = lessonPages.flat();
-    console.info(`[Course ${courseId}] Lessons fetched`, adaptedLessons);
-    return adaptedLessons;
+    const lessonPages = await Promise.all([...moduleIds].map(moduleId => this.getByModuleId(moduleId, moduleById.get(moduleId)).catch(() => [])));
+    const moduleLessons = lessonPages.flat();
+    return moduleLessons.length > 0 ? moduleLessons : matching;
   },
 
   /** GET /lessons/{id} */
