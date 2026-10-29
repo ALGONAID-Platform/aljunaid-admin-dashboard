@@ -68,7 +68,7 @@ function CourseWorkspace() {
   return <section dir="rtl" className="space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-4">
       <div><h2 className="text-lg font-black text-slate-900">{selectedCourse?.title ?? 'محتوى المقرر'}</h2><p className="mt-1 text-sm text-slate-500">اختر مقرراً آخر لعرض دروسه ومحتواه.</p></div>
-      <label className="min-w-64 text-sm font-bold text-slate-700">المقرر
+      <label className="w-full min-w-0 text-sm font-bold text-slate-700 sm:w-auto sm:min-w-64">المقرر
         <select aria-label="اختيار المقرر" value={courseId} onChange={event => { const nextCourseId = event.target.value; if (nextCourseId) navigate(`/admin/courses/${nextCourseId}/lessons`); }} className="mt-1.5 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
           <option value="" disabled>اختر مقرراً</option>
           {courses.map(course => <option key={course.id} value={String(course.id)}>{course.title}</option>)}

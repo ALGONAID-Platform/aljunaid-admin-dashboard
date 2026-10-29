@@ -135,9 +135,11 @@ interface FormState {
   isMandatory: boolean;
   isFreePreview: boolean;
   liveStatus: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED';
+  liveMeetingUrl: string;
+  recordingVideoUrl: string;
   status: 'DRAFT' | 'PUBLISHED';
 }
-const emptyLessonForm: FormState = { courseId: '', moduleId: '', title: '', description: '', objectives: [''], order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '', scheduledAt: '', durationMinutes: '', dayNumber: '', isMandatory: true, isFreePreview: false, liveStatus: 'SCHEDULED', status: 'DRAFT' };
+const emptyLessonForm: FormState = { courseId: '', moduleId: '', title: '', description: '', objectives: [''], order: '', type: 'video', videoUrl: '', pdfUrl: '', content: '', scheduledAt: '', durationMinutes: '', dayNumber: '', isMandatory: true, isFreePreview: false, liveStatus: 'SCHEDULED', liveMeetingUrl: '', recordingVideoUrl: '', status: 'DRAFT' };
 
 type FormError = Partial<Record<keyof FormState | 'submit', string>>;
 type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -170,7 +172,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
   useEffect(() => {
     void fetchCourses();
-    void fetchLessons();
+    void fetchLessons(scopedCourseId);
     if (scopedCourseId) void fetchModulesByCourse(scopedCourseId);
     else void fetchModules();
   }, [fetchCourses, fetchLessons, fetchModules, fetchModulesByCourse, scopedCourseId]);
@@ -267,13 +269,14 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const openModal = () => {
     resetModal();
     const isScopedNonModuleCourse = courses.find(course => String(course.id) === String(scopedCourseId))?.isPaid === true;
-    if (scopedCourseId) setForm({ ...emptyLessonForm, courseId: scopedCourseId, ...(isScopedNonModuleCourse ? { moduleId: scopedCourseId } : {}) });
+    const defaultModuleId = isScopedNonModuleCourse ? String(filteredModules[0]?.id ?? '') : '';
+    if (scopedCourseId) setForm({ ...emptyLessonForm, courseId: scopedCourseId, moduleId: defaultModuleId });
     const saved = sessionStorage.getItem('create_lesson_form_state');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         // Only restore state for new lessons
-        setForm({ ...emptyLessonForm, ...parsed, ...(scopedCourseId ? { courseId: scopedCourseId, ...(isScopedNonModuleCourse ? { moduleId: scopedCourseId } : {}) } : {}) });
+        setForm({ ...emptyLessonForm, ...parsed, ...(scopedCourseId ? { courseId: scopedCourseId, ...(isScopedNonModuleCourse ? { moduleId: defaultModuleId } : {}) } : {}) });
       } catch (e) {
         console.error('Failed to parse saved lesson form state', e);
       }
@@ -315,6 +318,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
         liveStatus: (lesson as any).liveStatus ?? 'SCHEDULED',
+        liveMeetingUrl: (lesson as any).liveMeetingUrl ?? '', recordingVideoUrl: (lesson as any).recordingVideoUrl ?? '',
         status: (lesson as any).isPublished ? 'PUBLISHED' : 'DRAFT',
       });
     } else {
@@ -334,6 +338,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
         liveStatus: (lesson as any).liveStatus ?? 'SCHEDULED',
+        liveMeetingUrl: (lesson as any).liveMeetingUrl ?? '', recordingVideoUrl: (lesson as any).recordingVideoUrl ?? '',
         status: (lesson as any).isPublished ? 'PUBLISHED' : 'DRAFT',
       });
     }
@@ -370,10 +375,15 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   };
 
   useEffect(() => {
-    if (form.moduleId && !filteredModules.some(m => String(m.id) === form.moduleId)) {
-      setForm(p => ({ ...p, moduleId: '' }));
+    if (isNonModuleCourse) {
+      const defaultModuleId = String(filteredModules[0]?.id ?? '');
+      if (defaultModuleId && form.moduleId !== defaultModuleId) {
+        setForm(current => ({ ...current, moduleId: defaultModuleId }));
+      }
+    } else if (form.moduleId && !filteredModules.some(m => String(m.id) === form.moduleId)) {
+      setForm(current => ({ ...current, moduleId: '' }));
     }
-  }, [form.courseId]);
+  }, [form.courseId, form.moduleId, filteredModules, isNonModuleCourse]);
 
   const suggestedOrder = (): number => {
     if (!form.moduleId) return 1;
@@ -402,7 +412,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     const e: FormError = {};
     if (step === 1 || step === 3) {
       if (!form.courseId) e.moduleId = 'تعذر تحديد المقرر المرتبط بهذا الدرس';
-      else if (!isNonModuleCourse && !form.moduleId) e.moduleId = 'يرجى اختيار الوحدة التي ينتمي لها الدرس';
+      else if (!form.moduleId) e.moduleId = 'يرجى اختيار الوحدة التي ينتمي لها الدرس';
       if (!form.title.trim()) e.title = 'عنوان الدرس مطلوب';
       else if (form.title.trim().length < 2) e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
       if (!form.order.trim()) e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
@@ -434,7 +444,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     try {
 
       const payload = {
-        courseId: isNonModuleCourse ? form.courseId : form.moduleId,
+        courseId: form.moduleId,
         courseName: course.title,
         title: form.title.trim(),
         description: form.description.trim() || undefined,
@@ -459,10 +469,16 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         // sends this flag as JSON because multipart boolean parsing is unreliable.
         isFreePreview: form.isFreePreview,
         liveStatus: form.liveStatus,
+        liveMeetingUrl: form.liveMeetingUrl || undefined,
+        recordingVideoUrl: form.recordingVideoUrl || undefined,
       };
 
       if (editingLessonId) {
-        await updateLesson({ id: editingLessonId, ...payload });
+        // Editing lesson details must not reassign its backend module. The
+        // form's courseId is a course ID for paid courses, while lesson PATCH
+        // interprets courseId as moduleId; sending it moves the lesson.
+        const { courseId: _courseId, ...lessonChanges } = payload;
+        await updateLesson({ id: editingLessonId, ...lessonChanges });
         toast.success('تم تحديث الدرس بنجاح');
       } else {
         await addLesson(payload);
@@ -530,21 +546,24 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     // Lesson.courseId is the module ID in this dashboard's backend adapter.
     // Comparing it directly to a course ID leaks lessons when IDs happen to overlap.
     const lessonModule = allModules.find(module => String(module.id) === String(l.courseId));
+    const directPaidCourse = courses.find(course => course.isPaid && String(course.id) === String(l.courseId));
     const matchesCourse = courseFilter === 'all'
-      || String(lessonModule?.courseId ?? l.courseId) === courseFilter;
+      || String(directPaidCourse?.id ?? lessonModule?.courseId ?? l.courseId) === courseFilter;
 
     let matchesView = true;
     if (activeView === 'published') matchesView = !!l.isPublished;
     if (activeView === 'drafts') matchesView = !l.isPublished;
     if (activeView === 'incomplete') matchesView = !l.hasContent;
 
-    return matchesSearch && matchesStatus && matchesCourse && matchesView && (!scopedLessonId || String(l.id) === String(scopedLessonId));
+    return matchesSearch && matchesStatus && matchesCourse && matchesView
+      && (!scopedLessonId || String(l.id) === String(scopedLessonId));
   });
 
   const courseLessons = scopedCourseId
     ? lessons.filter(lesson => {
+        const directPaidCourse = courses.find(course => course.isPaid && String(course.id) === String(lesson.courseId));
         const lessonModule = allModules.find(module => String(module.id) === String(lesson.courseId));
-        return String(lessonModule?.courseId ?? lesson.courseId) === String(scopedCourseId);
+        return String(directPaidCourse?.id ?? lessonModule?.courseId ?? lesson.courseId) === String(scopedCourseId);
       })
     : lessons;
 
@@ -1242,7 +1261,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   </div>)}
                   {!lessonPdfs.length && <p className="text-xs text-slate-500">لا توجد ملفات PDF مرفقة.</p>}
                   <div className="grid gap-2 sm:grid-cols-[1fr_1.5fr_auto]">
-                    <input value={newPdfTitle} onChange={e => setNewPdfTitle(e.target.value)} placeholder="عنوان الملف" className={inputCls(false)} />
+                    <input value={newPdfTitle} onChange={e => setNewPdfTitle(e.target.value)} placeholder="اسم ملف PDF المرفوع (اختياري)" aria-label="اسم ملف PDF المرفوع" className={inputCls(false)} />
                     <input value={newPdfUrl} onChange={e => setNewPdfUrl(e.target.value)} placeholder="رابط PDF موجود" className={inputCls(false)} dir="ltr" />
                     <button type="button" disabled={!newPdfUrl.trim() || pdfManagementLoading} onClick={() => void handleAttachPdfUrl()} className="rounded-lg bg-emerald-600 px-3 font-bold text-white disabled:opacity-50">إضافة رابط</button>
                   </div>
@@ -1250,8 +1269,10 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     if (pdfUploadInFlightRef.current) { e.target.value = ''; return; }
                     pdfUploadInFlightRef.current = true;
                     const files = Array.from(e.target.files ?? []); e.target.value = ''; let nextOrder = lessonPdfs.length;
+                    const customTitle = newPdfTitle.trim();
+                    setPdfManagementProgress(null);
                     const batchKeys = new Set<string>();
-                    for (const file of files) {
+                    for (const [fileIndex, file] of files.entries()) {
                       if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { setPdfManagementError(`الملف ${file.name} ليس بصيغة PDF`); continue; }
                       const fileKey = `${file.name.toLocaleLowerCase()}-${file.size}-${file.lastModified}`;
                       if (batchKeys.has(fileKey) || lessonPdfs.some(pdf => pdf.file && `${pdf.file.name.toLocaleLowerCase()}-${pdf.file.size}-${pdf.file.lastModified}` === fileKey) || (editingLessonId && lessonPdfs.some(pdf => pdf.title?.toLocaleLowerCase() === file.name.toLocaleLowerCase()))) {
@@ -1259,16 +1280,25 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                         continue;
                       }
                       batchKeys.add(fileKey);
-                      setPdfManagementLoading(true);
-                      setPdfManagementProgress({ percent: 0, loaded: 0, total: file.size });
+                      if (editingLessonId) {
+                        setPdfManagementLoading(true);
+                        setPdfManagementProgress({ percent: 0, loaded: 0, total: file.size });
+                      }
                       try {
-                        const title = file.name;
+                        const title = fileIndex === 0 && customTitle ? customTitle : file.name;
                         if (editingLessonId) { await lessonService.addPdf(editingLessonId, { file, title, order: nextOrder++ }, setPdfManagementProgress); setLessonPdfs(await lessonService.getPdfs(editingLessonId)); }
                         else { setLessonPdfs(p => [...p, { title, file, order: p.length }]); }
+                        if (fileIndex === 0 && customTitle) setNewPdfTitle('');
                         setPdfManagementError('');
-                      } catch (err: any) { setPdfManagementError(err?.message || `تعذر رفع ${file.name}`); } finally { setPdfManagementLoading(false); }
+                      } catch (err: any) {
+                        setPdfManagementError(err?.message || `تعذر رفع ${file.name}`);
+                        setPdfManagementProgress(null);
+                      } finally {
+                        if (editingLessonId) setPdfManagementLoading(false);
+                      }
                     }
                     pdfUploadInFlightRef.current = false;
+                    if (editingLessonId && files.length === 0) setPdfManagementProgress(null);
                   }} /></label>
                   {pdfManagementProgress && <div role="status" aria-live="polite" className="space-y-1">
                     <div role="progressbar" aria-label="تقدم رفع ملف PDF" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pdfManagementProgress.percent} className="h-2 overflow-hidden rounded bg-slate-200">

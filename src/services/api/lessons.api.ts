@@ -21,6 +21,7 @@
  */
 
 import { api } from '../../lib/api';
+import { modulesService } from './modules.api';
 import type { BackendLesson, BackendModule } from '../../types/api';
 import type { Lesson, CreateLessonPayload, UpdateLessonPayload } from '../../types';
 
@@ -59,7 +60,7 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; 
   return {
     id: String(bl.id),
     courseId: String(bl.moduleId),
-    courseName: module ? `وحدة: ${module.title}` : `وحدة #${bl.moduleId}`,
+    courseName: module?.title || `#${bl.moduleId}`,
     title: bl.title,
     description: bl.description ?? '',
     order: bl.order ?? 0,
@@ -128,12 +129,22 @@ function buildLessonFormData(payload: {
   return fd;
 }
 
+function logLessonUpdatePayload(payload: FormData | Record<string, unknown>): Record<string, unknown> {
+  if (!(payload instanceof FormData)) return payload;
+  return Object.fromEntries([...payload.entries()].map(([key, value]) => [
+    key,
+    value instanceof File ? { name: value.name, size: value.size, type: value.type } : value,
+  ]));
+}
+
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const lessonService = {
   async getAllPages(params: { moduleId?: string } = {}): Promise<BackendLesson[]> {
-    const limit = 100;
+    // Keep each lesson search response small so course lesson loads stay within
+    // the existing request timeout, while still walking every page.
+    const limit = 10;
     const lessons: BackendLesson[] = [];
     let page = 1;
     let totalPages: number | null = null;
@@ -212,11 +223,43 @@ export const lessonService = {
     return lessons.map((lesson) => adaptLesson(lesson, (lesson as any).module));
   },
 
+  /** Fetch published lessons for one module using the same paginated endpoint as mobile. */
+  async getByModuleId(moduleId: string, moduleInfo?: BackendModule): Promise<Lesson[]> {
+    const limit = 10;
+    const lessons: BackendLesson[] = [];
+    const module = moduleInfo ?? await modulesService.getById(moduleId).catch(() => undefined);
+    let page = 1;
+    let totalPages: number | null = null;
+    do {
+      const { data } = await api.get<any>(`/lessons/module/${moduleId}`, { params: { page, limit } });
+      const result = readLessonPage(data, limit);
+      lessons.push(...result.items.filter(lesson => String(lesson.moduleId) === String(moduleId)));
+      totalPages = result.totalPages ?? (result.items.length === limit ? page + 1 : page);
+      page += 1;
+    } while (page <= totalPages);
+    const result = lessons.map(lesson => adaptLesson(lesson, module ?? (lesson as any).module));
+    console.info(`[Module ${moduleId}] Lessons fetched`, result);
+    return result;
+  },
+
+  /** Fetch only the lessons belonging to modules in a course. */
+  async getByCourseId(courseId: string): Promise<Lesson[]> {
+    const modules = await modulesService.getByCourse(courseId);
+    const moduleIds = [...new Set(modules.map(module => String(module.id)))];
+    console.info(`[Course ${courseId}] Course modules`, modules);
+    const moduleById = new Map(modules.map(module => [String(module.id), module]));
+    const lessonPages = await Promise.all(moduleIds.map(moduleId => this.getByModuleId(moduleId, moduleById.get(moduleId))));
+    const adaptedLessons = lessonPages.flat();
+    console.info(`[Course ${courseId}] Lessons fetched`, adaptedLessons);
+    return adaptedLessons;
+  },
+
   /** GET /lessons/{id} */
   async getById(id: string): Promise<Lesson> {
     const { data } = await api.get<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`);
     const lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
-    const adapted = adaptLesson(lesson);
+    const module = (lesson as any).module ?? await modulesService.getById(String(lesson.moduleId)).catch(() => undefined);
+    const adapted = adaptLesson(lesson, module);
     try {
       const pdfFiles = await this.getPdfs(id);
       return { ...adapted, pdfFiles };
@@ -260,6 +303,7 @@ export const lessonService = {
     // PDF attachment rows are managed by their dedicated endpoint. The lesson
     // create/update DTO does not reliably persist a `pdfFiles` array.
     const attachedPdfKeys = new Set<string>();
+    const pdfUploads: Promise<void>[] = [];
     for (const [index, pdf] of (((payload as any).pdfFiles ?? []) as Array<{ title?: string; url?: string; file?: File; order?: number }>).entries()) {
       if (!pdf?.url && !pdf?.file) continue;
       const key = pdf.file
@@ -267,8 +311,9 @@ export const lessonService = {
         : `url:${pdf.url}`;
       if (attachedPdfKeys.has(key)) continue;
       attachedPdfKeys.add(key);
-      await this.addPdf(String(lesson.id), { title: pdf.title, url: pdf.url, file: pdf.file, order: pdf.order ?? index });
+      pdfUploads.push(this.addPdf(String(lesson.id), { title: pdf.title, url: pdf.url, file: pdf.file, order: pdf.order ?? index }));
     }
+    await Promise.all(pdfUploads);
 
     // The API updates the PDF relation after forming its PATCH response. Reload
     // to keep the dashboard's lesson list in sync with the saved attachments.
@@ -289,13 +334,19 @@ export const lessonService = {
       pdfFiles: (payload as any).pdfFiles,
     });
 
+    console.info(`[Lesson ${id}] Updating request sent`);
+    console.info(`[Lesson ${id}] Update payload`, logLessonUpdatePayload(fd));
     const { data } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, fd, { onUploadProgress, timeout: 0 });
+    console.info(`[Lesson ${id}] Server response`, data);
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
     const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
     const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
     if (Object.keys(extraPayload).length) {
+      console.info(`[Lesson ${id}] Updating request sent (JSON fields)`);
+      console.info(`[Lesson ${id}] Update payload (JSON fields)`, extraPayload);
       const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${id}`, extraPayload);
+      console.info(`[Lesson ${id}] Server response (JSON fields)`, updatedData);
       lesson = (updatedData as { data?: BackendLesson }).data ?? (updatedData as BackendLesson);
     }
 

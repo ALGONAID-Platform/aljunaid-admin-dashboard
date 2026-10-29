@@ -136,9 +136,9 @@ export function LessonPreviewModal({ lesson, onClose }: { lesson: Lesson; onClos
                 <div className="mt-5 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <h4 className="text-sm font-bold text-slate-700">إدارة ملفات PDF</h4>
                   {pdfBusy && <p role="status" className="text-xs text-slate-500">جارٍ تحميل أو تحديث المرفقات…</p>}
-                  <div className="flex flex-wrap gap-2">
-                    <input value={pdfTitle} onChange={e => setPdfTitle(e.target.value)} placeholder="عنوان الملف (اختياري)" className="min-w-40 flex-1 rounded-lg border border-slate-200 bg-white p-2 text-sm" />
-                    <input value={pdfUrl} onChange={e => setPdfUrl(e.target.value)} placeholder="رابط PDF موجود" dir="ltr" className="min-w-48 flex-[2] rounded-lg border border-slate-200 bg-white p-2 text-sm" />
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <input value={pdfTitle} onChange={e => setPdfTitle(e.target.value)} placeholder="عنوان الملف (اختياري)" className="w-full min-w-0 flex-1 rounded-lg border border-slate-200 bg-white p-2 text-sm sm:min-w-40" />
+                    <input value={pdfUrl} onChange={e => setPdfUrl(e.target.value)} placeholder="رابط PDF موجود" dir="ltr" className="w-full min-w-0 flex-[2] rounded-lg border border-slate-200 bg-white p-2 text-sm sm:min-w-48" />
                     <button type="button" disabled={!pdfUrl.trim() || pdfBusy} onClick={() => void attachUrl()} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">إضافة رابط</button>
                     <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700">{pdfBusy ? 'جارٍ العمل…' : 'رفع PDF'}<input type="file" accept="application/pdf,.pdf" multiple disabled={pdfBusy} className="hidden" onChange={e => { const files = Array.from(e.target.files ?? []); e.target.value = ''; if (files.length) void attachFiles(files); }} /></label>
                   </div>
