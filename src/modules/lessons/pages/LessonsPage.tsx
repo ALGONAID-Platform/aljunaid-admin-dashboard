@@ -269,14 +269,14 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const openModal = () => {
     resetModal();
     const isScopedNonModuleCourse = courses.find(course => String(course.id) === String(scopedCourseId))?.isPaid === true;
-    const defaultModuleId = isScopedNonModuleCourse ? String(filteredModules[0]?.id ?? '') : '';
+    const defaultModuleId = isScopedNonModuleCourse ? String(scopedCourseId ?? '') : String(filteredModules[0]?.id ?? '');
     if (scopedCourseId) setForm({ ...emptyLessonForm, courseId: scopedCourseId, moduleId: defaultModuleId });
     const saved = sessionStorage.getItem('create_lesson_form_state');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         // Only restore state for new lessons
-        setForm({ ...emptyLessonForm, ...parsed, ...(scopedCourseId ? { courseId: scopedCourseId, ...(isScopedNonModuleCourse ? { moduleId: defaultModuleId } : {}) } : {}) });
+        setForm({ ...emptyLessonForm, ...parsed, ...(scopedCourseId ? { courseId: scopedCourseId, ...(isScopedNonModuleCourse ? { moduleId: String(scopedCourseId) } : {}) } : {}) });
       } catch (e) {
         console.error('Failed to parse saved lesson form state', e);
       }
@@ -376,18 +376,19 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
   useEffect(() => {
     if (isNonModuleCourse) {
-      const defaultModuleId = String(filteredModules[0]?.id ?? '');
-      if (defaultModuleId && form.moduleId !== defaultModuleId) {
-        setForm(current => ({ ...current, moduleId: defaultModuleId }));
+      const courseIdStr = String(scopedCourseId ?? form.courseId ?? '');
+      if (courseIdStr && form.moduleId !== courseIdStr) {
+        setForm(current => ({ ...current, moduleId: courseIdStr }));
       }
     } else if (form.moduleId && !filteredModules.some(m => String(m.id) === form.moduleId)) {
       setForm(current => ({ ...current, moduleId: '' }));
     }
-  }, [form.courseId, form.moduleId, filteredModules, isNonModuleCourse]);
+  }, [form.courseId, form.moduleId, filteredModules, isNonModuleCourse, scopedCourseId]);
 
   const suggestedOrder = (): number => {
-    if (!form.moduleId) return 1;
-    return lessons.filter(l => l.courseId === form.moduleId).length + 1; // Backend maps moduleId to courseId temporarily in the list
+    const targetId = isNonModuleCourse ? (scopedCourseId ?? form.courseId) : form.moduleId;
+    if (!targetId) return 1;
+    return lessons.filter(l => String(l.courseId) === String(targetId)).length + 1;
   };
 
   const handleAttachPdfUrl = async () => {
@@ -412,7 +413,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     const e: FormError = {};
     if (step === 1 || step === 3) {
       if (!form.courseId) e.moduleId = 'تعذر تحديد المقرر المرتبط بهذا الدرس';
-      else if (!form.moduleId) e.moduleId = 'يرجى اختيار الوحدة التي ينتمي لها الدرس';
+      else if (!isNonModuleCourse && !form.moduleId) e.moduleId = 'يرجى اختيار الوحدة التي ينتمي لها الدرس';
       if (!form.title.trim()) e.title = 'عنوان الدرس مطلوب';
       else if (form.title.trim().length < 2) e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
       if (!form.order.trim()) e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
@@ -444,7 +445,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     try {
 
       const payload = {
-        courseId: form.moduleId,
+        courseId: isNonModuleCourse ? form.courseId : form.moduleId,
         courseName: course.title,
         title: form.title.trim(),
         description: form.description.trim() || undefined,
@@ -1139,7 +1140,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                 <Field label="ترتيب التشغيل" required error={errors.order} helperText="تُعرض الدروس للمتعلم تصاعدياً بناءً على هذا الرقم.">
                   <div className="flex gap-3 items-stretch">
                     <input type="number" min={1} value={form.order} onChange={e => { setForm(p => ({ ...p, order: e.target.value })); setErrors(p => { const x = { ...p }; delete x.order; return x; }); }} placeholder="مثال: 1" className={`w-32 ${inputCls(!!errors.order, 'font-mono text-center text-lg')}`} dir="ltr" />
-                    {form.moduleId && (
+                    {(isNonModuleCourse || form.moduleId) && (
                       <button type="button" onClick={() => { setForm(p => ({ ...p, order: String(suggestedOrder()) })); setErrors(p => { const x = { ...p }; delete x.order; return x; }); }} className="px-4 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 rounded-xl transition-all font-bold flex items-center gap-2 shadow-sm shrink-0" title="استخدام الترتيب التلقائي التالي">
                         الترتيب المقترح: {suggestedOrder()}
                       </button>
