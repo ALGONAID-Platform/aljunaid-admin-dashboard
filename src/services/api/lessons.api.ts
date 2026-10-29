@@ -96,6 +96,7 @@ function buildLessonFormData(payload: {
   pdfUrl?: string;
   order?: number;
   moduleId?: number;
+  courseId?: number;
   pdf?: File;
   isPublished?: boolean;
   status?: 'DRAFT' | 'PUBLISHED';
@@ -119,6 +120,7 @@ function buildLessonFormData(payload: {
   if (payload.pdfUrl !== undefined) fd.append('pdfUrl', payload.pdfUrl);
   if (payload.order !== undefined) fd.append('order', String(payload.order));
   if (payload.moduleId !== undefined) fd.append('moduleId', String(payload.moduleId));
+  if (payload.courseId !== undefined) fd.append('courseId', String(payload.courseId));
   // Free preview is sent in the JSON follow-up patch so false stays boolean.
   if (payload.pdf instanceof File) fd.append('pdf', payload.pdf);
   if (payload.status !== undefined) {
@@ -272,8 +274,14 @@ export const lessonService = {
    * POST /lessons (multipart/form-data)
    * Frontend's courseId is treated as moduleId.
    */
-  async create(payload: CreateLessonPayload & { courseName?: string; pdf?: File; pdfUrl?: string; videoUrl?: string; content?: string; status?: 'DRAFT' | 'PUBLISHED'; isPublished?: boolean }, onUploadProgress?: (progressEvent: any) => void): Promise<Lesson> {
+  async create(payload: CreateLessonPayload & { courseName?: string; pdf?: File; pdfUrl?: string; videoUrl?: string; content?: string; status?: 'DRAFT' | 'PUBLISHED'; isPublished?: boolean; isPaidCourse?: boolean; moduleId?: number }, onUploadProgress?: (progressEvent: any) => void): Promise<Lesson> {
     const status = payload.status ?? ((payload.isPublished ?? true) ? 'PUBLISHED' : 'DRAFT');
+    const isPaid = (payload as any).isPaidCourse === true;
+    const courseIdNum = Number(payload.courseId);
+    const moduleIdNum = (payload as any).moduleId !== undefined
+      ? Number((payload as any).moduleId)
+      : (!isPaid && !isNaN(courseIdNum) ? courseIdNum : undefined);
+
     const fd = buildLessonFormData({
       title: payload.title,
       description: payload.description,
@@ -281,7 +289,8 @@ export const lessonService = {
       videoUrl: (payload as any).videoUrl,
       pdfUrl: (payload as any).pdfUrl,
       order: payload.order,
-      moduleId: Number(payload.courseId),
+      courseId: isPaid ? courseIdNum : undefined,
+      moduleId: moduleIdNum,
       pdf: (payload as any).pdf,
       isFreePreview: (payload as any).isFreePreview,
       status,
@@ -294,7 +303,11 @@ export const lessonService = {
 
     // Send isReading explicitly via JSON to bypass FormData boolean/string strict validation in backend
     const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
-    const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
+    const extraPayload = {
+      ...extraFields,
+      ...(isPaid && !isNaN(courseIdNum) ? { courseId: courseIdNum } : {}),
+      ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {})
+    };
     if (Object.keys(extraPayload).length) {
       const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${lesson.id}`, extraPayload);
       lesson = (updatedData as { data?: BackendLesson }).data ?? (updatedData as BackendLesson);

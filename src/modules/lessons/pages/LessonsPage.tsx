@@ -225,7 +225,12 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     ? allModules.filter(module => String(module.courseId) === String(scopedCourseId))
     : allModules;
   const selectedCourse = courses.find(course => String(course.id) === String(scopedCourseId ?? form.courseId));
-  const isNonModuleCourse = selectedCourse?.isPaid === true;
+  const isNonModuleCourse = Boolean(
+    selectedCourse?.isPaid ||
+    (selectedCourse as any)?.isPaid === 1 ||
+    (selectedCourse as any)?.isPaid === 'true' ||
+    (selectedCourse?.price !== undefined && Number(selectedCourse.price) > 0)
+  );
   const modulesLoading = false;
   const [modulesError, setModulesError] = useState<string | null>(null);
 
@@ -268,19 +273,16 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
   const openModal = () => {
     resetModal();
-    const isScopedNonModuleCourse = courses.find(course => String(course.id) === String(scopedCourseId))?.isPaid === true;
-    const defaultModuleId = isScopedNonModuleCourse ? String(scopedCourseId ?? '') : String(filteredModules[0]?.id ?? '');
-    if (scopedCourseId) setForm({ ...emptyLessonForm, courseId: scopedCourseId, moduleId: defaultModuleId });
-    const saved = sessionStorage.getItem('create_lesson_form_state');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Only restore state for new lessons
-        setForm({ ...emptyLessonForm, ...parsed, ...(scopedCourseId ? { courseId: scopedCourseId, ...(isScopedNonModuleCourse ? { moduleId: String(scopedCourseId) } : {}) } : {}) });
-      } catch (e) {
-        console.error('Failed to parse saved lesson form state', e);
-      }
-    }
+    const effectiveCourseId = scopedCourseId ? String(scopedCourseId) : '';
+    const defaultModuleId = isNonModuleCourse
+      ? effectiveCourseId
+      : (filteredModules[0]?.id ? String(filteredModules[0].id) : '');
+    setForm({
+      ...emptyLessonForm,
+      courseId: effectiveCourseId,
+      moduleId: defaultModuleId,
+    });
+    sessionStorage.removeItem('create_lesson_form_state');
     setShowModal(true);
   };
 
@@ -411,13 +413,23 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
   const validate = (step: 1 | 2 | 3 = formStep): boolean => {
     const e: FormError = {};
+    const effectiveCourseId = form.courseId || scopedCourseId || '';
     if (step === 1 || step === 3) {
-      if (!form.courseId) e.moduleId = 'تعذر تحديد المقرر المرتبط بهذا الدرس';
-      else if (!isNonModuleCourse && !form.moduleId) e.moduleId = 'يرجى اختيار الوحدة التي ينتمي لها الدرس';
-      if (!form.title.trim()) e.title = 'عنوان الدرس مطلوب';
-      else if (form.title.trim().length < 2) e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
-      if (!form.order.trim()) e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
-      else if (isNaN(Number(form.order)) || Number(form.order) < 1) e.order = 'يجب أن يكون الترتيب رقماً موجباً';
+      if (!effectiveCourseId) {
+        e.title = 'تعذر تحديد المقرر المرتبط بهذا الدرس';
+      } else if (!isNonModuleCourse && !form.moduleId) {
+        e.moduleId = 'يرجى اختيار الوحدة التي ينتمي لها الدرس';
+      }
+      if (!form.title || !form.title.trim()) {
+        e.title = 'عنوان الدرس مطلوب';
+      } else if (form.title.trim().length < 2) {
+        e.title = 'يجب أن يكون عنوان الدرس حرفين على الأقل';
+      }
+      if (!form.order || !String(form.order).trim()) {
+        e.order = 'ترتيب الدرس مطلوب داخل الوحدة';
+      } else if (isNaN(Number(form.order)) || Number(form.order) < 1) {
+        e.order = 'يجب أن يكون الترتيب رقماً موجباً';
+      }
     }
 
     if (step === 3) {
@@ -435,8 +447,9 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     if (!validate(3)) return;
     saveInFlightRef.current = true;
     setSaveStatus('loading');
-    const course = courses.find(c => String(c.id) === String(form.courseId));
-    if (!course) {
+    const courseIdToUse = form.courseId || scopedCourseId || '';
+    const course = courses.find(c => String(c.id) === String(courseIdToUse));
+    if (!course && !courseIdToUse) {
       saveInFlightRef.current = false;
       setSaveStatus('error');
       setErrors(previous => ({ ...previous, submit: 'تعذر تحديد المقرر المرتبط بهذا الدرس.' }));
@@ -444,9 +457,10 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     }
     try {
 
-      const payload = {
-        courseId: isNonModuleCourse ? form.courseId : form.moduleId,
-        courseName: course.title,
+      const payload: any = {
+        courseId: courseIdToUse,
+        isPaidCourse: isNonModuleCourse,
+        courseName: course?.title || '',
         title: form.title.trim(),
         description: form.description.trim() || undefined,
         objectives: form.objectives.map(objective => objective.trim()).filter(Boolean),
@@ -473,6 +487,10 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         liveMeetingUrl: form.liveMeetingUrl || undefined,
         recordingVideoUrl: form.recordingVideoUrl || undefined,
       };
+
+      if (!isNonModuleCourse && form.moduleId) {
+        payload.moduleId = Number(form.moduleId);
+      }
 
       if (editingLessonId) {
         // Editing lesson details must not reassign its backend module. The
@@ -507,7 +525,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   };
 
   const goToNextStep = () => {
-    if (formStep === 1 && !validate(1)) return;
+    if (formStep === 1) {
+      const isValid = validate(1);
+      if (!isValid) {
+        toast.error('يرجى التحقق من ملء الحقول الإلزامية (عنوان الدرس والترتيب)');
+        return;
+      }
+    }
     setFormStep(current => current === 1 ? 2 : 3);
     setErrors(current => ({ ...current, submit: undefined }));
   };
