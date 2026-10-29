@@ -638,9 +638,13 @@ export function CoursesPage() {
                       <img
                         src={getImageUrl(course.thumbnail || (course as any).imageUrl || (course as any).image)}
                         alt={course.title}
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
                         className="w-full h-full object-cover"
                         onError={e => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found';
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="%23f1f5f9"%3E%3Crect width="600" height="400" fill="%23f1f5f9"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="20" fill="%2394a3b8"%3E%D8%BA%D9%84%D8%A7%D9%81+%D8%A7%D9%84%D9%85%D9%82%D8%B1%D8%B1%3C/text%3E%3C/svg%3E';
                         }}
                       />
                     ) : (
@@ -824,8 +828,13 @@ export function CoursesPage() {
                         <img
                           src={previewUrl ? getImageUrl(previewUrl) : getImageUrl(form.thumbnailUrl)}
                           alt="معاينة الغلاف"
+                          referrerPolicy="no-referrer"
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          onError={e => { (e.target as HTMLImageElement).src = 'https://placehold.co/800x400/F8FAFC/94A3B8?text=Image+Not+Found'; }}
+                          onError={e => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400" fill="%23f1f5f9"%3E%3Crect width="800" height="400" fill="%23f1f5f9"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="20" fill="%2394a3b8"%3E%D9%84%D8%A7+%D8%AA%D9%88%D8%AC%D8%AF+%D8%B5%D9%88%D8%B1%D8%A9%3C/text%3E%3C/svg%3E';
+                          }}
                         />
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3 pt-10">
                           <p className="text-white text-xs font-medium truncate flex items-center gap-1.5">
