@@ -26,12 +26,20 @@ import { mediaApi } from './media.api';
 
 function adaptCourse(bc: BackendCourse): Course {
   const course = bc as BackendCourse & Record<string, any>;
+  const rawThumbnail = bc.thumbnail
+    || course.thumbnailUrl
+    || course.imageUrl
+    || course.image
+    || course.cover
+    || course.coverImage
+    || course.picture
+    || undefined;
   return {
     ...bc,
     id: String(bc.id),
     title: bc.title,
     description: bc.description ?? '',
-    thumbnail: bc.thumbnail ?? undefined,
+    thumbnail: rawThumbnail,
     lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? 0,
     enrolledStudentsCount: course.enrollmentsCount ?? bc._count?.enrollments,
     modulesCount: course.modulesCount ?? bc._count?.modules ?? 0,
@@ -117,7 +125,11 @@ export const courseService = {
     }
 
     const { imageFile: _imageFile, ...body } = payload;
-    Object.assign(body, { thumbnail: thumbnailUrl });
+    Object.assign(body, {
+      thumbnail: thumbnailUrl,
+      imageUrl: thumbnailUrl,
+      image: thumbnailUrl,
+    });
 
     const { data } = await api.post<BackendCourseResponse | BackendCourse>('/courses', body);
     const course = (data as BackendCourseResponse).data ?? (data as BackendCourse);
@@ -135,7 +147,11 @@ export const courseService = {
     }
 
     const { imageFile: _imageFile, ...body } = rest;
-    Object.assign(body, { thumbnail: thumbnailUrl });
+    Object.assign(body, {
+      thumbnail: thumbnailUrl,
+      imageUrl: thumbnailUrl,
+      image: thumbnailUrl,
+    });
 
     const { data } = await api.patch<BackendCourseResponse | BackendCourse>(`/courses/${id}`, body);
     const course = (data as BackendCourseResponse).data ?? (data as BackendCourse);

@@ -62,6 +62,17 @@ export function getImageUrl(path?: string | null): string {
 
   const cleanPath = path.trim();
 
+  // Replace localhost or 127.0.0.1 URLs with proper server host
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(cleanPath)) {
+    const withoutHost = cleanPath.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?/, '');
+    return getImageUrl(withoutHost);
+  }
+
+  // Handle protocol-relative URLs
+  if (/^\/\//.test(cleanPath)) {
+    return `https:${cleanPath}`;
+  }
+
   // Preserve complete URLs returned by the API (including data/blob previews).
   if (/^(https?:|blob:|data:)/i.test(cleanPath)) {
     return cleanPath;

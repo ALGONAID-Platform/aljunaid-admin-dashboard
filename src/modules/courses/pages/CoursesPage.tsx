@@ -262,8 +262,8 @@ export function CoursesPage() {
     else if (titleStr.length > 100) e.title = 'لا يمكن أن يتجاوز عنوان المقرر 100 حرف';
     else if (!/^(?!\s*$).+/.test(form.title)) e.title = 'لا يمكن أن يكون عنوان المقرر مسافات فارغة فقط';
     else if (!editingId && courses.some(c => c.title.toLowerCase() === titleStr.toLowerCase())) e.title = 'اسم المقرر موجود مسبقاً في النظام';
-    if (!form.thumbnailFile && form.thumbnailUrl && !form.thumbnailUrl.startsWith('http')) {
-      e.thumbnailUrl = 'الرابط غير صالح. تأكد من أنه يبدأ بـ http:// أو https://';
+    if (!form.thumbnailFile && form.thumbnailUrl && !form.thumbnailUrl.startsWith('http') && !form.thumbnailUrl.startsWith('/') && !form.thumbnailUrl.startsWith('uploads/')) {
+      e.thumbnailUrl = 'الرابط غير صالح. تأكد من إدخال رابط أو مسار صورة صحيح';
     }
     if (form.isPaid && (!form.price.trim() || !Number.isFinite(Number(form.price)) || Number(form.price) <= 0)) e.price = 'السعر الأساسي بالدولار مطلوب للمقررات المدفوعة';
     setErrors(e);
@@ -279,12 +279,14 @@ export function CoursesPage() {
     setErrors({});
 
     try {
-      let finalThumbnailUrl = form.thumbnailUrl.trim().startsWith('http') ? form.thumbnailUrl.trim() : undefined;
+    let finalThumbnailUrl = form.thumbnailUrl.trim() ? getImageUrl(form.thumbnailUrl.trim()) : undefined;
 
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
         thumbnail: finalThumbnailUrl,
+        imageUrl: finalThumbnailUrl,
+        image: finalThumbnailUrl,
         isPaid: form.isPaid,
         courseType: form.courseType,
         ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, form[k as keyof FormState] ? Number(form[k as keyof FormState]) : undefined])),
@@ -632,9 +634,9 @@ export function CoursesPage() {
                         <Trash2 className="w-4 h-4 text-red-600" />
                       </button>
                     </div>
-                    {course.thumbnail ? (
+                    {(course.thumbnail || (course as any).imageUrl || (course as any).image) ? (
                       <img
-                        src={getImageUrl(course.thumbnail)}
+                        src={getImageUrl(course.thumbnail || (course as any).imageUrl || (course as any).image)}
                         alt={course.title}
                         className="w-full h-full object-cover"
                         onError={e => {
