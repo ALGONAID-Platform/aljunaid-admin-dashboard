@@ -706,7 +706,7 @@ export function CoursesPage() {
 
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all">
-          <div className="bg-white w-full h-full sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300 overflow-hidden">
+          <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 overflow-hidden">
             <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0">
@@ -726,7 +726,7 @@ export function CoursesPage() {
               </button>
             </div>
 
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
+            <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
               {errors.submit && (
                 <div className="mb-6 flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -773,8 +773,8 @@ export function CoursesPage() {
                       value={form.description}
                       onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
                       placeholder="هذا المقرر يهدف إلى تعريف الطلاب بالمفاهيم الأساسية لـ..."
-                      rows={4}
-                      className={`${inputCls(!!errors.description)} resize-none leading-relaxed text-sm`}
+                      rows={7}
+                      className={`${inputCls(!!errors.description)} resize-y leading-relaxed text-sm min-h-[160px]`}
                     />
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -887,7 +887,7 @@ export function CoursesPage() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2rem] flex flex-col sm:flex-row items-center justify-end gap-3 shrink-0">
+            <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 rounded-b-[2rem] flex flex-col sm:flex-row items-center justify-end gap-3 shrink-0">
               <button onClick={closeModal} className="w-full sm:w-auto px-6 py-3 text-slate-600 font-bold rounded-xl bg-white border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-all focus:ring-2 focus:ring-slate-200 order-2 sm:order-1">إلغاء الأمر</button>
               <button
                 onClick={handleSave}

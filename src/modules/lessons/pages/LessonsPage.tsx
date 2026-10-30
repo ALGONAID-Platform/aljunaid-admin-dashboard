@@ -1083,7 +1083,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       {/* Ultra-Modern Create Modal */}
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all">
-          <div className="bg-white w-full h-full sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300 overflow-hidden">
+          <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 overflow-hidden">
 
             {/* Modal Header */}
             <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
@@ -1102,7 +1102,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
             </div>
 
             {/* Modal Body */}
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-8">
+            <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6 sm:space-y-8">
               <div className="grid grid-cols-3 gap-2" aria-label="خطوات إنشاء الدرس">
                 {(['تفاصيل الدرس', 'الجدولة', 'محتوى الدرس'] as const).map((label, index) => {
                   const number = (index + 1) as 1 | 2 | 3;
@@ -1184,8 +1184,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     value={form.description}
                     onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
                     placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
-                    rows={3}
-                    className={`${inputCls(!!errors.description)} resize-none font-medium leading-relaxed`}
+                    rows={7}
+                    className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed min-h-[160px]`}
                   />
                 </Field>
 
