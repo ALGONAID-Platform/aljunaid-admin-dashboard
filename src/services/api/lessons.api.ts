@@ -244,28 +244,49 @@ export const lessonService = {
     return result;
   },
 
-  /** Fetch only the lessons belonging to modules in a course or directly to the course. */
+  /**
+   * Fetch all lessons for a given course using GET /lessons/course/:courseId (paginated).
+   * Falls back to module-by-module strategy if the dedicated endpoint is unavailable.
+   */
   async getByCourseId(courseId: string): Promise<Lesson[]> {
-    const [all, modules] = await Promise.all([
-      this.getAll().catch(() => []),
-      modulesService.getByCourse(courseId).catch(() => []),
-    ]);
-    const moduleIds = new Set(modules.map(m => String(m.id)));
-    const matching = all.filter(l =>
-      String(l.courseId) === String(courseId) ||
-      moduleIds.has(String(l.courseId)) ||
-      Boolean((l as any).moduleId && moduleIds.has(String((l as any).moduleId)))
-    );
+    const limit = 10;
+    const lessons: BackendLesson[] = [];
+    let page = 1;
+    let totalPages: number | null = null;
+    const seenPageSignatures = new Set<string>();
 
-    if (matching.length > 0 || modules.length === 0) {
-      return matching;
+    try {
+      // Use the dedicated paginated endpoint GET /lessons/course/:courseId
+      do {
+        const { data } = await api.get<any>(`/lessons/course/${courseId}`, {
+          params: { page, limit },
+        });
+        const { items, totalPages: reported } = readLessonPage(data, limit);
+        lessons.push(...items);
+        const signature = items.map((item: BackendLesson) => String(item.id)).join(',');
+        if (page > 1 && signature && seenPageSignatures.has(signature)) break;
+        if (signature) seenPageSignatures.add(signature);
+        totalPages = reported ?? (items.length === limit ? page + 1 : page);
+        page += 1;
+      } while (page <= totalPages!);
+
+      if (lessons.length > 0) {
+        const unique = [...new Map(lessons.map(l => [String(l.id), l])).values()];
+        return unique.map(l => adaptLesson(l, (l as any).module));
+      }
+    } catch {
+      // Endpoint not available — fall through to module-by-module strategy
     }
 
-    // Fallback: try module-by-module if not found in all
-    const moduleById = new Map(modules.map(module => [String(module.id), module]));
-    const lessonPages = await Promise.all([...moduleIds].map(moduleId => this.getByModuleId(moduleId, moduleById.get(moduleId)).catch(() => [])));
-    const moduleLessons = lessonPages.flat();
-    return moduleLessons.length > 0 ? moduleLessons : matching;
+    // Fallback: fetch modules then lessons per module
+    const modules = await modulesService.getByCourse(courseId).catch(() => []);
+    const moduleById = new Map(modules.map(m => [String(m.id), m]));
+    const lessonPages = await Promise.all(
+      [...moduleById.keys()].map(moduleId =>
+        this.getByModuleId(moduleId, moduleById.get(moduleId)).catch(() => [])
+      )
+    );
+    return lessonPages.flat();
   },
 
   /** GET /lessons/{id} */

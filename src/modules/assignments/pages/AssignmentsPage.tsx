@@ -71,36 +71,66 @@ export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCour
   const load = useCallback(async () => {
     setLoading(true); setError(''); setLoadWarning('');
     try {
-      const [lessons, modules, courses] = await Promise.all([lessonService.getAll(), modulesService.getAll(), courseService.getAll()]);
+      const courses = await courseService.getAll();
+      const modules = await modulesService.getAll();
+
+      // If scoped to a specific course, fetch only that course's lessons via the
+      // paginated GET /lessons/course/:courseId endpoint. Otherwise, iterate each
+      // course sequentially to avoid a single massive request that times out.
+      const targetCourses = scopedCourseId
+        ? courses.filter(c => String(c.id) === String(scopedCourseId))
+        : courses;
+
+      let allLessons: import('../../../types').Lesson[] = [];
+      for (const course of targetCourses) {
+        const courseLessons = await lessonService.getByCourseId(String(course.id)).catch(() => []);
+        allLessons = allLessons.concat(courseLessons);
+      }
+
+      const lessons = scopedLessonId
+        ? allLessons.filter(l => String(l.id) === String(scopedLessonId))
+        : allLessons;
+
       setLoadedLessonCount(lessons.length);
-      const requestErrors: string[] = [];
-      const relevantLessons = lessons.filter(lesson => !scopedLessonId || String(lesson.id) === String(scopedLessonId));
-      const availableLessons = relevantLessons.flatMap(lesson => {
+
+      // Build a lookup: lesson → courseTitle for the dropdown
+      const availableLessons = lessons.flatMap(lesson => {
         const module = modules.find(item => String(item.id) === String(lesson.courseId));
-        const courseId = String(module?.courseId ?? '');
+        const courseId = String(module?.courseId ?? lesson.courseId ?? '');
         const course = courses.find(item => String(item.id) === courseId);
-        if (scopedCourseId && courseId !== String(scopedCourseId)) return [];
         return [{ id: String(lesson.id), title: lesson.title, courseTitle: course?.title ?? lesson.courseName }];
       });
-      const results = await Promise.all(relevantLessons.map(async lesson => {
-        try {
-          const response = await api.get(`/assignments/lesson/${lesson.id}`);
-          const assignment = resultOf(response.data) as Assignment | null;
-          if (!assignment) return null;
-          let submissions: Submission[] = [];
-          if (assignment.type !== 'QUIZ') {
-            submissions = await getAllSubmissions(assignment.id, status);
+
+      const requestErrors: string[] = [];
+
+      // Fetch assignments one-by-one but in parallel batches of 5 to reduce
+      // total wall-clock time while not overwhelming the server.
+      const BATCH = 5;
+      const finalRows: ReviewRow[] = [];
+      for (let i = 0; i < lessons.length; i += BATCH) {
+        const batch = lessons.slice(i, i + BATCH);
+        const batchResults = await Promise.all(batch.map(async lesson => {
+          try {
+            const response = await api.get(`/assignments/lesson/${lesson.id}`);
+            const assignment = resultOf(response.data) as Assignment | null;
+            if (!assignment) return null;
+            let submissions: Submission[] = [];
+            if (assignment.type !== 'QUIZ') {
+              submissions = await getAllSubmissions(assignment.id, status);
+            }
+            const module = modules.find(m => String(m.id) === String(lesson.courseId));
+            const courseId = String(module?.courseId ?? lesson.courseId ?? '');
+            const course = courses.find(c => String(c.id) === courseId);
+            return { assignment, lessonTitle: lesson.title, courseTitle: course?.title ?? lesson.courseName, courseId, submissions } as ReviewRow;
+          } catch (e: any) {
+            // A lesson without an assignment is expected — the API returns 404.
+            if (e?.response?.status !== 404) requestErrors.push(`${lesson.title}: ${errorOf(e)}`);
+            return null;
           }
-          const module = modules.find(m => String(m.id) === String(lesson.courseId));
-          const course = module && courses.find(c => String(c.id) === String(module.courseId));
-          return { assignment, lessonTitle: lesson.title, courseTitle: course?.title ?? lesson.courseName, courseId: String(module?.courseId ?? ''), submissions } as ReviewRow;
-        } catch (e: any) {
-          // A lesson without an assignment is expected and the API reports it as 404.
-          if (e?.response?.status !== 404) requestErrors.push(`${lesson.title}: ${errorOf(e)}`);
-          return null;
-        }
-      }));
-      const finalRows = results.filter((row): row is ReviewRow => row !== null && (!scopedCourseId || row.courseId === String(scopedCourseId)));
+        }));
+        finalRows.push(...batchResults.filter((r): r is ReviewRow => r !== null));
+      }
+
       setRows(finalRows);
       const lessonsWithoutAssignment = availableLessons.filter(lesson => !finalRows.some(row => String(row.assignment.lessonId) === lesson.id));
       setLessonOptions(lessonsWithoutAssignment);
