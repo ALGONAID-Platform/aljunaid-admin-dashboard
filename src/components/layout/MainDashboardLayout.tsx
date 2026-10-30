@@ -8,6 +8,7 @@ import { useNavigate, useLocation } from 'react-router';
 import { ROUTES } from '../../routes/routes.config';
 import { AIAssistantCopilot } from '../ui/AIAssistantCopilot';
 import { SaveStatusIndicator } from '../ui/SaveStatusIndicator';
+import { RouteTransitionLoader } from '../feedback/RouteTransitionLoader';
 import logo from '../../assets/logo.png';
 
 const NAV_ITEMS = [
@@ -68,6 +69,9 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
 
   return (
     <div dir="rtl" className="flex min-h-screen h-[100dvh] bg-slate-50 overflow-hidden relative" style={{ fontFamily: "'Cairo', sans-serif" }}>
+      {/* Route Navigation Transition Loading Bar & Indicator */}
+      <RouteTransitionLoader />
+
       {/* Mobile Backdrop */}
       {!isSidebarCollapsed && (
         <div 

@@ -151,7 +151,7 @@ export function UnverifiedUsersPage() {
             </table>
           </div>
           {loading && users.length > 0 && <div className="px-4 py-2 text-center text-xs text-slate-400">جارٍ تحديث النتائج…</div>}
-          <Pagination currentPage={page} totalItems={total} itemsPerPage={limit} totalPages={totalPages} onPageChange={setPage} onItemsPerPageChange={setLimit} />
+          <Pagination currentPage={page} totalItems={total} itemsPerPage={limit} totalPages={totalPages} isLoading={loading} onPageChange={setPage} onItemsPerPageChange={setLimit} />
           <span className="sr-only">إجمالي الصفحات: {totalPages}</span>
         </div>
       )}

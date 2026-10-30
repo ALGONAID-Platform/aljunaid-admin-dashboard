@@ -692,6 +692,7 @@ export function CoursesPage() {
             currentPage={currentPage}
             totalItems={filteredCourses.length}
             itemsPerPage={itemsPerPage}
+            isLoading={isLoading}
             onPageChange={setCurrentPage}
             onItemsPerPageChange={setItemsPerPage}
           />

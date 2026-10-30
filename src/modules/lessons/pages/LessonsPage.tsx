@@ -160,6 +160,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [activeView, setActiveView] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isPaginating, setIsPaginating] = useState(false);
 
   // Whether server-side pagination is active (only when scoped to a course and no client-side filtering)
   const useServerPagination = Boolean(scopedCourseId) && !searchQuery && activeView === 'all';
@@ -773,7 +774,20 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
           <button onClick={() => setSearchQuery('')} className="mt-4 text-emerald-600 hover:text-emerald-700 font-semibold text-sm underline underline-offset-4">مسح عوامل التصفية</button>
         </div>
       ) : (
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden mb-6">
+        <div id="lessons-table-container" className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden mb-6 relative">
+          {(isLoading || isPaginating) && (
+            <div className="absolute inset-0 bg-white/75 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center gap-3 transition-opacity duration-200 min-h-[300px]">
+              <div className="bg-white px-6 py-3.5 rounded-2xl shadow-xl border border-slate-200 flex items-center gap-3 animate-in fade-in zoom-in-95 duration-150">
+                <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
+                <span className="text-sm font-bold text-slate-700">
+                  {useServerPagination
+                    ? `جارٍ تحميل الصفحة ${serverPage}...`
+                    : `جارٍ تحميل الصفحة ${currentPage}...`}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Mobile Stacked Cards Layout with Clear Visual Separation */}
           <div className="md:hidden space-y-4 p-3 bg-slate-50/50">
             {/* Mobile Select All Header */}
@@ -997,11 +1011,18 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
             currentPage={useServerPagination ? serverPage : currentPage}
             totalItems={useServerPagination ? serverTotal : filteredLessons.length}
             itemsPerPage={useServerPagination ? serverLimit : itemsPerPage}
+            isLoading={isLoading || isPaginating}
             onPageChange={(page) => {
               if (useServerPagination) {
                 void fetchLessonsPage(scopedCourseId!, page, serverLimit);
               } else {
+                setIsPaginating(true);
                 setCurrentPage(page);
+                setTimeout(() => setIsPaginating(false), 200);
+              }
+              const tableEl = document.getElementById('lessons-table-container');
+              if (tableEl) {
+                tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               }
             }}
             onItemsPerPageChange={(limit) => {

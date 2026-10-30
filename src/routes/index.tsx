@@ -136,8 +136,8 @@ function LessonExamPage({ lessonId }: { lessonId: string }) {
 
 
 const PageLoader = () => (
-  <div className="flex-1 flex items-center justify-center min-h-64">
-    <Loader />
+  <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] py-12 animate-in fade-in duration-200">
+    <Loader text="جارٍ تحميل الصفحة..." size="lg" />
   </div>
 );
 

@@ -295,6 +295,7 @@ export function ExamModelsPage({ scopedCourseId }: { scopedCourseId?: string } =
             currentPage={currentPage}
             totalItems={filteredModels.length}
             itemsPerPage={itemsPerPage}
+            isLoading={isLoading}
             onPageChange={setCurrentPage}
             onItemsPerPageChange={setItemsPerPage}
           />

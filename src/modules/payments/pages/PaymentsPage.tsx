@@ -175,7 +175,7 @@ export function PaymentsPage() {
             </div>
           </article>;
         })}</div>
-        <Pagination currentPage={currentPage} totalItems={filteredPayments.length} itemsPerPage={itemsPerPage} onPageChange={setCurrentPage} onItemsPerPageChange={setItemsPerPage}/>
+        <Pagination currentPage={currentPage} totalItems={filteredPayments.length} itemsPerPage={itemsPerPage} isLoading={loading} onPageChange={setCurrentPage} onItemsPerPageChange={setItemsPerPage}/>
       </>}
     </> : <>
       <div className="flex justify-end"><button onClick={() => openAccount()} className="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white"><Plus className="ml-2 inline" size={17}/>إضافة حساب</button></div>
