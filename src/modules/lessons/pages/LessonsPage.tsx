@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2
 } from 'lucide-react';
 import type { Lesson } from '../../../types';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
@@ -208,7 +208,26 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [videoFileInfo, setVideoFileInfo] = useState<{name: string; size: number} | null>(null);
   const [previewLessonDesc, setPreviewLessonDesc] = useState(false);
   const [previewLessonContent, setPreviewLessonContent] = useState(false);
-  const [updatingField, setUpdatingField] = useState<{ id: string; field: 'isPublished' | 'isMandatory' | 'isFreePreview' } | null>(null);
+  const [updatingField, setUpdatingField] = useState<{ id: string; field: 'isPublished' | 'isMandatory' | 'isFreePreview' | 'liveStatus' } | null>(null);
+
+  const handleSetLiveStatus = async (lesson: Lesson, status: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED') => {
+    if (lesson.liveStatus === status) return;
+    setUpdatingField({ id: lesson.id, field: 'liveStatus' });
+    try {
+      await updateLesson({ id: lesson.id, liveStatus: status });
+      const labels = {
+        SCHEDULED: 'تم ضبط المحاضرة: مجدولة 📅',
+        LIVE_NOW: 'تم بدء البث المباشر: مباشر الآن 🔴',
+        COMPLETED: 'تم ضبط المحاضرة: مكتملة ✅',
+      };
+      toast.success(labels[status]);
+    } catch (err: any) {
+      console.error('Failed to update live status:', err);
+      toast.error(err?.message || 'تعذر تحديث حالة البث');
+    } finally {
+      setUpdatingField(null);
+    }
+  };
 
   const handleToggleField = async (lesson: Lesson, field: 'isPublished' | 'isMandatory' | 'isFreePreview') => {
     setUpdatingField({ id: lesson.id, field });
@@ -915,6 +934,24 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                         {lesson.type === 'video' || lesson.videoUrl ? <PlayCircle className="w-3.5 h-3.5" /> : lesson.type === 'pdf' || lesson.pdfUrl ? <FileText className="w-3.5 h-3.5" /> : <FileType2 className="w-3.5 h-3.5" />}
                         <span>{lesson.type === 'video' || lesson.videoUrl ? 'فيديو' : lesson.type === 'pdf' || lesson.pdfUrl ? 'ملف PDF' : lesson.content ? 'مقال' : 'درس'}</span>
                       </div>
+
+                      {/* Live Status Badge */}
+                      {lesson.liveStatus === 'LIVE_NOW' ? (
+                        <div className="flex items-center gap-1.5 bg-rose-500 text-white px-2.5 py-1.5 rounded-lg font-bold shadow-xs animate-pulse">
+                          <Radio className="w-3.5 h-3.5" />
+                          <span>بث مباشر الآن</span>
+                        </div>
+                      ) : lesson.liveStatus === 'COMPLETED' ? (
+                        <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-lg border border-emerald-100 font-bold">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>محاضرة مكتملة</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-lg border border-blue-100 font-bold">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>محاضرة مجدولة</span>
+                        </div>
+                      )}
                     </div>
                     {lesson.videoUrl && (
                       <a href={lesson.videoUrl} target="_blank" rel="noreferrer" dir="ltr" className="inline-flex max-w-full items-center gap-1.5 self-start break-all text-xs font-semibold text-blue-700 hover:underline">
@@ -923,14 +960,69 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                       </a>
                     )}
 
-                    {/* Quick Toggles: Status, Mandatory, Free Preview */}
-                    <div className="bg-slate-50/90 rounded-xl p-2.5 sm:p-3 border border-slate-200/80 flex flex-col gap-2">
+                    {/* Quick Toggles: Live Status, Publish/Archive, Mandatory, Free Preview */}
+                    <div className="bg-slate-50/90 rounded-xl p-2.5 sm:p-3 border border-slate-200/80 flex flex-col gap-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1.5">
                           <Sliders className="w-3.5 h-3.5 text-emerald-600" />
                           <span>التحكم السريع في الدرس:</span>
                         </span>
                         <span className="text-[10px] text-slate-400 font-medium">تغيير فوري بنقرة واحدة</span>
+                      </div>
+
+                      {/* Live Status Selector: مجدولة / مباشر الآن / مكتملة */}
+                      <div className="bg-white rounded-xl p-2.5 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+                        <div className="flex items-center gap-1.5">
+                          <Radio className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          <span className="text-xs font-extrabold text-slate-800">حالة البث / المحاضرة:</span>
+                          {updatingField?.id === lesson.id && updatingField?.field === 'liveStatus' && (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1.5 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            disabled={updatingField?.id === lesson.id}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void handleSetLiveStatus(lesson, 'SCHEDULED'); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                              (lesson.liveStatus === 'SCHEDULED' || (!lesson.liveStatus && !lesson.recordingVideoUrl))
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
+                            }`}
+                          >
+                            <Calendar className="w-3 h-3 shrink-0" />
+                            <span>مجدولة</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={updatingField?.id === lesson.id}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void handleSetLiveStatus(lesson, 'LIVE_NOW'); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                              lesson.liveStatus === 'LIVE_NOW'
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-sm shadow-rose-600/30 ring-2 ring-rose-300'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-rose-50 hover:text-rose-700'
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${lesson.liveStatus === 'LIVE_NOW' ? 'bg-white animate-ping' : 'bg-rose-500'}`} />
+                            <span>مباشر الآن</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={updatingField?.id === lesson.id}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void handleSetLiveStatus(lesson, 'COMPLETED'); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                              lesson.liveStatus === 'COMPLETED'
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                            }`}
+                          >
+                            <CheckCircle2 className="w-3 h-3 shrink-0" />
+                            <span>مكتملة</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1170,6 +1262,48 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                             title="انقر لتغيير ما إذا كانت المعاينة مجانية"
                           >
                             {lesson.isFreePreview ? 'معاينة مجانية' : 'مدفوع'}
+                          </button>
+                        </div>
+                        {/* Live Status buttons in desktop table */}
+                        <div className="flex items-center gap-1 pt-1 border-t border-slate-100">
+                          <button
+                            type="button"
+                            disabled={updatingField?.id === lesson.id}
+                            onClick={() => void handleSetLiveStatus(lesson, 'SCHEDULED')}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                              (lesson.liveStatus === 'SCHEDULED' || (!lesson.liveStatus && !lesson.recordingVideoUrl))
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50 hover:text-blue-600'
+                            }`}
+                            title="محاضرة مجدولة"
+                          >
+                            مجدولة
+                          </button>
+                          <button
+                            type="button"
+                            disabled={updatingField?.id === lesson.id}
+                            onClick={() => void handleSetLiveStatus(lesson, 'LIVE_NOW')}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                              lesson.liveStatus === 'LIVE_NOW'
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-xs ring-1 ring-rose-400'
+                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-rose-50 hover:text-rose-600'
+                            }`}
+                            title="بث مباشر الآن"
+                          >
+                            {lesson.liveStatus === 'LIVE_NOW' ? '🔴 مباشر' : 'مباشر'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={updatingField?.id === lesson.id}
+                            onClick={() => void handleSetLiveStatus(lesson, 'COMPLETED')}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                              lesson.liveStatus === 'COMPLETED'
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-600'
+                            }`}
+                            title="محاضرة مكتملة"
+                          >
+                            مكتملة
                           </button>
                         </div>
                         {!lesson.isPublished && (
