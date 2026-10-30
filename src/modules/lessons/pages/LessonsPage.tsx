@@ -147,7 +147,7 @@ type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
 export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId?: string; scopedLessonId?: string } = {}) {
   const navigate = useNavigate();
   const { courses, fetchCourses } = useCoursesStore();
-  const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, error, isLoading } = useLessonsStore();
+  const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, fetchLessonsPage, serverPage, serverTotalPages, serverTotal, serverLimit, error, isLoading } = useLessonsStore();
   const { modules: allModules, fetchModules, fetchModulesByCourse } = useModulesStore();
 
   const [showModal, setShowModal] = useState(false);
@@ -161,6 +161,9 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  // Whether server-side pagination is active (only when scoped to a course and no client-side filtering)
+  const useServerPagination = Boolean(scopedCourseId) && !searchQuery && activeView === 'all';
+
   const [selectedLessons, setSelectedLessons] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<any>(null);
@@ -172,10 +175,15 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
   useEffect(() => {
     void fetchCourses();
-    void fetchLessons(scopedCourseId);
-    if (scopedCourseId) void fetchModulesByCourse(scopedCourseId);
-    else void fetchModules();
-  }, [fetchCourses, fetchLessons, fetchModules, fetchModulesByCourse, scopedCourseId]);
+    if (scopedCourseId) {
+      // Use server-side pagination when scoped to a specific course
+      void fetchLessonsPage(scopedCourseId, 1, itemsPerPage);
+      void fetchModulesByCourse(scopedCourseId);
+    } else {
+      void fetchLessons();
+      void fetchModules();
+    }
+  }, [fetchCourses, fetchLessons, fetchLessonsPage, fetchModules, fetchModulesByCourse, scopedCourseId, itemsPerPage]);
 
   const [form, setForm] = useState<FormState>(emptyLessonForm);
   const [errors, setErrors] = useState<FormError>({});
@@ -623,9 +631,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     }
   };
 
-  const paginatedLessons = [...filteredLessons]
-    .sort((a, b) => a.order - b.order)
-    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedLessons = useServerPagination
+    ? [...filteredLessons].sort((a, b) => a.order - b.order)
+    : [...filteredLessons]
+        .sort((a, b) => a.order - b.order)
+        .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (isLoading && lessons.length === 0 && !showModal) return <Loader fullPage />;
 
@@ -984,11 +994,22 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
             </table>
           </div>
           <Pagination
-            currentPage={currentPage}
-            totalItems={filteredLessons.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-            onItemsPerPageChange={setItemsPerPage}
+            currentPage={useServerPagination ? serverPage : currentPage}
+            totalItems={useServerPagination ? serverTotal : filteredLessons.length}
+            itemsPerPage={useServerPagination ? serverLimit : itemsPerPage}
+            onPageChange={(page) => {
+              if (useServerPagination) {
+                void fetchLessonsPage(scopedCourseId!, page, serverLimit);
+              } else {
+                setCurrentPage(page);
+              }
+            }}
+            onItemsPerPageChange={(limit) => {
+              setItemsPerPage(limit);
+              if (useServerPagination) {
+                void fetchLessonsPage(scopedCourseId!, 1, limit);
+              }
+            }}
           />
         </div>
       )}

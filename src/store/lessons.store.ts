@@ -12,7 +12,14 @@ interface LessonsState {
   isLoading: boolean;
   error: string | null;
 
+  // Server-side pagination state (only populated when fetching by courseId)
+  serverPage: number;
+  serverTotalPages: number;
+  serverTotal: number;
+  serverLimit: number;
+
   fetchLessons: (courseId?: string) => Promise<void>;
+  fetchLessonsPage: (courseId: string, page: number, limit?: number) => Promise<void>;
   addLesson: (payload: CreateLessonPayload & { courseName: string; pdf?: File }, onUploadProgress?: (progressEvent: any) => void) => Promise<Lesson>;
   updateLesson: (payload: UpdateLessonPayload & { pdf?: File }, onUploadProgress?: (progressEvent: any) => void) => Promise<void>;
   deleteLesson: (id: string) => Promise<void>;
@@ -24,6 +31,10 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
   lessons: [],
   isLoading: false,
   error: null,
+  serverPage: 1,
+  serverTotalPages: 1,
+  serverTotal: 0,
+  serverLimit: 10,
 
   fetchLessons: async (courseId) => {
     latestFetchCourseId = courseId;
@@ -46,6 +57,32 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
       if (request === latestFetchRequest && mutationVersion !== lessonsMutationVersion) {
         void get().fetchLessons(latestFetchCourseId);
       } else if (request === latestFetchRequest) {
+        set({ error: resolveErrorMessage(err), isLoading: false });
+      }
+    }
+  },
+
+  /** Server-side pagination: fetch one page from GET /lessons/course/:courseId */
+  fetchLessonsPage: async (courseId, page, limit = 10) => {
+    latestFetchCourseId = courseId;
+    const request = ++latestFetchRequest;
+    const mutationVersion = lessonsMutationVersion;
+    set({ isLoading: true, error: null, serverPage: page, serverLimit: limit });
+    try {
+      const result = await lessonService.getCoursePage(courseId, page, limit);
+      if (request !== latestFetchRequest) return;
+      if (mutationVersion !== lessonsMutationVersion) {
+        void get().fetchLessonsPage(courseId, page, limit);
+        return;
+      }
+      set({
+        lessons: result.items,
+        serverTotalPages: result.totalPages,
+        serverTotal: result.total,
+        isLoading: false,
+      });
+    } catch (err) {
+      if (request === latestFetchRequest) {
         set({ error: resolveErrorMessage(err), isLoading: false });
       }
     }

@@ -143,6 +143,25 @@ function logLessonUpdatePayload(payload: FormData | Record<string, unknown>): Re
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const lessonService = {
+  /**
+   * Fetch a single page of lessons for a course using GET /lessons/course/:courseId.
+   * Returns items + totalPages so the caller can render server-side pagination.
+   */
+  async getCoursePage(courseId: string, page: number, limit: number): Promise<{ items: Lesson[]; totalPages: number; total: number }> {
+    const { data } = await api.get<any>(`/lessons/course/${courseId}`, {
+      params: { page, limit },
+    });
+    const { items, totalPages } = readLessonPage(data, limit);
+    const rawTotal = data?.meta?.total ?? data?.meta?.totalItems ?? data?.meta?.count ?? null;
+    const resolvedTotal = Number.isFinite(Number(rawTotal)) ? Number(rawTotal) : (totalPages ?? 1) * limit;
+    const resolvedPages = totalPages ?? (items.length === limit ? page + 1 : page);
+    return {
+      items: items.map((l: BackendLesson) => adaptLesson(l, (l as any).module)),
+      totalPages: resolvedPages,
+      total: resolvedTotal,
+    };
+  },
+
   async getAllPages(params: { moduleId?: string } = {}): Promise<BackendLesson[]> {
     // Keep each lesson search response small so course lesson loads stay within
     // the existing request timeout, while still walking every page.
