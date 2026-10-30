@@ -29,14 +29,16 @@ const customSchema = {
   ],
   attributes: {
     ...defaultSchema.attributes,
-    '*': ['className', 'style', 'dir'],
+    '*': [...(defaultSchema.attributes?.['*'] || []), 'className', 'style', 'dir'],
     span: ['className', 'style'],
     div: ['className', 'style'],
     annotation: ['encoding'],
+    img: ['src', 'alt', 'title', 'width', 'height', 'className', 'style', 'referrerPolicy', 'loading'],
   },
   protocols: {
     ...defaultSchema.protocols,
     href: ['http', 'https', 'mailto', 'tel'],
+    src: ['http', 'https', 'data'],
   }
 };
 
