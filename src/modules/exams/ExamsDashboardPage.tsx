@@ -242,11 +242,12 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
       ...(form.examType === 'CHALLENGE' ? {
         startTime: new Date(form.startTime).toISOString(), endTime: new Date(form.endTime).toISOString(),
       } : {}),
-      ...(!editing ? { questions: questions.map(({ correctIndex, ...question }) => ({
-        ...question,
-        imageUrl: question.imageUrl || undefined,
-        questionImageUrl: question.imageUrl || undefined,
-        options: question.options.map((option, index) => ({ ...option, isCorrect: index === correctIndex })),
+      ...(!editing ? { questions: questions.map(({ correctIndex, id, ...question }) => ({
+        text: question.text.trim(),
+        type: question.type,
+        points: question.points,
+        ...(question.imageUrl ? { imageUrl: question.imageUrl.trim() } : {}),
+        options: question.options.map((option, index) => ({ text: option.text.trim(), isCorrect: index === correctIndex })),
       })) } : {}),
     };
 
@@ -255,10 +256,11 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
       const savedExam = editing
         ? await examManagementService.update(editing.id, payload)
         : await examManagementService.create(payload);
-      const questionPayload = (question: DraftQuestion): Omit<ExamQuestion, 'id'> & { questionImageUrl?: string } => ({
-        text: question.text.trim(), type: question.type, points: question.points,
-        imageUrl: question.imageUrl || undefined,
-        questionImageUrl: question.imageUrl || undefined,
+      const questionPayload = (question: DraftQuestion): Omit<ExamQuestion, 'id'> => ({
+        text: question.text.trim(),
+        type: question.type,
+        points: question.points,
+        ...(question.imageUrl ? { imageUrl: question.imageUrl.trim() } : {}),
         // Persist only fields accepted by CreateOptionDto; loaded option IDs
         // and relation metadata must not be sent back as input fields.
         options: question.options.map((option, index) => ({ text: option.text.trim(), isCorrect: index === question.correctIndex })),

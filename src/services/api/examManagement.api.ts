@@ -76,9 +76,8 @@ function buildDto(payload: ExamPayload): CreateExamDto {
         text: question.text.trim(),
         type: question.type,
         points: question.points,
-        imageUrl: question.imageUrl || undefined,
-        questionImageUrl: question.imageUrl || question.questionImageUrl || undefined,
-        options: question.options.map(({ text, isCorrect }: any) => ({ text: text.trim(), isCorrect })),
+        ...(question.imageUrl ? { imageUrl: String(question.imageUrl).trim() } : {}),
+        options: question.options.map(({ text, isCorrect }: any) => ({ text: text.trim(), isCorrect: Boolean(isCorrect) })),
       })),
     } : {}),
   } as CreateExamDto;
@@ -118,8 +117,14 @@ export const examManagementService = {
 
   async addQuestion(examId: string, question: Omit<ExamQuestion, 'id'>): Promise<ExamQuestion> {
     const payload = {
-      ...question,
-      questionImageUrl: question.imageUrl || undefined,
+      text: question.text.trim(),
+      type: question.type,
+      points: question.points,
+      ...(question.imageUrl ? { imageUrl: String(question.imageUrl).trim() } : {}),
+      options: question.options.map(({ text, isCorrect }) => ({
+        text: text.trim(),
+        isCorrect: Boolean(isCorrect),
+      })),
     };
     const { data } = await api.post<any>(`/exams/${examId}/questions`, payload);
     return this.normalizeQuestion(unwrap(data));
@@ -127,8 +132,14 @@ export const examManagementService = {
 
   async updateQuestion(questionId: string | number, question: Omit<ExamQuestion, 'id'>): Promise<ExamQuestion> {
     const payload = {
-      ...question,
-      questionImageUrl: question.imageUrl || undefined,
+      text: question.text.trim(),
+      type: question.type,
+      points: question.points,
+      ...(question.imageUrl ? { imageUrl: String(question.imageUrl).trim() } : {}),
+      options: question.options.map(({ text, isCorrect }) => ({
+        text: text.trim(),
+        isCorrect: Boolean(isCorrect),
+      })),
     };
     const { data } = await api.patch<any>(`/exams/questions/${questionId}`, payload);
     return this.normalizeQuestion(unwrap(data));
@@ -163,43 +174,22 @@ export const examManagementService = {
   async uploadImage(file: File): Promise<string> {
     const formData = new FormData();
     formData.append('image', file);
-    formData.append('file', file);
 
-    let resData: any;
-    try {
-      const response = await api.post<any>('/exams/upload-image', formData, {
-        timeout: 60_000,
-        headers: { 'Accept': 'application/json' },
-      });
-      resData = response.data;
-    } catch (primaryErr) {
-      try {
-        const response = await api.post<any>('/upload/image', formData, {
-          timeout: 60_000,
-          headers: { 'Accept': 'application/json' },
-        });
-        resData = response.data;
-      } catch {
-        throw primaryErr;
-      }
-    }
+    const { data } = await api.post<any>('/exams/upload-image', formData, {
+      timeout: 60_000,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
 
     const candidate =
-      (typeof resData === 'string' ? resData : null) ??
-      resData?.imageUrl ??
-      resData?.url ??
-      resData?.secure_url ??
-      resData?.path ??
-      resData?.filePath ??
-      resData?.image ??
-      resData?.questionImageUrl ??
-      resData?.data?.imageUrl ??
-      resData?.data?.url ??
-      resData?.data?.secure_url ??
-      resData?.data?.path ??
-      resData?.data?.filePath ??
-      resData?.data?.image ??
-      resData?.data?.questionImageUrl;
+      (typeof data === 'string' ? data : null) ??
+      data?.imageUrl ??
+      data?.url ??
+      data?.secure_url ??
+      data?.path ??
+      data?.data?.imageUrl ??
+      data?.data?.url;
 
     if (!candidate || typeof candidate !== 'string') {
       throw new Error('لم يُرجع الخادم رابط الصورة.');
