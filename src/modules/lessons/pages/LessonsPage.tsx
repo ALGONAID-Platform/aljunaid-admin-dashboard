@@ -1086,7 +1086,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
           <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 overflow-hidden">
 
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
+            <div className="flex items-center justify-between px-3 sm:px-8 py-3 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0">
                   <BookMarked className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
@@ -1102,7 +1102,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6 sm:space-y-8">
+            <div className="px-2 py-3 sm:p-8 overflow-y-auto custom-scrollbar flex-1 space-y-4 sm:space-y-8">
               <div className="grid grid-cols-3 gap-2" aria-label="خطوات إنشاء الدرس">
                 {(['تفاصيل الدرس', 'الجدولة', 'محتوى الدرس'] as const).map((label, index) => {
                   const number = (index + 1) as 1 | 2 | 3;
@@ -1119,8 +1119,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
               )}
               {formStep === 1 && <>
               {/* Section 1: Relational Structure */}
-              {!isNonModuleCourse && <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-5 relative">
-                <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-100 text-xs font-bold text-emerald-600 shadow-sm flex items-center gap-1.5">
+              {!isNonModuleCourse && <div className="p-2.5 sm:p-6 rounded-xl sm:rounded-3xl bg-slate-50 border border-slate-100 space-y-3.5 sm:space-y-5 relative">
+                <div className="absolute -top-3 right-4 sm:right-6 bg-white px-3 py-1 rounded-full border border-slate-100 text-xs font-bold text-emerald-600 shadow-sm flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   المسار التنظيمي
                 </div>
@@ -1166,8 +1166,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
               </div>}
 
               {/* Section 2: Lesson Specifics */}
-              <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 relative">
-                <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
+              <div className="p-2.5 sm:p-6 rounded-xl sm:rounded-3xl bg-white border border-slate-200 space-y-3.5 sm:space-y-5 relative">
+                <div className="absolute -top-3 right-4 sm:right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
                   تفاصيل المادة المعرفية
                 </div>
 
@@ -1184,8 +1184,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     value={form.description}
                     onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
                     placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
-                    rows={7}
-                    className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed min-h-[160px]`}
+                    rows={10}
+                    className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed min-h-[220px]`}
                   />
                 </Field>
 
@@ -1246,7 +1246,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
               </div>
               </>}
 
-              {formStep === 2 && <div className="rounded-3xl border border-indigo-100 bg-indigo-50/50 p-6">
+              {formStep === 2 && <div className="rounded-xl sm:rounded-3xl border border-indigo-100 bg-indigo-50/50 p-2.5 sm:p-6">
                 <div className="space-y-3">
                   <div><h4 className="font-bold text-slate-800">جدولة الدرس</h4><p className="text-xs text-slate-500">تُفتح الدروس المجدولة حسب الموعد المحدد. إذا كانت الدورة تمتد 30 يوماً، يمكن ضبط day number والموعد لكل درس.</p></div>
                   {selectedCourse?.startDate && <p className="text-xs text-indigo-800">فترة المقرر: {new Date(selectedCourse.startDate).toLocaleDateString('ar')} {selectedCourse.endDate ? `– ${new Date(selectedCourse.endDate).toLocaleDateString('ar')}` : ''}</p>}
@@ -1273,8 +1273,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
               {formStep === 3 && <>
               {/* Section 3: Knowledge Content */}
-              <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 relative">
-                <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
+              <div className="p-2.5 sm:p-6 rounded-xl sm:rounded-3xl bg-white border border-slate-200 space-y-3.5 sm:space-y-5 relative">
+                <div className="absolute -top-3 right-4 sm:right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
                   المحتوى المعرفي
                 </div>
                 <div>
@@ -1287,7 +1287,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                           key={type}
                           type="button"
                           onClick={() => setForm(p => ({ ...p, type }))}
-                          className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all ${isActive ? 'shadow-sm' : 'hover:bg-slate-50'}`}
+                          className={`flex flex-col items-center gap-2 p-3 rounded-xl sm:rounded-2xl border-2 transition-all ${isActive ? 'shadow-sm' : 'hover:bg-slate-50'}`}
                           style={isActive ? { background: cfg.bg, borderColor: cfg.color } : { background: '#FAFAFA', borderColor: '#E2E8F0' }}
                         >
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? 'bg-white shadow-sm' : ''}`}>
@@ -1333,8 +1333,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                         value={form.content}
                         onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.content; return x; }); }}
                         placeholder="اكتب المحتوى النصي هنا..."
-                        rows={6}
-                        className={`${inputCls(!!errors.content)} resize-y text-sm leading-relaxed`}
+                        rows={14}
+                        className={`${inputCls(!!errors.content)} resize-y text-sm leading-relaxed min-h-[320px]`}
                       />
                     </Field>
                   </div>
@@ -1342,7 +1342,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
                 {(form.type === 'live' || form.type === 'markdown') && form.type === 'live' && (
                   <Field label="موضوعات الجلسة ومحتواها (اختياري)">
-                    <textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} rows={5} placeholder="أضف موضوعات الجلسة أو المحتوى المساند" className={`${inputCls(false)} resize-y`} />
+                    <textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} rows={10} placeholder="أضف موضوعات الجلسة أو المحتوى المساند" className={`${inputCls(false)} resize-y min-h-[220px]`} />
                   </Field>
                 )}
 
@@ -1462,8 +1462,8 @@ function Field({ label, required, error, helperText, action, children }: { label
 }
 
 function inputCls(hasError: boolean, extra = '') {
-  return `w-full px-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 ${hasError
+  return `w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border outline-none transition-all duration-200 ${hasError
     ? 'border-red-300 bg-red-50/50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:bg-white'
-    : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+    : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
     } ${extra}`;
 }

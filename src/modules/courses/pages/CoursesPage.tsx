@@ -707,7 +707,7 @@ export function CoursesPage() {
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all">
           <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] shadow-2xl flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 overflow-hidden">
-            <div className="flex items-center justify-between px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
+            <div className="flex items-center justify-between px-3 sm:px-8 py-3 sm:py-5 border-b border-slate-100 shrink-0 bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0">
                   {editingId ? <Edit3 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" /> : <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />}
@@ -726,23 +726,23 @@ export function CoursesPage() {
               </button>
             </div>
 
-            <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
+            <div className="px-2 py-3 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
               {errors.submit && (
-                <div className="mb-6 flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700">
+                <div className="mb-4 sm:mb-6 flex items-center gap-3 p-3.5 sm:p-4 bg-red-50 border border-red-200 rounded-xl sm:rounded-2xl text-red-700">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
                   <span className="text-sm font-bold">{errors.submit}</span>
                 </div>
               )}
 
               {uploadError && (
-                <div className="mb-6">
+                <div className="mb-4 sm:mb-6">
                   <UploadErrorBanner error={uploadError} onRetry={handleRetryUpload} />
                 </div>
               )}
 
-              <div className="space-y-6">
+              <div className="space-y-3.5 sm:space-y-6">
                 {editingId && !form.isPaid && (
-                  <section className="flex flex-col gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <section className="flex flex-col gap-3 rounded-xl sm:rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3 sm:p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h4 className="font-bold text-slate-800">وحدات المقرر</h4>
                       <p className="mt-1 text-xs text-slate-500">أضف وحدات هذا المقرر أو عدّلها.</p>
@@ -752,8 +752,8 @@ export function CoursesPage() {
                     </button>
                   </section>
                 )}
-                <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-5 relative">
-                  <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-100 text-xs font-bold text-emerald-600 shadow-sm flex items-center gap-1.5">
+                <div className="p-2.5 sm:p-6 rounded-xl sm:rounded-3xl bg-slate-50 border border-slate-100 space-y-3.5 sm:space-y-5 relative">
+                  <div className="absolute -top-3 right-4 sm:right-6 bg-white px-3 py-1 rounded-full border border-slate-100 text-xs font-bold text-emerald-600 shadow-sm flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     المعلومات الأساسية (إلزامية)
                   </div>
@@ -773,8 +773,8 @@ export function CoursesPage() {
                       value={form.description}
                       onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
                       placeholder="هذا المقرر يهدف إلى تعريف الطلاب بالمفاهيم الأساسية لـ..."
-                      rows={7}
-                      className={`${inputCls(!!errors.description)} resize-y leading-relaxed text-sm min-h-[160px]`}
+                      rows={12}
+                      className={`${inputCls(!!errors.description)} resize-y leading-relaxed text-sm min-h-[280px]`}
                     />
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -791,8 +791,8 @@ export function CoursesPage() {
                   <div className="space-y-2"><div className="flex items-center justify-between"><span className="text-sm font-bold text-slate-700">أهداف المقرر</span><button type="button" onClick={()=>setForm(p=>({...p,objectives:[...p.objectives,'']}))} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">+ إضافة هدف</button></div>{form.objectives.map((objective,index)=><div key={index} className="flex gap-2"><input value={objective} onChange={e=>setForm(p=>({...p,objectives:p.objectives.map((item,i)=>i===index?e.target.value:item)}))} className={inputCls(false)} placeholder={`الهدف ${index+1}`}/><button type="button" aria-label={`حذف الهدف ${index+1}`} onClick={()=>setForm(p=>({...p,objectives:p.objectives.filter((_,i)=>i!==index)}))} className="rounded-lg border px-3 text-red-600">×</button></div>)}{form.objectives.length===0&&<p className="text-xs text-slate-400">أضف أهداف المقرر واحداً تلو الآخر.</p>}</div>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-white border border-slate-200 space-y-5 relative mt-6">
-                  <div className="absolute -top-3 right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
+                <div className="p-2.5 sm:p-6 rounded-xl sm:rounded-3xl bg-white border border-slate-200 space-y-3.5 sm:space-y-5 relative mt-4 sm:mt-6">
+                  <div className="absolute -top-3 right-4 sm:right-6 bg-white px-3 py-1 rounded-full border border-slate-200 text-xs font-bold text-slate-500 shadow-sm">
                     الوسائط المرئية (اختياري)
                   </div>
 
@@ -937,9 +937,9 @@ function Field({ label, required, error, helperText, children }: { label: string
 }
 
 function inputCls(hasError: boolean, extra = '') {
-  return `w-full px-4 py-3 rounded-xl border-2 outline-none transition-all duration-200 ${hasError
+  return `w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border outline-none transition-all duration-200 ${hasError
     ? 'border-red-300 bg-red-50/50 text-red-900 placeholder:text-red-300 focus:border-red-500 focus:bg-white'
-    : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+    : 'border-slate-200 bg-white text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
     } ${extra}`;
 }
 
