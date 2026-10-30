@@ -1,0 +1,12 @@
+[[redirects]]
+  from = "/api-images/*"
+  to = "https://api.exchangesmangement.online/uploads/images/:splat"
+  status = 200
+  force = true
+  headers = {X-From = "Netlify-Proxy"}
+
+[[headers]]
+  for = "/api-images/*"
+  [headers.values]
+    Cross-Origin-Resource-Policy = "cross-origin"
+    Access-Control-Allow-Origin = "*"

@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { uploadService, validateImageFile, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
 import {
   Plus, BookOpen, X, CheckCircle, AlertCircle, Image as ImageIcon, Link as LinkIcon,
-  Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi, CheckSquare, Square, Copy
+  Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi, CheckSquare, Square, Copy, Eye
 } from 'lucide-react';
+import { MarkdownRenderer } from '../../quizzes/components/MarkdownRenderer';
 import { getImageUrl } from '../../../utils/helpers';
 import { useCoursesStore, useLessonsStore, useModulesStore, useExamModelsStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
@@ -194,6 +195,7 @@ export function CoursesPage() {
   const [uploadError, setUploadError] = useState<UploadError | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewDescription, setPreviewDescription] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -211,6 +213,7 @@ export function CoursesPage() {
     setUploadError(null);
     setUploadProgress(null);
     setPreviewUrl(null);
+    setPreviewDescription(false);
     setEditingId(null);
     if (fileRef.current) fileRef.current.value = '';
   }, []);
@@ -768,14 +771,55 @@ export function CoursesPage() {
                     />
                   </Field>
 
-                  <Field label="وصف المقرر" required error={errors.description} helperText="اكتب نبذة شاملة عن أهداف المقرر وما سيتعلمه الطالب.">
-                    <textarea
-                      value={form.description}
-                      onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
-                      placeholder="هذا المقرر يهدف إلى تعريف الطلاب بالمفاهيم الأساسية لـ..."
-                      rows={12}
-                      className={`${inputCls(!!errors.description)} resize-y leading-relaxed text-sm min-h-[280px]`}
-                    />
+                  <Field
+                    label="وصف المقرر"
+                    required
+                    error={errors.description}
+                    helperText="اكتب نبذة شاملة عن أهداف المقرر وما سيتعلمه الطالب (يدعم Markdown والصور والنصوص)."
+                    action={
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDescription(p => !p)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${
+                          previewDescription
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {previewDescription ? (
+                          <>
+                            <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>تحرير</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>معاينة Markdown</span>
+                          </>
+                        )}
+                      </button>
+                    }
+                  >
+                    {previewDescription ? (
+                      <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[280px] max-h-[500px] overflow-y-auto custom-scrollbar select-text">
+                        {form.description?.trim() ? (
+                          <MarkdownRenderer content={form.description} />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-48 text-slate-400 gap-2">
+                            <Eye className="w-6 h-6 opacity-40" />
+                            <p className="text-xs font-semibold">لا يوجد نص للمعاينة بعد، اكتب الوصف في وضع التحرير أولاً.</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={form.description}
+                        onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
+                        placeholder="هذا المقرر يهدف إلى تعريف الطلاب بالمفاهيم الأساسية لـ..."
+                        rows={12}
+                        className={`${inputCls(!!errors.description)} resize-y leading-relaxed text-sm min-h-[280px]`}
+                      />
+                    )}
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.isPaid} onChange={e=>setForm(p=>({...p,isPaid:e.target.checked}))}/>مقرر مدفوع</label>
@@ -918,14 +962,17 @@ export function CoursesPage() {
   );
 }
 
-function Field({ label, required, error, helperText, children }: { label: string; required?: boolean; error?: string; helperText?: string; children: React.ReactNode }) {
+function Field({ label, required, error, helperText, action, children }: { label: string; required?: boolean; error?: string; helperText?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5 w-full">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-bold text-slate-700 flex items-center gap-1">
-          {label}
-          {required && <span className="text-red-500 text-lg leading-none mt-1">*</span>}
-        </label>
+        <div className="flex items-center gap-2.5">
+          <label className="text-sm font-bold text-slate-700 flex items-center gap-1">
+            {label}
+            {required && <span className="text-red-500 text-lg leading-none mt-1">*</span>}
+          </label>
+          {action}
+        </div>
         {error && <span className="text-[11px] font-bold text-red-500 animate-pulse bg-red-50 px-2 py-0.5 rounded-md">{error}</span>}
       </div>
       {children}

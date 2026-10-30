@@ -27,6 +27,7 @@ import { mediaApi, type UploadProgress } from '../../../services/api/media.api';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { toast } from 'react-hot-toast';
+import { MarkdownRenderer } from '../../quizzes/components/MarkdownRenderer';
 
 const normalizeSearchText = (value: unknown) => String(value ?? '')
   .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
@@ -205,6 +206,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [videoUploadProgress, setVideoUploadProgress] = useState<UploadProgress | null>(null);
   const [videoUploadError, setVideoUploadError] = useState('');
   const [videoFileInfo, setVideoFileInfo] = useState<{name: string; size: number} | null>(null);
+  const [previewLessonDesc, setPreviewLessonDesc] = useState(false);
+  const [previewLessonContent, setPreviewLessonContent] = useState(false);
 
   const uploadLessonVideo = async (file?: File) => {
     if (!file || !form.courseId) return;
@@ -269,6 +272,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     setVideoUploadProgress(null);
     setVideoUploadError('');
     setVideoFileInfo(null);
+    setPreviewLessonDesc(false);
+    setPreviewLessonContent(false);
     if (videoInputRef.current) videoInputRef.current.value = '';
     setFormStep(1);
   }, []);
@@ -1179,14 +1184,54 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   <input value={form.title} onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setErrors(p => { const x = { ...p }; delete x.title; return x; }); }} placeholder="مثال: حل المعادلات من الدرجة الأولى" className={inputCls(!!errors.title, 'font-semibold')} />
                 </Field>
 
-                <Field label="وصف الدرس" error={errors.description}>
-                  <textarea
-                    value={form.description}
-                    onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
-                    placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
-                    rows={10}
-                    className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed min-h-[220px]`}
-                  />
+                <Field
+                  label="وصف الدرس"
+                  error={errors.description}
+                  helperText="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس (يدعم Markdown)."
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setPreviewLessonDesc(p => !p)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${
+                        previewLessonDesc
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {previewLessonDesc ? (
+                        <>
+                          <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>تحرير</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          <span>معاينة Markdown</span>
+                        </>
+                      )}
+                    </button>
+                  }
+                >
+                  {previewLessonDesc ? (
+                    <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[220px] max-h-[500px] overflow-y-auto custom-scrollbar select-text">
+                      {form.description?.trim() ? (
+                        <MarkdownRenderer content={form.description} />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-2">
+                          <Eye className="w-6 h-6 opacity-40" />
+                          <p className="text-xs font-semibold">لا يوجد نص للمعاينة بعد، اكتب الوصف في وضع التحرير أولاً.</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      value={form.description}
+                      onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
+                      placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
+                      rows={10}
+                      className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed min-h-[220px]`}
+                    />
+                  )}
                 </Field>
 
                 <Field label="أهداف الدرس" helperText="اختياري — يمكنك إضافة أهداف لمساعدة الطالب على معرفة ما سيحققه من هذا الدرس.">
@@ -1328,14 +1373,55 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
                 {form.type === 'markdown' && (
                   <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <Field label="محتوى نصي (Markdown مدعوم)" required error={errors.content}>
-                      <textarea
-                        value={form.content}
-                        onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.content; return x; }); }}
-                        placeholder="اكتب المحتوى النصي هنا..."
-                        rows={14}
-                        className={`${inputCls(!!errors.content)} resize-y text-sm leading-relaxed min-h-[320px]`}
-                      />
+                    <Field
+                      label="محتوى نصي (Markdown مدعوم)"
+                      required
+                      error={errors.content}
+                      helperText="يمكنك استخدام Markdown للتنسيق، وإدراج روابط، نصوص عريضة، كود برمجي، وصور."
+                      action={
+                        <button
+                          type="button"
+                          onClick={() => setPreviewLessonContent(p => !p)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${
+                            previewLessonContent
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm'
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {previewLessonContent ? (
+                            <>
+                              <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>تحرير</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              <span>معاينة Markdown</span>
+                            </>
+                          )}
+                        </button>
+                      }
+                    >
+                      {previewLessonContent ? (
+                        <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[320px] max-h-[600px] overflow-y-auto custom-scrollbar select-text">
+                          {form.content?.trim() ? (
+                            <MarkdownRenderer content={form.content} />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-48 text-slate-400 gap-2">
+                              <Eye className="w-6 h-6 opacity-40" />
+                              <p className="text-xs font-semibold">لا يوجد محتوى للمعاينة بعد، اكتب المحتوى في وضع التحرير أولاً.</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <textarea
+                          value={form.content}
+                          onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.content; return x; }); }}
+                          placeholder="اكتب المحتوى النصي هنا..."
+                          rows={14}
+                          className={`${inputCls(!!errors.content)} resize-y text-sm leading-relaxed min-h-[320px]`}
+                        />
+                      )}
                     </Field>
                   </div>
                 )}
