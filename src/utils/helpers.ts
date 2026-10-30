@@ -60,7 +60,7 @@ export function getImageUrl(path?: string | null): string {
     return 'https://placehold.co/600x400/F8FAFC/94A3B8?text=Image+Not+Found';
   }
 
-  const cleanPath = path.trim();
+  const cleanPath = path.trim().replace(/^["']|["']$/g, '').replace(/\\/g, '/');
 
   // Replace localhost or 127.0.0.1 URLs with proper server host
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(cleanPath)) {
@@ -73,9 +73,15 @@ export function getImageUrl(path?: string | null): string {
     return `https:${cleanPath}`;
   }
 
+  // Auto-upgrade insecure http:// to https:// to prevent Mixed Content blocking on HTTPS deployments
+  let finalPath = cleanPath;
+  if (/^http:\/\//i.test(finalPath) && !/^http:\/\/(localhost|127\.0\.0\.1)/i.test(finalPath)) {
+    finalPath = finalPath.replace(/^http:\/\//i, 'https://');
+  }
+
   // Preserve complete URLs returned by the API (including data/blob previews).
-  if (/^(https?:|blob:|data:)/i.test(cleanPath)) {
-    return cleanPath;
+  if (/^(https?:|blob:|data:)/i.test(finalPath)) {
+    return finalPath;
   }
 
   // Uploadcare can return its file UUID instead of a path or full URL.

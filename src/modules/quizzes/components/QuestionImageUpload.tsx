@@ -76,7 +76,7 @@ export function QuestionImageUpload({ imageUrl, onImageUploaded, onImageRemoved 
 
       {imageUrl && !isUploading ? (
         <div className="relative group border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center p-2" style={{ maxHeight: 200 }}>
-          <img src={getImageUrl(imageUrl)} alt="Question visual" className="max-h-40 object-contain rounded-lg" />
+          <img src={getImageUrl(imageUrl)} alt="Question visual" referrerPolicy="no-referrer" className="max-h-40 object-contain rounded-lg" />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
             <button onClick={() => fileInputRef.current?.click()} className="p-2 bg-white text-slate-700 rounded-full hover:bg-emerald-50 hover:text-emerald-600 transition-colors" title="استبدال الصورة">
               <RefreshCw className="w-4 h-4" />

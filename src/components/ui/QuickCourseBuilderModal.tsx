@@ -685,7 +685,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                         />
                         {courseImagePreview && (
                           <div className="relative rounded-2xl overflow-hidden border h-36 bg-slate-100">
-                            <img src={getImageUrl(courseImagePreview)} alt="معاينة الغلاف" className="w-full h-full object-cover" />
+                            <img src={getImageUrl(courseImagePreview)} alt="معاينة الغلاف" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                           </div>
                         )}
                       </div>
@@ -730,7 +730,7 @@ export const QuickCourseBuilderModal: React.FC<QuickCourseBuilderModalProps> = (
                         />
                         <label htmlFor="course-thumbnail-upload-enhanced" className="cursor-pointer flex flex-col items-center gap-2">
                           {courseImagePreview ? (
-                            <img src={getImageUrl(courseImagePreview)} alt="غلاف" className="h-32 object-cover rounded-xl shadow-md border" />
+                            <img src={getImageUrl(courseImagePreview)} alt="غلاف" referrerPolicy="no-referrer" className="h-32 object-cover rounded-xl shadow-md border" />
                           ) : (
                             <>
                               <Upload className="w-8 h-8 text-emerald-600 mb-1" />

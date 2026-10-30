@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BarChart3, FileImage, Loader2, Medal, Pencil, Plus, Search, Trash2, Trophy, X } from 'lucide-react';
+import { AlertCircle, BarChart3, Check, ExternalLink, FileImage, Loader2, Medal, Pencil, Plus, RefreshCw, Search, Trash2, Trophy, X } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../../store';
 import { examManagementService } from '../../services/api/examManagement.api';
 import { resolveErrorMessage } from '../../lib/errors';
@@ -129,7 +129,11 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
       }));
       setQuestions(details.questions.map((question) => {
         const correctIndex = Math.max(0, question.options.findIndex((option) => option.isCorrect));
-        return { ...question, correctIndex };
+        return {
+          ...question,
+          imageUrl: question.imageUrl || '',
+          correctIndex,
+        };
       }));
     } catch (err) {
       setFormError(resolveErrorMessage(err));
@@ -169,6 +173,9 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
     if (!Number.isInteger(Number(form.passingScore)) || Number(form.passingScore) < 0 || Number(form.passingScore) > 100) return 'درجة النجاح يجب أن تكون عدداً صحيحاً بين 0 و100.';
     if (!Number.isInteger(Number(form.maxAttempts)) || Number(form.maxAttempts) < 1) return 'عدد المحاولات يجب أن يكون عدداً صحيحاً لا يقل عن 1.';
     if (form.timeLimit && (!Number.isInteger(Number(form.timeLimit)) || Number(form.timeLimit) < 1)) return 'الوقت المحدد يجب أن يكون عدداً صحيحاً موجباً.';
+    if (questions.some((q) => q.imageUrl?.startsWith('blob:'))) {
+      return 'يرجى الانتظار حتى يكتمل رفع جميع صور الأسئلة قبل الحفظ.';
+    }
     const invalidQuestionIndex = questions.findIndex((question) =>
       !question.text.trim()
       || !Number.isInteger(question.points)
@@ -183,6 +190,41 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
     }
     if (!editing && questions.length === 0) return 'أضف سؤالاً واحداً على الأقل.';
     return '';
+  };
+
+  const handleQuestionImageUpload = async (file: File, qIndex: number, question: DraftQuestion) => {
+    const uploadKey = String(question.id ?? `new-${qIndex}`);
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setFormError('الصورة يجب أن تكون JPG أو JPEG أو PNG أو WEBP أو GIF وبحجم لا يتجاوز 5 ميجابايت.');
+      return;
+    }
+
+    const localBlob = URL.createObjectURL(file);
+    // Display image immediately so the user can see it right away
+    setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl: localBlob } : item));
+    setUploadingQuestionIds((current) => new Set(current).add(uploadKey));
+    setFormError('');
+
+    try {
+      const serverUrl = await examManagementService.uploadImage(file);
+      setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl: serverUrl } : item));
+      toast.success('تم رفع وحفظ صورة السؤال بنجاح');
+    } catch (err) {
+      setFormError(resolveErrorMessage(err));
+      toast.error(resolveErrorMessage(err));
+      setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl: question.imageUrl || '' } : item));
+    } finally {
+      URL.revokeObjectURL(localBlob);
+      setUploadingQuestionIds((current) => {
+        const next = new Set(current);
+        next.delete(uploadKey);
+        return next;
+      });
+    }
+  };
+
+  const handleRemoveQuestionImage = (qIndex: number) => {
+    setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl: '' } : item));
   };
 
   const saveExam = async (event: React.FormEvent) => {
@@ -201,7 +243,9 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
         startTime: new Date(form.startTime).toISOString(), endTime: new Date(form.endTime).toISOString(),
       } : {}),
       ...(!editing ? { questions: questions.map(({ correctIndex, ...question }) => ({
-        ...question, imageUrl: question.imageUrl || undefined,
+        ...question,
+        imageUrl: question.imageUrl || undefined,
+        questionImageUrl: question.imageUrl || undefined,
         options: question.options.map((option, index) => ({ ...option, isCorrect: index === correctIndex })),
       })) } : {}),
     };
@@ -211,9 +255,10 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
       const savedExam = editing
         ? await examManagementService.update(editing.id, payload)
         : await examManagementService.create(payload);
-      const questionPayload = (question: DraftQuestion): Omit<ExamQuestion, 'id'> => ({
+      const questionPayload = (question: DraftQuestion): Omit<ExamQuestion, 'id'> & { questionImageUrl?: string } => ({
         text: question.text.trim(), type: question.type, points: question.points,
         imageUrl: question.imageUrl || undefined,
+        questionImageUrl: question.imageUrl || undefined,
         // Persist only fields accepted by CreateOptionDto; loaded option IDs
         // and relation metadata must not be sent back as input fields.
         options: question.options.map((option, index) => ({ text: option.text.trim(), isCorrect: index === question.correctIndex })),
@@ -329,18 +374,240 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
             {form.examType === 'LESSON_QUIZ' && <label className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900 sm:col-span-2"><input type="checkbox" checked={form.asAssignment} onChange={(event) => setForm((current) => ({ ...current, asAssignment: event.target.checked }))} className="h-4 w-4 accent-emerald-600"/>تعيين كتكليف تلقائي للدرس</label>}
           </section>
 
-          <section className="space-y-4 border-t pt-5"><div className="flex items-center justify-between"><h3 className="font-bold">الأسئلة</h3></div>
-            {questionsLoading ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">جارٍ تحميل الأسئلة…</p> : questions.length === 0 ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">لا توجد أسئلة. أضف سؤالاً للبدء.</p> : questions.map((question, qIndex) => <div key={question.id ?? `new-${qIndex}`} className="space-y-3 rounded-xl border p-4"><div className="flex items-center justify-between"><b>السؤال {qIndex + 1}</b><button type="button" disabled={question.id != null && deletingQuestionId === question.id} onClick={() => void removeQuestion(question, qIndex)} className="text-red-600 disabled:opacity-40"><Trash2 size={16}/></button></div>
-              <div className="grid gap-3 sm:grid-cols-[1fr_180px_100px]"><label className="text-xs font-semibold">نوع السؤال<select value={question.type} onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, type: event.target.value as DraftQuestion['type'], options: event.target.value === 'TRUE_FALSE' ? [{ text: 'صح', isCorrect: true }, { text: 'خطأ', isCorrect: false }] : ['', '', '', ''].map((text, optionIndex) => ({ text, isCorrect: optionIndex === 0 })), correctIndex: 0 } : item))} className="mt-1 block w-full rounded-lg border p-2"><option value="MULTIPLE_CHOICE">اختيار متعدد</option><option value="TRUE_FALSE">صح / خطأ</option></select></label>
-                <label className="text-xs font-semibold">النقاط<input type="number" min={1} step={1} value={question.points} onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, points: Number(event.target.value) } : item))} className="mt-1 block w-full rounded-lg border p-2"/></label>
-                <div className="text-xs font-semibold"><span>صورة السؤال</span><label className="mt-1 flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-center font-bold text-emerald-700 transition hover:bg-emerald-100"><FileImage size={16}/>{uploadingQuestionIds.has(String(question.id ?? `new-${qIndex}`)) ? 'جارٍ رفع الصورة…' : question.imageUrl ? 'تم رفع الصورة · اختر للتغيير' : 'رفع صورة للسؤال'}<input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif" disabled={uploadingQuestionIds.has(String(question.id ?? `new-${qIndex}`))} onChange={async (event) => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; const uploadKey = String(question.id ?? `new-${qIndex}`); if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 5 * 1024 * 1024) { setFormError('الصورة يجب أن تكون JPG أو JPEG أو PNG أو WEBP أو GIF وبحجم لا يتجاوز 5 ميجابايت.'); input.value = ''; return; } setUploadingQuestionIds((current) => new Set(current).add(uploadKey)); try { const imageUrl = await examManagementService.uploadImage(file); setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl } : item)); } catch (err) { setFormError(resolveErrorMessage(err)); } finally { setUploadingQuestionIds((current) => { const next = new Set(current); next.delete(uploadKey); return next; }); input.value = ''; } }} className="sr-only"/></label>{question.imageUrl && <button type="button" onClick={() => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, imageUrl: '' } : item))} className="mt-1 text-red-600">إزالة الصورة</button>}</div>
+          <section className="space-y-4 border-t pt-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold">الأسئلة</h3>
+              <span className="text-xs font-semibold text-slate-500">
+                إجمالي الأسئلة: {questions.length}
+              </span>
+            </div>
+            {questionsLoading ? (
+              <div className="flex items-center justify-center gap-2 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">
+                <Loader2 size={18} className="animate-spin text-emerald-600" />
+                <span>جارٍ تحميل الأسئلة مع الصور…</span>
               </div>
-              {question.imageUrl && <img src={getImageUrl(question.imageUrl)} alt={`صورة السؤال ${qIndex + 1}`} className="max-h-64 max-w-full rounded-lg border object-contain" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
-              <textarea value={question.text} onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, text: event.target.value } : item))} placeholder="نص السؤال" rows={4} className="w-full resize-y rounded-lg border p-3 text-sm outline-none focus:border-emerald-500" />
-              <div className="space-y-2">{question.options.map((option, optionIndex) => <div key={optionIndex} className="flex items-center gap-2"><input type="radio" name={`correct-${qIndex}`} checked={question.correctIndex === optionIndex} onChange={() => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, correctIndex: optionIndex, options: item.options.map((entry, i) => ({ ...entry, isCorrect: i === optionIndex })) } : item))} className="accent-emerald-600"/><input disabled={question.type === 'TRUE_FALSE'} value={option.text} onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, options: item.options.map((entry, i) => i === optionIndex ? { ...entry, text: event.target.value } : entry) } : item))} placeholder={`الخيار ${optionIndex + 1}`} className="flex-1 rounded-lg border p-2 text-sm disabled:bg-slate-50"/>{question.type === 'MULTIPLE_CHOICE' && question.options.length > 2 && <button type="button" onClick={() => setQuestions((current) => current.map((item, index) => { if (index !== qIndex) return item; const options = item.options.filter((_, i) => i !== optionIndex); const correctIndex = item.correctIndex === optionIndex ? 0 : item.correctIndex > optionIndex ? item.correctIndex - 1 : item.correctIndex; return { ...item, options, correctIndex }; }))} className="text-slate-400 hover:text-red-600"><X size={16}/></button>}</div>)}
-                {question.type === 'MULTIPLE_CHOICE' && <button type="button" onClick={() => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, options: [...item.options, { text: '', isCorrect: false }] } : item))} className="text-sm font-semibold text-emerald-700">+ إضافة خيار</button>}</div>
-            </div>)}
-            {!questionsLoading && <button type="button" onClick={() => setQuestions((current) => [...current, newQuestion()])} className="w-full rounded-lg border border-dashed border-emerald-300 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><Plus size={15} className="ml-1 inline"/> أضف سؤالاً</button>}
+            ) : questions.length === 0 ? (
+              <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">لا توجد أسئلة. أضف سؤالاً للبدء.</p>
+            ) : (
+              questions.map((question, qIndex) => {
+                const uploadKey = String(question.id ?? `new-${qIndex}`);
+                const isUploadingThis = uploadingQuestionIds.has(uploadKey);
+
+                return (
+                  <div key={question.id ?? `new-${qIndex}`} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    {/* Header: Question Number & Actions */}
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-xs font-extrabold text-emerald-800">
+                          {qIndex + 1}
+                        </span>
+                        <b className="text-sm">السؤال {qIndex + 1}</b>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!question.imageUrl && (
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100">
+                            <FileImage size={14} />
+                            {isUploadingThis ? 'جارٍ الرفع…' : 'إرفاق صورة للسؤال'}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                              disabled={isUploadingThis}
+                              onChange={(e) => {
+                                const file = e.currentTarget.files?.[0];
+                                if (file) void handleQuestionImageUpload(file, qIndex, question);
+                                e.currentTarget.value = '';
+                              }}
+                              className="sr-only"
+                            />
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          disabled={question.id != null && deletingQuestionId === question.id}
+                          onClick={() => void removeQuestion(question, qIndex)}
+                          className="text-red-500 hover:text-red-700 disabled:opacity-40"
+                          title="حذف السؤال"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Question Image Preview Card (when imageUrl exists) */}
+                    {question.imageUrl && (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="relative flex h-24 w-36 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:h-28 sm:w-44">
+                              <img
+                                src={getImageUrl(question.imageUrl)}
+                                alt={`صورة السؤال ${qIndex + 1}`}
+                                referrerPolicy="no-referrer"
+                                className="max-h-full max-w-full object-contain"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  target.onerror = null;
+                                  target.src = 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200" fill="%23f8fafc"%3E%3Crect width="300" height="200" fill="%23f8fafc"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%2394a3b8"%3E%D8%AA%D8%B9%D8%B0%D8%B1+%D8%AA%D8%AD%D9%85%D9%8A%D9%84+%D8%A7%D9%84%D8%B5%D9%88%D8%B1%D8%A9%3C/text%3E%3C/svg%3E';
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 space-y-1 text-xs">
+                              <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                                <Check size={14} className="text-emerald-600 shrink-0" />
+                                <span>صورة السؤال مرفقة ومعروضة</span>
+                              </div>
+                              <p className="max-w-xs truncate text-[11px] text-slate-500 font-mono dir-ltr text-left" title={question.imageUrl}>
+                                {question.imageUrl}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <a
+                                  href={getImageUrl(question.imageUrl)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                                >
+                                  <ExternalLink size={12} /> فتح الرابط بالحجم الكامل
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-2 sm:self-center">
+                            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                              <RefreshCw size={13} className={isUploadingThis ? 'animate-spin' : ''} />
+                              {isUploadingThis ? 'جارٍ الرفع…' : 'تغيير الصورة'}
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                                disabled={isUploadingThis}
+                                onChange={(e) => {
+                                  const file = e.currentTarget.files?.[0];
+                                  if (file) void handleQuestionImageUpload(file, qIndex, question);
+                                  e.currentTarget.value = '';
+                                }}
+                                className="sr-only"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveQuestionImage(qIndex)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                            >
+                              <Trash2 size={13} /> إزالة الصورة
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Question Controls (Type & Points) */}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs font-semibold">نوع السؤال
+                        <select
+                          value={question.type}
+                          onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? {
+                            ...item,
+                            type: event.target.value as DraftQuestion['type'],
+                            options: event.target.value === 'TRUE_FALSE'
+                              ? [{ text: 'صح', isCorrect: true }, { text: 'خطأ', isCorrect: false }]
+                              : ['', '', '', ''].map((text, optionIndex) => ({ text, isCorrect: optionIndex === 0 })),
+                            correctIndex: 0,
+                          } : item))}
+                          className="mt-1 block w-full rounded-lg border p-2"
+                        >
+                          <option value="MULTIPLE_CHOICE">اختيار متعدد</option>
+                          <option value="TRUE_FALSE">صح / خطأ</option>
+                        </select>
+                      </label>
+                      <label className="text-xs font-semibold">النقاط
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={question.points}
+                          onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, points: Number(event.target.value) } : item))}
+                          className="mt-1 block w-full rounded-lg border p-2"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Question Text */}
+                    <label className="block text-xs font-semibold">
+                      نص السؤال
+                      <textarea
+                        value={question.text}
+                        onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, text: event.target.value } : item))}
+                        placeholder="اكتب نص السؤال هنا..."
+                        rows={3}
+                        className="mt-1 w-full resize-y rounded-lg border p-3 text-sm outline-none focus:border-emerald-500"
+                      />
+                    </label>
+
+                    {/* Options */}
+                    <div className="space-y-2">
+                      <span className="text-xs font-semibold text-slate-600">خيارات الإجابة (حدد الخيار الصحيح):</span>
+                      {question.options.map((option, optionIndex) => (
+                        <div key={optionIndex} className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name={`correct-${qIndex}`}
+                            checked={question.correctIndex === optionIndex}
+                            onChange={() => setQuestions((current) => current.map((item, index) => index === qIndex ? {
+                              ...item,
+                              correctIndex: optionIndex,
+                              options: item.options.map((entry, i) => ({ ...entry, isCorrect: i === optionIndex })),
+                            } : item))}
+                            className="accent-emerald-600"
+                          />
+                          <input
+                            disabled={question.type === 'TRUE_FALSE'}
+                            value={option.text}
+                            onChange={(event) => setQuestions((current) => current.map((item, index) => index === qIndex ? {
+                              ...item,
+                              options: item.options.map((entry, i) => i === optionIndex ? { ...entry, text: event.target.value } : entry),
+                            } : item))}
+                            placeholder={`الخيار ${optionIndex + 1}`}
+                            className="flex-1 rounded-lg border p-2 text-sm disabled:bg-slate-50"
+                          />
+                          {question.type === 'MULTIPLE_CHOICE' && question.options.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => setQuestions((current) => current.map((item, index) => {
+                                if (index !== qIndex) return item;
+                                const options = item.options.filter((_, i) => i !== optionIndex);
+                                const correctIndex = item.correctIndex === optionIndex ? 0 : item.correctIndex > optionIndex ? item.correctIndex - 1 : item.correctIndex;
+                                return { ...item, options, correctIndex };
+                              }))}
+                              className="text-slate-400 hover:text-red-600"
+                            >
+                              <X size={16}/>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {question.type === 'MULTIPLE_CHOICE' && (
+                        <button
+                          type="button"
+                          onClick={() => setQuestions((current) => current.map((item, index) => index === qIndex ? { ...item, options: [...item.options, { text: '', isCorrect: false }] } : item))}
+                          className="text-sm font-semibold text-emerald-700 hover:underline"
+                        >
+                          + إضافة خيار
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            {!questionsLoading && (
+              <button
+                type="button"
+                onClick={() => setQuestions((current) => [...current, newQuestion()])}
+                className="w-full rounded-lg border border-dashed border-emerald-300 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+              >
+                <Plus size={15} className="ml-1 inline"/> أضف سؤالاً
+              </button>
+            )}
           </section>
         </div>
         <div className="flex justify-end gap-2 border-t bg-slate-50 p-4"><button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border bg-white px-4 py-2.5 font-semibold">إلغاء</button><button disabled={saving || uploadingQuestionIds.size > 0 || questionsLoading} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 font-bold text-white disabled:opacity-60">{saving && <Loader2 size={16} className="animate-spin"/>}{editing ? 'حفظ التغييرات' : 'إنشاء الاختبار'}</button></div>

@@ -8,12 +8,44 @@ function unwrap<T>(value: T | { data: T }): T {
     : value as T;
 }
 
+export function extractQuestionImageUrl(q: any): string | null {
+  if (!q || typeof q !== 'object') return null;
+  const candidate =
+    q.imageUrl ??
+    q.questionImageUrl ??
+    q.image ??
+    q.photo ??
+    q.url ??
+    q.mediaUrl ??
+    q.image_url ??
+    q.question_image_url ??
+    q.filePath ??
+    q.path ??
+    q.thumbnail ??
+    q.thumbnailUrl ??
+    q.media?.url ??
+    q.media?.secure_url ??
+    q.attachment ??
+    null;
+
+  if (typeof candidate === 'string' && candidate.trim()) {
+    return candidate.trim();
+  }
+  if (candidate && typeof candidate === 'object') {
+    const nested = candidate.url ?? candidate.imageUrl ?? candidate.path ?? candidate.secure_url;
+    if (typeof nested === 'string' && nested.trim()) {
+      return nested.trim();
+    }
+  }
+  return null;
+}
+
 function adaptExam(exam: BackendExam & Record<string, any>): AdminExam {
   return {
     id: String(exam.id),
     title: exam.title,
     description: exam.description ?? '',
-    imageUrl: exam.imageUrl,
+    imageUrl: exam.imageUrl ?? exam.image ?? exam.coverImage ?? exam.thumbnail ?? null,
     examType: exam.examType ?? (exam.lessonId ? 'LESSON_QUIZ' : 'COURSE_QUIZ'),
     rankingCriteria: exam.rankingCriteria ?? 'BOTH',
     passingScore: exam.passingScore,
@@ -40,12 +72,13 @@ function buildDto(payload: ExamPayload): CreateExamDto {
   return {
     ...metadata,
     ...(questions ? {
-      questions: questions.map((question) => ({
+      questions: questions.map((question: any) => ({
         text: question.text.trim(),
         type: question.type,
         points: question.points,
         imageUrl: question.imageUrl || undefined,
-        options: question.options.map(({ text, isCorrect }) => ({ text: text.trim(), isCorrect })),
+        questionImageUrl: question.imageUrl || question.questionImageUrl || undefined,
+        options: question.options.map(({ text, isCorrect }: any) => ({ text: text.trim(), isCorrect })),
       })),
     } : {}),
   } as CreateExamDto;
@@ -59,16 +92,18 @@ export const examManagementService = {
 
   async getById(id: string): Promise<AdminExam & { questions: ExamQuestion[] }> {
     const { data } = await api.get<any>(`/exams/${id}`);
-    const exam = unwrap(data);
-    return { ...adaptExam(exam), questions: Array.isArray(exam?.questions) ? exam.questions.map((question: any) => ({
-      ...question,
-      id: question.id,
-      type: String(question.type).toUpperCase() === 'TRUE_FALSE' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
-      imageUrl: question.imageUrl ?? question.questionImageUrl ?? null,
-      options: Array.isArray(question.options) ? question.options.map((option: any) => ({
-        ...option, text: typeof option === 'string' ? option : option.text ?? '', isCorrect: typeof option === 'string' ? false : Boolean(option.isCorrect),
-      })) : [],
-    })) : [] };
+    const rawExam = unwrap(data);
+    const exam = rawExam?.exam ?? rawExam;
+    const rawQuestions = Array.isArray(exam?.questions)
+      ? exam.questions
+      : Array.isArray(rawExam?.questions)
+      ? rawExam.questions
+      : [];
+
+    return {
+      ...adaptExam(exam),
+      questions: rawQuestions.map((question: any) => this.normalizeQuestion(question)),
+    };
   },
 
   async create(payload: ExamPayload): Promise<AdminExam> {
@@ -82,12 +117,20 @@ export const examManagementService = {
   },
 
   async addQuestion(examId: string, question: Omit<ExamQuestion, 'id'>): Promise<ExamQuestion> {
-    const { data } = await api.post<any>(`/exams/${examId}/questions`, question);
+    const payload = {
+      ...question,
+      questionImageUrl: question.imageUrl || undefined,
+    };
+    const { data } = await api.post<any>(`/exams/${examId}/questions`, payload);
     return this.normalizeQuestion(unwrap(data));
   },
 
   async updateQuestion(questionId: string | number, question: Omit<ExamQuestion, 'id'>): Promise<ExamQuestion> {
-    const { data } = await api.patch<any>(`/exams/questions/${questionId}`, question);
+    const payload = {
+      ...question,
+      questionImageUrl: question.imageUrl || undefined,
+    };
+    const { data } = await api.patch<any>(`/exams/questions/${questionId}`, payload);
     return this.normalizeQuestion(unwrap(data));
   },
 
@@ -97,15 +140,18 @@ export const examManagementService = {
 
   normalizeQuestion(question: any): ExamQuestion {
     const value = question?.question ?? question;
+    const imageUrl = extractQuestionImageUrl(value);
     return {
       ...value,
       id: value?.id,
       text: value?.text ?? '',
       type: String(value?.type).toUpperCase() === 'TRUE_FALSE' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE',
       points: Number(value?.points ?? 1),
-      imageUrl: value?.imageUrl ?? value?.questionImageUrl ?? null,
+      imageUrl: imageUrl || null,
       options: Array.isArray(value?.options) ? value.options.map((option: any) => ({
-        ...option, text: typeof option === 'string' ? option : option.text ?? '', isCorrect: typeof option === 'string' ? false : Boolean(option.isCorrect),
+        ...option,
+        text: typeof option === 'string' ? option : option.text ?? '',
+        isCorrect: typeof option === 'string' ? false : Boolean(option.isCorrect),
       })) : [],
     };
   },
@@ -117,14 +163,48 @@ export const examManagementService = {
   async uploadImage(file: File): Promise<string> {
     const formData = new FormData();
     formData.append('image', file);
-    const { data } = await api.post<{
-      imageUrl?: string;
-      url?: string;
-      data?: { imageUrl?: string; url?: string };
-      }>('/exams/upload-image', formData, { timeout: 60_000 });
-    const imageUrl = data.imageUrl ?? data.url ?? data.data?.imageUrl ?? data.data?.url;
-    if (!imageUrl) throw new Error('لم يُرجع الخادم رابط الصورة.');
-    return imageUrl;
+    formData.append('file', file);
+
+    let resData: any;
+    try {
+      const response = await api.post<any>('/exams/upload-image', formData, {
+        timeout: 60_000,
+        headers: { 'Accept': 'application/json' },
+      });
+      resData = response.data;
+    } catch (primaryErr) {
+      try {
+        const response = await api.post<any>('/upload/image', formData, {
+          timeout: 60_000,
+          headers: { 'Accept': 'application/json' },
+        });
+        resData = response.data;
+      } catch {
+        throw primaryErr;
+      }
+    }
+
+    const candidate =
+      (typeof resData === 'string' ? resData : null) ??
+      resData?.imageUrl ??
+      resData?.url ??
+      resData?.secure_url ??
+      resData?.path ??
+      resData?.filePath ??
+      resData?.image ??
+      resData?.questionImageUrl ??
+      resData?.data?.imageUrl ??
+      resData?.data?.url ??
+      resData?.data?.secure_url ??
+      resData?.data?.path ??
+      resData?.data?.filePath ??
+      resData?.data?.image ??
+      resData?.data?.questionImageUrl;
+
+    if (!candidate || typeof candidate !== 'string') {
+      throw new Error('لم يُرجع الخادم رابط الصورة.');
+    }
+    return candidate.trim();
   },
 
   async getStats(id: string): Promise<ExamStats> {

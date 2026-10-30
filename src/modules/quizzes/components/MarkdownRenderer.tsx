@@ -92,7 +92,7 @@ export function MarkdownRenderer({ content, className = '' }: Props) {
           hr: () => <hr className="my-5 border-t border-slate-200" />,
           img: ({ src, alt }) => (
             <span className="block my-4 text-center">
-              <img src={src} alt={alt} className="inline-block max-h-64 object-contain rounded-xl border border-slate-100 shadow-sm bg-slate-50 p-1" />
+              <img src={src} alt={alt} referrerPolicy="no-referrer" className="inline-block max-h-64 object-contain rounded-xl border border-slate-100 shadow-sm bg-slate-50 p-1" />
               {alt && <span className="block text-xs text-slate-400 mt-1 font-semibold">{alt}</span>}
             </span>
           ),
