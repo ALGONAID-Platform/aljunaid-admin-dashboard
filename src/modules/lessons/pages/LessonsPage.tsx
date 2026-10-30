@@ -147,7 +147,7 @@ type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
 export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId?: string; scopedLessonId?: string } = {}) {
   const navigate = useNavigate();
   const { courses, fetchCourses } = useCoursesStore();
-  const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, fetchLessonsPage, serverPage, serverTotalPages, serverTotal, serverLimit, error, isLoading } = useLessonsStore();
+  const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, fetchLessonsPage, serverPage, serverTotalPages, serverTotal, serverLimit, error, isLoading, clearLessons } = useLessonsStore();
   const { modules: allModules, fetchModules, fetchModulesByCourse } = useModulesStore();
 
   const [showModal, setShowModal] = useState(false);
@@ -177,6 +177,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   useEffect(() => {
     void fetchCourses();
     if (scopedCourseId) {
+      // Clear stale lessons from previous course immediately to avoid showing wrong data
+      clearLessons();
       // Use server-side pagination when scoped to a specific course
       void fetchLessonsPage(scopedCourseId, 1, itemsPerPage);
       void fetchModulesByCourse(scopedCourseId);
@@ -184,7 +186,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       void fetchLessons();
       void fetchModules();
     }
-  }, [fetchCourses, fetchLessons, fetchLessonsPage, fetchModules, fetchModulesByCourse, scopedCourseId, itemsPerPage]);
+  }, [fetchCourses, fetchLessons, fetchLessonsPage, fetchModules, fetchModulesByCourse, clearLessons, scopedCourseId, itemsPerPage]);
 
   const [form, setForm] = useState<FormState>(emptyLessonForm);
   const [errors, setErrors] = useState<FormError>({});
@@ -638,6 +640,16 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         .sort((a, b) => a.order - b.order)
         .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const hasFetchedOnceRef = useRef(false);
+  if (!isLoading && (lessons.length > 0 || !scopedCourseId)) hasFetchedOnceRef.current = true;
+  // Reset when scoped course changes so we show spinner for new course
+  const prevScopedCourseIdRef = useRef(scopedCourseId);
+  if (prevScopedCourseIdRef.current !== scopedCourseId) {
+    prevScopedCourseIdRef.current = scopedCourseId;
+    hasFetchedOnceRef.current = false;
+  }
+  const hasFetchedOnce = hasFetchedOnceRef.current;
+
   if (isLoading && lessons.length === 0 && !showModal) return <Loader fullPage />;
 
   return (
@@ -752,6 +764,20 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
           <button onClick={() => void fetchLessons()} className="px-8 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-bold shadow-md shadow-red-500/20">
             إعادة المحاولة
           </button>
+        </div>
+      ) : isLoading && courseLessons.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-16 text-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
+            <p className="text-slate-500 font-semibold">جارٍ تحميل الدروس...</p>
+          </div>
+        </div>
+      ) : !isLoading && !hasFetchedOnce ? (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-16 text-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
+            <p className="text-slate-500 font-semibold">جارٍ تحميل الدروس...</p>
+          </div>
         </div>
       ) : courseLessons.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-2">

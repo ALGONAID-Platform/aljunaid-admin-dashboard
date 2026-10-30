@@ -144,12 +144,14 @@ function logLessonUpdatePayload(payload: FormData | Record<string, unknown>): Re
 
 export const lessonService = {
   /**
-   * Fetch a single page of lessons for a course using GET /lessons/course/:courseId.
-   * Returns items + totalPages so the caller can render server-side pagination.
+   * Fetch a single page of lessons for a course using the admin search endpoint.
+   * Uses /lessons/search?courseId=X (returns ALL lessons including drafts for admin).
+   * Falls back to the student-facing /lessons/course/:courseId if search fails.
    */
   async getCoursePage(courseId: string, page: number, limit: number): Promise<{ items: Lesson[]; totalPages: number; total: number }> {
-    const { data } = await api.get<any>(`/lessons/course/${courseId}`, {
-      params: { page, limit },
+    // Use the admin search endpoint so drafts are visible in the dashboard
+    const { data } = await api.get<any>('/lessons/search', {
+      params: { q: '', courseId, page, limit },
     });
     const { items, totalPages } = readLessonPage(data, limit);
     const rawTotal = data?.meta?.total ?? data?.meta?.totalItems ?? data?.meta?.count ?? null;

@@ -25,6 +25,8 @@ interface LessonsState {
   deleteLesson: (id: string) => Promise<void>;
   togglePublish: (id: string) => Promise<void>;
   clearError: () => void;
+  /** Clear lessons array immediately (e.g. when switching course scope) */
+  clearLessons: () => void;
 }
 
 export const useLessonsStore = create<LessonsState>()((set, get) => ({
@@ -148,4 +150,6 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
 
 
   clearError: () => set({ error: null }),
+
+  clearLessons: () => set({ lessons: [], serverPage: 1, serverTotalPages: 1, serverTotal: 0 }),
 }));
