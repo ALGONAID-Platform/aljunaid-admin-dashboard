@@ -285,8 +285,6 @@ export function CoursesPage() {
         title: form.title.trim(),
         description: form.description.trim(),
         thumbnail: finalThumbnailUrl,
-        imageUrl: finalThumbnailUrl,
-        image: finalThumbnailUrl,
         isPaid: form.isPaid,
         courseType: form.courseType,
         ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, form[k as keyof FormState] ? Number(form[k as keyof FormState]) : undefined])),

@@ -115,7 +115,7 @@ export const courseService = {
   },
 
 
-  /** POST /courses — uses upload service for file then sends JSON */
+  /** POST /courses — uses upload service for file then sends JSON strictly adhering to CreateCourseDto */
   async create(payload: CreateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {
     let thumbnailUrl = payload.thumbnail;
 
@@ -124,19 +124,46 @@ export const courseService = {
       thumbnailUrl = result.data.url;
     }
 
-    const { imageFile: _imageFile, ...body } = payload;
-    Object.assign(body, {
+    const { imageFile: _imageFile, ...rawBody } = payload;
+    // Strictly whitelist fields for CreateCourseDto — forbidNonWhitelisted rejects imageUrl, image, etc.
+    const body: Record<string, any> = {
+      title: rawBody.title || (rawBody as any).name,
+      description: rawBody.description,
       thumbnail: thumbnailUrl,
-      imageUrl: thumbnailUrl,
-      image: thumbnailUrl,
-    });
+      isPaid: rawBody.isPaid,
+      courseType: rawBody.courseType,
+      price: rawBody.price,
+      discountedPrice: rawBody.discountedPrice,
+      priceYerOld: rawBody.priceYerOld,
+      discountedPriceYerOld: rawBody.discountedPriceYerOld,
+      priceYerNew: rawBody.priceYerNew,
+      discountedPriceYerNew: rawBody.discountedPriceYerNew,
+      priceSar: rawBody.priceSar,
+      discountedPriceSar: rawBody.discountedPriceSar,
+      scheduleDaysText: rawBody.scheduleDaysText,
+      maxStudents: rawBody.maxStudents,
+      startDate: rawBody.startDate,
+      endDate: rawBody.endDate,
+      durationWeeks: rawBody.durationWeeks,
+      scheduleDays: rawBody.scheduleDays,
+      objectives: rawBody.objectives,
+      certificateMinScore: rawBody.certificateMinScore,
+      certificateMinAttendance: rawBody.certificateMinAttendance,
+    };
+
+    // Remove undefined or null keys
+    for (const key of Object.keys(body)) {
+      if (body[key] === undefined || body[key] === null || body[key] === '') {
+        delete body[key];
+      }
+    }
 
     const { data } = await api.post<BackendCourseResponse | BackendCourse>('/courses', body);
     const course = (data as BackendCourseResponse).data ?? (data as BackendCourse);
     return adaptCourse(course);
   },
 
-  /** PATCH /courses/{id} — uses upload service for file then sends JSON */
+  /** PATCH /courses/{id} — uses upload service for file then sends JSON strictly adhering to UpdateCourseDto */
   async update(payload: UpdateCoursePayload & { imageFile?: File }, onUploadProgress?: (p: any) => void): Promise<Course> {
     const { id, ...rest } = payload;
     let thumbnailUrl = rest.thumbnail;
@@ -146,12 +173,37 @@ export const courseService = {
       thumbnailUrl = result.data.url;
     }
 
-    const { imageFile: _imageFile, ...body } = rest;
-    Object.assign(body, {
+    const { imageFile: _imageFile, ...rawBody } = rest;
+    const body: Record<string, any> = {
+      title: rawBody.title || (rawBody as any).name,
+      description: rawBody.description,
       thumbnail: thumbnailUrl,
-      imageUrl: thumbnailUrl,
-      image: thumbnailUrl,
-    });
+      isPaid: rawBody.isPaid,
+      courseType: rawBody.courseType,
+      price: rawBody.price,
+      discountedPrice: rawBody.discountedPrice,
+      priceYerOld: rawBody.priceYerOld,
+      discountedPriceYerOld: rawBody.discountedPriceYerOld,
+      priceYerNew: rawBody.priceYerNew,
+      discountedPriceYerNew: rawBody.discountedPriceYerNew,
+      priceSar: rawBody.priceSar,
+      discountedPriceSar: rawBody.discountedPriceSar,
+      scheduleDaysText: rawBody.scheduleDaysText,
+      maxStudents: rawBody.maxStudents,
+      startDate: rawBody.startDate,
+      endDate: rawBody.endDate,
+      durationWeeks: rawBody.durationWeeks,
+      scheduleDays: rawBody.scheduleDays,
+      objectives: rawBody.objectives,
+      certificateMinScore: rawBody.certificateMinScore,
+      certificateMinAttendance: rawBody.certificateMinAttendance,
+    };
+
+    for (const key of Object.keys(body)) {
+      if (body[key] === undefined || body[key] === null || body[key] === '') {
+        delete body[key];
+      }
+    }
 
     const { data } = await api.patch<BackendCourseResponse | BackendCourse>(`/courses/${id}`, body);
     const course = (data as BackendCourseResponse).data ?? (data as BackendCourse);
