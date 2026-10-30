@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, FileText, FileType2, Link
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders
 } from 'lucide-react';
+import type { Lesson } from '../../../types';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
 import { useKeyboardShortcut } from '../../../hooks/useKeyboardShortcuts';
@@ -20,7 +21,6 @@ import { AdvancedFilters } from '../../../components/ui/AdvancedFilters';
 import { SavedViews } from '../../../components/ui/SavedViews';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
 import { PageGuide } from '../../../components/ui/PageGuide';
-import { Layers } from 'lucide-react';
 import type { BackendModule } from '../../../types/api';
 import { lessonService } from '../../../services/api/lessons.api';
 import { mediaApi, type UploadProgress } from '../../../services/api/media.api';
@@ -208,6 +208,31 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [videoFileInfo, setVideoFileInfo] = useState<{name: string; size: number} | null>(null);
   const [previewLessonDesc, setPreviewLessonDesc] = useState(false);
   const [previewLessonContent, setPreviewLessonContent] = useState(false);
+  const [updatingField, setUpdatingField] = useState<{ id: string; field: 'isPublished' | 'isMandatory' | 'isFreePreview' } | null>(null);
+
+  const handleToggleField = async (lesson: Lesson, field: 'isPublished' | 'isMandatory' | 'isFreePreview') => {
+    setUpdatingField({ id: lesson.id, field });
+    try {
+      if (field === 'isPublished') {
+        const next = !lesson.isPublished;
+        await updateLesson({ id: lesson.id, isPublished: next });
+        toast.success(next ? 'تم نشر الدرس بنجاح' : 'تم تحويل الدرس إلى مسودة (مؤرشف)');
+      } else if (field === 'isMandatory') {
+        const next = lesson.isMandatory === false;
+        await updateLesson({ id: lesson.id, isMandatory: next });
+        toast.success(next ? 'تم تعيين الدرس كإجباري للشهادة' : 'تم تعيين الدرس كاختياري');
+      } else if (field === 'isFreePreview') {
+        const next = !lesson.isFreePreview;
+        await updateLesson({ id: lesson.id, isFreePreview: next });
+        toast.success(next ? 'تم تفعيل المعاينة المجانية للدرس' : 'تم قفل المعاينة المجانية (خاص بالمشتركين)');
+      }
+    } catch (err: any) {
+      console.error('Failed to toggle lesson field:', err);
+      toast.error(err?.message || 'تعذر تحديث إعدادات الدرس');
+    } finally {
+      setUpdatingField(null);
+    }
+  };
 
   const uploadLessonVideo = async (file?: File) => {
     if (!file || !form.courseId) return;
@@ -898,6 +923,118 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                       </a>
                     )}
 
+                    {/* Quick Toggles: Status, Mandatory, Free Preview */}
+                    <div className="bg-slate-50/90 rounded-xl p-2.5 sm:p-3 border border-slate-200/80 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1.5">
+                          <Sliders className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>التحكم السريع في الدرس:</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">تغيير فوري بنقرة واحدة</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {/* 1. حالة النشر / الأرشفة */}
+                        <button
+                          type="button"
+                          disabled={updatingField?.id === lesson.id}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void handleToggleField(lesson, 'isPublished');
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-bold border transition-all ${
+                            lesson.isPublished
+                              ? 'bg-emerald-50/90 text-emerald-800 border-emerald-200 hover:bg-emerald-100 shadow-sm'
+                              : 'bg-amber-50/90 text-amber-800 border-amber-200 hover:bg-amber-100 shadow-sm'
+                          } ${updatingField?.id === lesson.id && updatingField?.field === 'isPublished' ? 'opacity-70 cursor-wait' : 'cursor-pointer active:scale-[0.98]'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {updatingField?.id === lesson.id && updatingField?.field === 'isPublished' ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                            ) : lesson.isPublished ? (
+                              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                            ) : (
+                              <Archive className="w-4 h-4 text-amber-600 shrink-0" />
+                            )}
+                            <div className="text-right">
+                              <div className="leading-tight">{lesson.isPublished ? 'منشور' : 'مؤرشف / مسودة'}</div>
+                              <div className="text-[10px] font-normal opacity-75">{lesson.isPublished ? 'متاح للطلاب' : 'غير معروض'}</div>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${lesson.isPublished ? 'bg-emerald-200/60 text-emerald-900' : 'bg-amber-200/60 text-amber-900'}`}>
+                            {lesson.isPublished ? 'أرشفة' : 'نشر'}
+                          </span>
+                        </button>
+
+                        {/* 2. إجباري أو اختياري */}
+                        <button
+                          type="button"
+                          disabled={updatingField?.id === lesson.id}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void handleToggleField(lesson, 'isMandatory');
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-bold border transition-all ${
+                            lesson.isMandatory !== false
+                              ? 'bg-indigo-50/90 text-indigo-800 border-indigo-200 hover:bg-indigo-100 shadow-sm'
+                              : 'bg-slate-100/90 text-slate-700 border-slate-200 hover:bg-slate-200 shadow-sm'
+                          } ${updatingField?.id === lesson.id && updatingField?.field === 'isMandatory' ? 'opacity-70 cursor-wait' : 'cursor-pointer active:scale-[0.98]'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {updatingField?.id === lesson.id && updatingField?.field === 'isMandatory' ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                            ) : lesson.isMandatory !== false ? (
+                              <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                            ) : (
+                              <ShieldAlert className="w-4 h-4 text-slate-400 shrink-0" />
+                            )}
+                            <div className="text-right">
+                              <div className="leading-tight">{lesson.isMandatory !== false ? 'إجباري' : 'اختياري'}</div>
+                              <div className="text-[10px] font-normal opacity-75">{lesson.isMandatory !== false ? 'لازم للشهادة' : 'إضافي'}</div>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${lesson.isMandatory !== false ? 'bg-indigo-200/60 text-indigo-900' : 'bg-slate-200 text-slate-800'}`}>
+                            {lesson.isMandatory !== false ? 'جعله اختياري' : 'جعله إجباري'}
+                          </span>
+                        </button>
+
+                        {/* 3. معاينة مجانية */}
+                        <button
+                          type="button"
+                          disabled={updatingField?.id === lesson.id}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void handleToggleField(lesson, 'isFreePreview');
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-bold border transition-all ${
+                            lesson.isFreePreview
+                              ? 'bg-teal-50/90 text-teal-800 border-teal-200 hover:bg-teal-100 shadow-sm'
+                              : 'bg-slate-100/90 text-slate-700 border-slate-200 hover:bg-slate-200 shadow-sm'
+                          } ${updatingField?.id === lesson.id && updatingField?.field === 'isFreePreview' ? 'opacity-70 cursor-wait' : 'cursor-pointer active:scale-[0.98]'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {updatingField?.id === lesson.id && updatingField?.field === 'isFreePreview' ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+                            ) : lesson.isFreePreview ? (
+                              <Unlock className="w-4 h-4 text-teal-600 shrink-0" />
+                            ) : (
+                              <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                            )}
+                            <div className="text-right">
+                              <div className="leading-tight">{lesson.isFreePreview ? 'معاينة مجانية' : 'خاص بالمشتركين'}</div>
+                              <div className="text-[10px] font-normal opacity-75">{lesson.isFreePreview ? 'مفتوح للزوار' : 'يتطلب اشتراك'}</div>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold ${lesson.isFreePreview ? 'bg-teal-200/60 text-teal-900' : 'bg-slate-200 text-slate-800'}`}>
+                            {lesson.isFreePreview ? 'قفل الدرس' : 'إتاحة مجاناً'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Footer: Health & Actions */}
                     <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                       <div className="flex flex-wrap gap-1.5">
@@ -995,7 +1132,46 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-2">
-                        <StatusBadge status={lesson.isPublished ? 'published' : 'draft'} />
+                        <button
+                          type="button"
+                          disabled={updatingField?.id === lesson.id}
+                          onClick={() => void handleToggleField(lesson, 'isPublished')}
+                          className="self-start inline-flex items-center gap-1.5 cursor-pointer hover:opacity-85 transition-opacity"
+                          title="انقر لتغيير حالة النشر / الأرشفة"
+                        >
+                          <StatusBadge status={lesson.isPublished ? 'published' : 'draft'} />
+                          <span className="text-[10px] text-slate-400 hover:text-slate-600 underline">
+                            {lesson.isPublished ? 'أرشفة' : 'نشر'}
+                          </span>
+                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={updatingField?.id === lesson.id}
+                            onClick={() => void handleToggleField(lesson, 'isMandatory')}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                              lesson.isMandatory !== false
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                                : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                            }`}
+                            title="انقر لتغيير ما إذا كان الدرس إجباري للشهادة"
+                          >
+                            {lesson.isMandatory !== false ? 'إجباري' : 'اختياري'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={updatingField?.id === lesson.id}
+                            onClick={() => void handleToggleField(lesson, 'isFreePreview')}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                              lesson.isFreePreview
+                                ? 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100'
+                                : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+                            }`}
+                            title="انقر لتغيير ما إذا كانت المعاينة مجانية"
+                          >
+                            {lesson.isFreePreview ? 'معاينة مجانية' : 'مدفوع'}
+                          </button>
+                        </div>
                         {!lesson.isPublished && (
                           <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
                             <Timer className="w-3 h-3" /> مجدول للنشر لاحقاً
@@ -1012,8 +1188,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                         <button onClick={() => void openPreview(lesson)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" title="وضع معاينة الطالب">
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button onClick={() => updateLesson({ id: lesson.id, isPublished: !lesson.isPublished })} className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${lesson.isPublished ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={lesson.isPublished ? "إلغاء النشر (مسودة)" : "نشر الدرس"}>
-                          {lesson.isPublished ? <Clock className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                        <button onClick={() => void handleToggleField(lesson, 'isPublished')} disabled={updatingField?.id === lesson.id} className={`p-2 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${lesson.isPublished ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`} title={lesson.isPublished ? "أرشفة الدرس (تحويل لمسودة)" : "نشر الدرس"}>
+                          {updatingField?.id === lesson.id && updatingField?.field === 'isPublished' ? <Loader2 className="w-4 h-4 animate-spin text-emerald-600" /> : lesson.isPublished ? <Archive className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
                         <div className="w-px h-4 bg-slate-200"></div>
                         <button
