@@ -17,6 +17,7 @@ export const ROUTES = {
   accountVerification: '/admin/account-verification',
   assignments: '/admin/assignments',
   notifications: '/admin/notifications',
+  databaseBackup: '/admin/backup',
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];

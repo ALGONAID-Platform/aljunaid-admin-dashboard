@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect } from 'react';
 import {
   LayoutDashboard, BookOpen, Megaphone,
-  Send, LogOut, Menu, Activity, X, Image as ImageIcon, WalletCards, UserRoundCheck
+  Send, LogOut, Menu, Activity, X, Image as ImageIcon, WalletCards, UserRoundCheck, Database
 } from 'lucide-react';
 import { useUIStore, useAuthStore } from '../../store';
 import { useNavigate, useLocation } from 'react-router';
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { path: ROUTES.accountVerification, icon: UserRoundCheck, label: 'توثيق الحسابات' },
   { path: ROUTES.notifications, icon: Megaphone, label: 'إشعارات الطلاب' },
   { path: ROUTES.progress, icon: Activity, label: 'التقدم الأكاديمي' },
+  { path: ROUTES.databaseBackup, icon: Database, label: 'النسخ الاحتياطي' },
 ];
 
 const MOBILE_BOTTOM_NAV = [

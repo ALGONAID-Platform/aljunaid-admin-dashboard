@@ -51,6 +51,9 @@ const AssignmentsPage = lazy(() =>
 const NotificationBroadcastPage = lazy(() =>
   import('../modules/notifications/pages/NotificationBroadcastPage').then((m) => ({ default: m.NotificationBroadcastPage }))
 );
+const DatabaseBackupPage = lazy(() =>
+  import('../modules/backup/pages/DatabaseBackupPage').then((m) => ({ default: m.DatabaseBackupPage }))
+);
 
 function CourseWorkspace() {
   const { courseId = '' } = useParams();
@@ -176,6 +179,7 @@ function DashboardRoutes() {
             <Route path="assignment" element={<LessonAssignmentRoute />} />
           </Route>
           <Route path="notifications" element={<NotificationBroadcastPage />} />
+          <Route path="backup" element={<DatabaseBackupPage />} />
         </Routes>
       </Suspense>
     </MainDashboardLayout>

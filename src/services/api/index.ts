@@ -11,6 +11,7 @@ export { enrollmentService } from './enrollment.api';
 export { progressService } from './progress.api';
 export { usersService } from './users.api';
 export { notificationsService } from './notifications.api';
+export { backupService } from './backup.api';
 
 export { api };
 export default api;
