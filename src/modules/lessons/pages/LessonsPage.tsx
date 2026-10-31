@@ -347,14 +347,29 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   };
 
   const openEdit = async (lesson: { id: string; courseId: string; title: string; description: string; order: number }) => {
+    const fallbackDesc = lesson.description || '';
+    const fallbackContent = (lesson as any).content || '';
+    let canonicalLesson: any = null;
     try {
       // Fetch the canonical lesson (including persisted PDF rows and media URLs)
       // before populating the edit form; list rows may be stale after attachment updates.
-      lesson = { ...lesson, ...await lessonService.getById(String(lesson.id)) };
+      canonicalLesson = await lessonService.getById(String(lesson.id));
     } catch (err: any) {
-      setModulesError(err?.message || 'تعذر تحميل تفاصيل الدرس قبل التعديل.');
-      return;
+      console.warn('تعذر تحميل تفاصيل إضافية للدرس قبل التعديل:', err);
     }
+
+    const merged = {
+      ...lesson,
+      ...(canonicalLesson || {}),
+      description: (canonicalLesson?.description && String(canonicalLesson.description).trim())
+        ? canonicalLesson.description
+        : fallbackDesc,
+      content: (canonicalLesson?.content && String(canonicalLesson.content).trim())
+        ? canonicalLesson.content
+        : fallbackContent,
+    };
+    lesson = merged;
+
     resetModal();
     setLessonPdfs(((lesson as any).pdfFiles ?? []).map((pdf: any, index: number) => ({ ...pdf, title: pdf.title || `PDF ${index + 1}`, order: pdf.order ?? index })).sort((a: any, b: any) => a.order - b.order));
     setEditingLessonId(lesson.id);
@@ -369,13 +384,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         courseId: String(lessonCourseId),
         moduleId: lesson.courseId,
         title: lesson.title,
-        description: lesson.description || '',
+        description: lesson.description || fallbackDesc || '',
         objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
         type: (lesson as any).type || 'video',
         videoUrl: (lesson as any).videoUrl || '',
         pdfUrl: (lesson as any).pdfUrl || '',
-        content: (lesson as any).content || '',
+        content: (lesson as any).content || fallbackContent || '',
         scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
@@ -389,13 +404,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         courseId: String(lessonCourseId),
         moduleId: lessonIsNonModule ? String(lessonCourseId) : lesson.courseId,
         title: lesson.title,
-        description: lesson.description || '',
+        description: lesson.description || fallbackDesc || '',
         objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
         type: (lesson as any).type || 'video',
         videoUrl: (lesson as any).videoUrl || '',
         pdfUrl: (lesson as any).pdfUrl || '',
-        content: (lesson as any).content || '',
+        content: (lesson as any).content || fallbackContent || '',
         scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
