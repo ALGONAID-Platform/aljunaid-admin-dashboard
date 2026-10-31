@@ -8,8 +8,8 @@ import { syncService } from '../services/sync/sync.service';
  */
 export function useAppData() {
   useEffect(() => {
-    // Start automatic multi-device synchronization engine
-    const cleanup = syncService.initAutoSync(30000); // 30-second background polling
+    // Connect network reconnection listener (polling disabled to prevent intrusive screen refresh loops)
+    const cleanup = syncService.initAutoSync(0);
     return cleanup;
   }, []);
 }

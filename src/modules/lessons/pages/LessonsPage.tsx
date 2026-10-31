@@ -175,19 +175,22 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   useEffect(() => { setCurrentPage(1); setSelectedLessons([]); }, [searchQuery, courseFilter, activeView, itemsPerPage]);
   useEffect(() => { setCourseFilter(scopedCourseId || 'all'); }, [scopedCourseId]);
 
+  const prevCourseScopeRef = useRef<string | undefined>(scopedCourseId);
   useEffect(() => {
     void fetchCourses();
     if (scopedCourseId) {
-      // Clear stale lessons from previous course immediately to avoid showing wrong data
-      clearLessons();
-      // Use server-side pagination when scoped to a specific course
+      if (prevCourseScopeRef.current !== scopedCourseId) {
+        clearLessons();
+        prevCourseScopeRef.current = scopedCourseId;
+      }
       void fetchLessonsPage(scopedCourseId, 1, itemsPerPage);
       void fetchModulesByCourse(scopedCourseId);
     } else {
       void fetchLessons();
       void fetchModules();
     }
-  }, [fetchCourses, fetchLessons, fetchLessonsPage, fetchModules, fetchModulesByCourse, clearLessons, scopedCourseId, itemsPerPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedCourseId, itemsPerPage]);
 
   const [form, setForm] = useState<FormState>(emptyLessonForm);
   const [errors, setErrors] = useState<FormError>({});

@@ -24,10 +24,11 @@ class SyncService {
 
     this.isSyncing = true;
     try {
+      // Sync global catalog stores. Lessons are fetched on-demand per course to prevent
+      // wiping out active course scoped state and causing screen reload flickers.
       await Promise.allSettled([
         useCoursesStore.getState().fetchCourses(),
         useModulesStore.getState().fetchModules(),
-        useLessonsStore.getState().fetchLessons(),
         useQuizzesStore.getState().fetchQuizzes(),
         useContentStore.getState().fetchContent(),
       ]);
@@ -39,15 +40,14 @@ class SyncService {
   }
 
   /**
-   * Initializes automatic event listeners (focus, online) & background polling for multi-device parity.
+   * Initializes network reconnection listener without intrusive focus-stealing or aggressive polling.
    */
-  public initAutoSync(pollIntervalMs = 60000): () => void {
-    const handleFocusOrOnline = () => {
+  public initAutoSync(pollIntervalMs = 0): () => void {
+    const handleOnline = () => {
       void this.syncAllData(true);
     };
 
-    window.addEventListener('focus', handleFocusOrOnline);
-    window.addEventListener('online', handleFocusOrOnline);
+    window.addEventListener('online', handleOnline);
 
     if (pollIntervalMs > 0 && !this.syncIntervalTimer) {
       this.syncIntervalTimer = setInterval(() => {
@@ -55,13 +55,8 @@ class SyncService {
       }, pollIntervalMs);
     }
 
-    // Trigger immediate initial sync if logged in
-    void this.syncAllData(true);
-
-    // Return cleanup function
     return () => {
-      window.removeEventListener('focus', handleFocusOrOnline);
-      window.removeEventListener('online', handleFocusOrOnline);
+      window.removeEventListener('online', handleOnline);
       if (this.syncIntervalTimer) {
         clearInterval(this.syncIntervalTimer);
         this.syncIntervalTimer = null;
