@@ -387,24 +387,23 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       console.warn('تعذر تحميل تفاصيل إضافية للدرس قبل التعديل:', err);
     }
 
-    const rawDesc = (canonicalLesson?.description && String(canonicalLesson.description).trim())
-      ? canonicalLesson.description
+    const targetLesson = canonicalLesson || lesson;
+    const rawDesc = (targetLesson?.description && String(targetLesson.description).trim())
+      ? targetLesson.description
       : (fallbackDesc || '');
-    const rawContent = (canonicalLesson?.content && String(canonicalLesson.content).trim())
-      ? canonicalLesson.content
+    const rawContent = (targetLesson?.content && String(targetLesson.content).trim())
+      ? targetLesson.content
       : (fallbackContent || '');
 
-    const resolvedType: LocalContentType = (lesson as any).type
-      ? (lesson as any).type
-      : ((lesson as any).pdfUrl || (lesson as any).pdfFiles?.length) && !(lesson as any).videoUrl && !rawContent
-      ? 'pdf'
-      : ((lesson as any).isReading || (!(lesson as any).videoUrl && rawContent))
-      ? 'markdown'
-      : (lesson as any).liveMeetingUrl
+    const resolvedType: LocalContentType = (targetLesson as any).type
+      ? (targetLesson as any).type
+      : ((targetLesson as any).liveMeetingUrl || (targetLesson as any).liveStatus)
       ? 'live'
-      : 'video';
+      : (targetLesson as any).isReading
+      ? (rawDesc || rawContent ? 'markdown' : 'pdf')
+      : ((targetLesson as any).videoUrl ? 'video' : 'video');
 
-    const resolvedDescription = rawDesc || rawContent || '';
+    const resolvedDescription = resolvedType === 'pdf' ? '' : (rawDesc || rawContent || '');
 
     const merged = {
       ...lesson,
@@ -578,7 +577,12 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     }
     try {
 
-      const effectiveDescription = form.type === 'pdf' ? undefined : (form.description.trim() || undefined);
+      const isPdf = form.type === 'pdf';
+      const isLive = form.type === 'live';
+      const isReading = form.type === 'markdown';
+      const isVideo = form.type === 'video';
+
+      const effectiveDescription = isPdf ? null : (form.description.trim() || null);
 
       const payload: any = {
         courseId: courseIdToUse,
@@ -586,29 +590,28 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         courseName: course?.title || '',
         title: form.title.trim(),
         description: effectiveDescription,
+        content: effectiveDescription,
         objectives: form.objectives.map(objective => objective.trim()).filter(Boolean),
         order: Number(form.order),
-        type: form.type, // إرسال النوع الحقيقي للباكاند بدون تحايل
-        videoUrl: (form.type === 'video' || form.type === 'live') && form.videoUrl.trim() ? form.videoUrl.trim() : undefined,
-        content: effectiveDescription,
-        pdfUrl: (form.type === 'pdf' || form.type === 'video') ? (lessonPdfs.find(pdf => pdf.url)?.url || form.pdfUrl.trim() || undefined) : undefined,
+        type: form.type,
+        videoUrl: (isVideo || isLive) && form.videoUrl.trim() ? form.videoUrl.trim() : null,
+        pdfUrl: (isPdf || isVideo || isLive || isReading)
+          ? (lessonPdfs.find(pdf => pdf.url)?.url || form.pdfUrl.trim() || null)
+          : null,
         pdfFiles: lessonPdfs.length
           ? lessonPdfs.map((pdf, index) => ({ title: pdf.title || `PDF ${index + 1}`, url: pdf.url || '', file: pdf.file, order: index }))
           : form.pdfUrl.trim() ? [{ title: form.pdfUrl.trim().split('/').pop() || form.title.trim(), url: form.pdfUrl.trim(), order: 0 }] : [],
         pdf: undefined,
-        // إرسال true بشكل صريح للـ PDF والنص
-        isReading: (form.type === 'pdf' || form.type === 'markdown') ? true : false,
+        isReading: isReading || isPdf,
         status: form.status,
-        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
-        durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : undefined,
-        dayNumber: form.dayNumber ? Number(form.dayNumber) : undefined,
+        scheduledAt: isLive && form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null,
+        durationMinutes: isLive && form.durationMinutes ? Number(form.durationMinutes) : null,
+        dayNumber: form.dayNumber ? Number(form.dayNumber) : null,
         isMandatory: form.isMandatory,
-        // Persist the form value explicitly, including `false`; the API service
-        // sends this flag as JSON because multipart boolean parsing is unreliable.
         isFreePreview: form.isFreePreview,
-        liveStatus: form.liveStatus,
-        liveMeetingUrl: form.liveMeetingUrl || undefined,
-        recordingVideoUrl: form.recordingVideoUrl || undefined,
+        liveStatus: isLive ? form.liveStatus : null,
+        liveMeetingUrl: isLive && form.liveMeetingUrl.trim() ? form.liveMeetingUrl.trim() : null,
+        recordingVideoUrl: isLive && form.recordingVideoUrl.trim() ? form.recordingVideoUrl.trim() : null,
       };
 
       if (!isNonModuleCourse && form.moduleId) {
@@ -1125,8 +1128,27 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
                       {/* Type */}
                       <div className="flex items-center gap-1.5 bg-amber-50/80 text-amber-700 px-2.5 py-1.5 rounded-lg border border-amber-100/50">
-                        {lesson.type === 'video' || lesson.videoUrl ? <PlayCircle className="w-3.5 h-3.5" /> : lesson.type === 'pdf' || lesson.pdfUrl ? <FileText className="w-3.5 h-3.5" /> : <FileType2 className="w-3.5 h-3.5" />}
-                        <span>{lesson.type === 'video' || lesson.videoUrl ? 'فيديو' : lesson.type === 'pdf' || lesson.pdfUrl ? 'ملف PDF' : lesson.content ? 'درس قراءة' : 'درس'}</span>
+                        {lesson.type === 'live' ? (
+                          <>
+                            <Radio className="w-3.5 h-3.5 text-rose-500" />
+                            <span>درس مباشر</span>
+                          </>
+                        ) : lesson.type === 'markdown' ? (
+                          <>
+                            <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>درس قراءة</span>
+                          </>
+                        ) : lesson.type === 'pdf' ? (
+                          <>
+                            <FileText className="w-3.5 h-3.5 text-red-500" />
+                            <span>مستند PDF</span>
+                          </>
+                        ) : (
+                          <>
+                            <PlayCircle className="w-3.5 h-3.5 text-blue-500" />
+                            <span>مقطع فيديو</span>
+                          </>
+                        )}
                       </div>
 
                       {/* Live Status Badge */}
@@ -1424,14 +1446,15 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                       <div className="flex flex-col items-start gap-2">
                         {lesson.hasContent ? (
                           <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100 shadow-sm">
-                            <PlayCircle className="w-3.5 h-3.5" /> مادة علمية متوفرة
+                            {lesson.type === 'live' ? <Radio className="w-3.5 h-3.5 text-rose-500" /> : lesson.type === 'markdown' ? <BookOpen className="w-3.5 h-3.5 text-emerald-600" /> : lesson.type === 'pdf' ? <FileText className="w-3.5 h-3.5 text-red-500" /> : <PlayCircle className="w-3.5 h-3.5 text-blue-500" />}
+                            <span>{lesson.type === 'live' ? 'درس مباشر' : lesson.type === 'markdown' ? 'درس قراءة' : lesson.type === 'pdf' ? 'مستند PDF' : 'مقطع فيديو'}</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-500 font-semibold border border-slate-200">
                             <AlertCircle className="w-3.5 h-3.5" /> قيد الإعداد
                           </span>
                         )}
-                        {lesson.videoUrl && <a href={lesson.videoUrl} target="_blank" rel="noreferrer" dir="ltr" title={lesson.videoUrl} className="inline-flex max-w-[220px] items-center gap-1 text-xs font-semibold text-blue-700 hover:underline"><Link className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{lesson.videoUrl}</span></a>}
+                        {(lesson.type === 'video' || lesson.type === 'live') && lesson.videoUrl && <a href={lesson.videoUrl} target="_blank" rel="noreferrer" dir="ltr" title={lesson.videoUrl} className="inline-flex max-w-[220px] items-center gap-1 text-xs font-semibold text-blue-700 hover:underline"><Link className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{lesson.videoUrl}</span></a>}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

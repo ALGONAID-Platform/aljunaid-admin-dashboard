@@ -70,7 +70,35 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; 
     pdfUrl: bl.pdfUrl ?? undefined,
     pdfFiles: (Array.isArray(rawPdfs) ? rawPdfs : []).map((pdf: any, index: number) => ({ id: pdf.id == null ? undefined : String(pdf.id), title: pdf.title ?? `PDF ${index + 1}`, url: pdf.url, order: pdf.order ?? index })).filter((pdf: any) => !!pdf.url).sort((a: any, b: any) => a.order - b.order),
     content: (bl.isReading && !bl.pdfUrl) ? (bl.description ?? undefined) : (bl.content ?? undefined),
-    type: bl.videoUrl ? 'video' : (bl.pdfUrl ? 'pdf' : (bl.isReading ? 'markdown' : 'video')),
+    type: (() => {
+      if ((bl as any).type && ['video', 'markdown', 'pdf', 'live'].includes((bl as any).type)) {
+        return (bl as any).type;
+      }
+      if (bl.liveMeetingUrl && String(bl.liveMeetingUrl).trim() !== '') {
+        return 'live';
+      }
+      if ((bl as any).liveStatus && !bl.isReading && !bl.videoUrl) {
+        return 'live';
+      }
+      const hasTextContent = Boolean((bl.description && String(bl.description).trim()) || (bl.content && String(bl.content).trim()));
+      if (bl.isReading && hasTextContent) {
+        return 'markdown';
+      }
+      const hasPdf = Boolean(bl.pdfUrl || (Array.isArray(rawPdfs) && rawPdfs.length > 0));
+      if (bl.isReading && !hasTextContent && hasPdf) {
+        return 'pdf';
+      }
+      if (bl.videoUrl && String(bl.videoUrl).trim() !== '' && !bl.isReading) {
+        return 'video';
+      }
+      if (bl.isReading) {
+        return hasTextContent ? 'markdown' : (hasPdf ? 'pdf' : 'markdown');
+      }
+      if (hasPdf && !bl.videoUrl && !hasTextContent) {
+        return 'pdf';
+      }
+      return 'video';
+    })(),
     createdAt: bl.createdAt ?? new Date().toISOString(),
     publishedAt: bl.publishedAt ?? undefined,
     publishedBy: typeof bl.publishedBy === 'object' ? bl.publishedBy?.name : bl.publishedBy ?? undefined,
@@ -113,11 +141,11 @@ function buildLessonFormData(payload: {
   pdfFiles?: Array<{ title: string; url: string; order: number }>;
 }): FormData {
   const fd = new FormData();
-  if (payload.title !== undefined) fd.append('title', payload.title);
-  if (payload.description !== undefined) fd.append('description', payload.description);
-  if (payload.content !== undefined) fd.append('content', payload.content);
-  if (payload.videoUrl !== undefined) fd.append('videoUrl', payload.videoUrl);
-  if (payload.pdfUrl !== undefined) fd.append('pdfUrl', payload.pdfUrl);
+  if (payload.title !== undefined && payload.title !== null) fd.append('title', payload.title);
+  if (payload.description !== undefined && payload.description !== null) fd.append('description', payload.description);
+  if (payload.content !== undefined && payload.content !== null) fd.append('content', payload.content);
+  if (payload.videoUrl) fd.append('videoUrl', payload.videoUrl);
+  if (payload.pdfUrl) fd.append('pdfUrl', payload.pdfUrl);
   if (payload.order !== undefined) fd.append('order', String(payload.order));
   if (payload.moduleId !== undefined) fd.append('moduleId', String(payload.moduleId));
   if (payload.courseId !== undefined) fd.append('courseId', String(payload.courseId));
@@ -367,7 +395,11 @@ export const lessonService = {
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
     // Send isReading explicitly via JSON to bypass FormData boolean/string strict validation in backend
-    const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
+    const extraFields = Object.fromEntries(
+      ['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives','videoUrl','pdfUrl','description','content']
+        .filter(key => (payload as any)[key] !== undefined)
+        .map(key => [key, (payload as any)[key]])
+    );
     const extraPayload = {
       ...extraFields,
       ...(isPaid && !isNaN(courseIdNum) ? { courseId: courseIdNum } : {}),
@@ -418,7 +450,11 @@ export const lessonService = {
     console.info(`[Lesson ${id}] Server response`, data);
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
-    const extraFields = Object.fromEntries(['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives'].filter(key => (payload as any)[key] !== undefined).map(key => [key, (payload as any)[key]]));
+    const extraFields = Object.fromEntries(
+      ['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives','videoUrl','pdfUrl','description','content']
+        .filter(key => (payload as any)[key] !== undefined)
+        .map(key => [key, (payload as any)[key]])
+    );
     const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
     if (Object.keys(extraPayload).length) {
       console.info(`[Lesson ${id}] Updating request sent (JSON fields)`);
