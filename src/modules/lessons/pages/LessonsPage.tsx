@@ -389,15 +389,29 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       console.warn('تعذر تحميل تفاصيل إضافية للدرس قبل التعديل:', err);
     }
 
+    const rawDesc = (canonicalLesson?.description && String(canonicalLesson.description).trim())
+      ? canonicalLesson.description
+      : (fallbackDesc || '');
+    const rawContent = (canonicalLesson?.content && String(canonicalLesson.content).trim())
+      ? canonicalLesson.content
+      : (fallbackContent || '');
+
+    const resolvedType: LocalContentType = (lesson as any).type
+      ? (lesson as any).type
+      : ((lesson as any).pdfUrl || (lesson as any).pdfFiles?.length) && !(lesson as any).videoUrl && !rawContent
+      ? 'pdf'
+      : ((lesson as any).isReading || (!(lesson as any).videoUrl && rawContent))
+      ? 'markdown'
+      : (lesson as any).liveMeetingUrl
+      ? 'live'
+      : 'video';
+
     const merged = {
       ...lesson,
       ...(canonicalLesson || {}),
-      description: (canonicalLesson?.description && String(canonicalLesson.description).trim())
-        ? canonicalLesson.description
-        : fallbackDesc,
-      content: (canonicalLesson?.content && String(canonicalLesson.content).trim())
-        ? canonicalLesson.content
-        : fallbackContent,
+      description: rawDesc,
+      content: rawContent,
+      type: resolvedType,
     };
     lesson = merged;
 
@@ -415,13 +429,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         courseId: String(lessonCourseId),
         moduleId: lesson.courseId,
         title: lesson.title,
-        description: lesson.description || fallbackDesc || '',
+        description: rawDesc,
         objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
-        type: (lesson as any).type || 'video',
+        type: resolvedType,
         videoUrl: (lesson as any).videoUrl || '',
         pdfUrl: (lesson as any).pdfUrl || '',
-        content: (lesson as any).content || fallbackContent || '',
+        content: rawContent,
         scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
@@ -435,13 +449,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         courseId: String(lessonCourseId),
         moduleId: lessonIsNonModule ? String(lessonCourseId) : lesson.courseId,
         title: lesson.title,
-        description: lesson.description || fallbackDesc || '',
+        description: rawDesc,
         objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
-        type: (lesson as any).type || 'video',
+        type: resolvedType,
         videoUrl: (lesson as any).videoUrl || '',
         pdfUrl: (lesson as any).pdfUrl || '',
-        content: (lesson as any).content || fallbackContent || '',
+        content: rawContent,
         scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
@@ -1920,6 +1934,74 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   </Field>
                 )}
 
+                {/* حقل محتوى الدرس (المحتوى النصي) - متاح لنقل ونسخ المحتوى بسهولة */}
+                {form.type !== 'pdf' && (
+                  <Field
+                    label="محتوى الدرس (المحتوى النصي)"
+                    helperText="المحتوى النصي للدرس (يدعم Markdown). يمكنك مراجعته أو نسخه مباشرة إلى حقل الوصف أعلاه."
+                    action={
+                      <div className="flex items-center gap-2">
+                        {form.content?.trim() && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForm(p => ({ ...p, description: p.content }));
+                              toast.success('تم نسخ المحتوى إلى حقل الوصف بنجاح!');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all shadow-xs"
+                            title="نسخ المحتوى بالكامل إلى حقل وصف الدرس أعلاه"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>نسخ إلى حقل الوصف</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setPreviewLessonContent(p => !p)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${
+                            previewLessonContent
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm'
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {previewLessonContent ? (
+                            <>
+                              <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>تحرير</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              <span>معاينة Markdown</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    }
+                  >
+                    {previewLessonContent ? (
+                      <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[200px] max-h-[500px] overflow-y-auto custom-scrollbar select-text">
+                        {form.content?.trim() ? (
+                          <MarkdownRenderer content={form.content} />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-32 text-slate-400 gap-2">
+                            <Eye className="w-6 h-6 opacity-40" />
+                            <p className="text-xs font-semibold">لا يوجد محتوى للمعاينة بعد.</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={form.content}
+                        onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
+                        placeholder="اكتب المحتوى النصي هنا..."
+                        rows={8}
+                        className={`${inputCls(false)} resize-y text-sm leading-relaxed min-h-[200px]`}
+                      />
+                    )}
+                  </Field>
+                )}
+
                 {(form.type === 'video' || form.type === 'live') && (
                   <Field label={form.type === 'live' ? 'رابط جلسة الفيديو (اختياري)' : 'رابط يوتيوب (YouTube URL)'} required={form.type === 'video'} error={errors.videoUrl}>
                     <input
@@ -1946,66 +2028,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   </Field>
                 )}
 
-                {form.type === 'markdown' && (
-                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <Field
-                      label="محتوى درس القراءة (Markdown مدعوم)"
-                      required
-                      error={errors.content}
-                      helperText="يمكنك استخدام Markdown للتنسيق، وإدراج روابط، نصوص عريضة، كود برمجي، وصور."
-                      action={
-                        <button
-                          type="button"
-                          onClick={() => setPreviewLessonContent(p => !p)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${
-                            previewLessonContent
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm'
-                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          {previewLessonContent ? (
-                            <>
-                              <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>تحرير</span>
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="w-3.5 h-3.5 text-slate-500" />
-                              <span>معاينة Markdown</span>
-                            </>
-                          )}
-                        </button>
-                      }
-                    >
-                      {previewLessonContent ? (
-                        <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[320px] max-h-[600px] overflow-y-auto custom-scrollbar select-text">
-                          {form.content?.trim() ? (
-                            <MarkdownRenderer content={form.content} />
-                          ) : (
-                            <div className="flex flex-col items-center justify-center h-48 text-slate-400 gap-2">
-                              <Eye className="w-6 h-6 opacity-40" />
-                              <p className="text-xs font-semibold">لا يوجد محتوى للمعاينة بعد، اكتب المحتوى في وضع التحرير أولاً.</p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <textarea
-                          value={form.content}
-                          onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.content; return x; }); }}
-                          placeholder="اكتب محتوى درس القراءة هنا..."
-                          rows={14}
-                          className={`${inputCls(!!errors.content)} resize-y text-sm leading-relaxed min-h-[320px]`}
-                        />
-                      )}
-                    </Field>
-                  </div>
-                )}
 
-                {(form.type === 'live' || form.type === 'markdown') && form.type === 'live' && (
-                  <Field label="موضوعات الجلسة ومحتواها (اختياري)">
-                    <textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} rows={10} placeholder="أضف موضوعات الجلسة أو المحتوى المساند" className={`${inputCls(false)} resize-y min-h-[220px]`} />
-                  </Field>
-                )}
 
                 <div className="space-y-3 rounded-xl border border-slate-200 p-4">
                   <h4 className="font-bold text-slate-700">ملفات PDF المرفقة</h4>
