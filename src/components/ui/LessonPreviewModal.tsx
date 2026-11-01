@@ -154,7 +154,7 @@ export function LessonPreviewModal({ lesson, onClose }: { lesson: Lesson; onClos
             )}
           </div>
           {lesson.content && <div className="mt-6 rounded-3xl border border-slate-100 bg-white p-4 sm:p-6 shadow-sm">
-            <div className="mb-4 flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><FileText className="h-5 w-5" /></div><h4 className="text-sm font-bold text-slate-800">محتوى نصي</h4></div>
+            <div className="mb-4 flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><FileText className="h-5 w-5" /></div><h4 className="text-sm font-bold text-slate-800">محتوى درس القراءة</h4></div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm font-medium leading-relaxed text-slate-700">{lesson.content}</div>
           </div>}
           <div className="mt-6 bg-white rounded-3xl p-4 sm:p-6 border border-slate-100 shadow-sm">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, ChevronUp, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, ChevronUp, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2, Info, BookOpen
 } from 'lucide-react';
 import type { Lesson } from '../../../types';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
@@ -112,11 +112,35 @@ function PortalSelect({ value, onChange, options, placeholder, className, disabl
 }
 
 type LocalContentType = 'video' | 'markdown' | 'pdf' | 'live';
-const TYPE_CONFIG: Record<LocalContentType, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  video: { label: 'مقطع فيديو', icon: PlayCircle, color: '#3B82F6', bg: '#EFF6FF' },
-  markdown: { label: 'محتوى نصي (Markdown)', icon: FileText, color: '#6366F1', bg: '#EEF2FF' },
-  pdf: { label: 'مستند PDF', icon: FileType2, color: '#EF4444', bg: '#FEF2F2' },
-  live: { label: 'درس مباشر', icon: Clock, color: '#F59E0B', bg: '#FFFBEB' },
+const TYPE_CONFIG: Record<LocalContentType, { label: string; icon: React.ElementType; color: string; bg: string; info: string }> = {
+  video: {
+    label: 'مقطع فيديو',
+    icon: PlayCircle,
+    color: '#3B82F6',
+    bg: '#EFF6FF',
+    info: 'يتم عرضه في تفاصيل الدرس في التطبيق: يوجد تبويب خاص بالفيديو وتحته الوصف أو المحتوى، مع تبويب لملفات PDF إن توفرت، وتبويب للاختبار إن توفر، وتبويب للتكليف إن توفر.',
+  },
+  markdown: {
+    label: 'درس قراءة',
+    icon: BookOpen,
+    color: '#6366F1',
+    bg: '#EEF2FF',
+    info: 'لا يوجد مقطع فيديو هنا. المحتوى النصي والوصف متاحان، مع إمكانية إرفاق ملفات PDF إن توفرت، وتبويب للاختبار إن توفر، وتبويب للتكليف إن توفر.',
+  },
+  pdf: {
+    label: 'مستند PDF',
+    icon: FileType2,
+    color: '#EF4444',
+    bg: '#FEF2F2',
+    info: 'لا يوجد هنا مقطع فيديو ولا محتوى نصي ولا وصف، فقط ملفات ومستندات PDF الخاصة بالدرس مع إمكانية إرفاق تكليف أو اختبار إن توفرا.',
+  },
+  live: {
+    label: 'درس مباشر',
+    icon: Clock,
+    color: '#F59E0B',
+    bg: '#FFFBEB',
+    info: 'سيكون هناك تبويب إضافي خاص بالدرس المباشر في تفاصيل الدرس في التطبيق للدخول والضغط على رابط البث، مع إمكانية توفر تسجيل فيديو للمحاضرة ومحتوى وملفات واختبار.',
+  },
 };
 
 interface FormState {
@@ -211,6 +235,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [videoFileInfo, setVideoFileInfo] = useState<{name: string; size: number} | null>(null);
   const [previewLessonDesc, setPreviewLessonDesc] = useState(false);
   const [previewLessonContent, setPreviewLessonContent] = useState(false);
+  const [activeHelpType, setActiveHelpType] = useState<LocalContentType | null>(null);
   const [updatingField, setUpdatingField] = useState<{ id: string; field: 'isPublished' | 'isMandatory' | 'isFreePreview' | 'liveStatus' } | null>(null);
 
   const handleSetLiveStatus = async (lesson: Lesson, status: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED') => {
@@ -321,6 +346,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     setVideoFileInfo(null);
     setPreviewLessonDesc(false);
     setPreviewLessonContent(false);
+    setActiveHelpType(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
     setFormStep(1);
   }, []);
@@ -542,7 +568,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         isPaidCourse: isNonModuleCourse,
         courseName: course?.title || '',
         title: form.title.trim(),
-        description: form.description.trim() || undefined,
+        description: form.type === 'pdf' ? undefined : (form.description.trim() || undefined),
         objectives: form.objectives.map(objective => objective.trim()).filter(Boolean),
         order: Number(form.order),
         type: form.type, // إرسال النوع الحقيقي للباكاند بدون تحايل
@@ -1083,7 +1109,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                       {/* Type */}
                       <div className="flex items-center gap-1.5 bg-amber-50/80 text-amber-700 px-2.5 py-1.5 rounded-lg border border-amber-100/50">
                         {lesson.type === 'video' || lesson.videoUrl ? <PlayCircle className="w-3.5 h-3.5" /> : lesson.type === 'pdf' || lesson.pdfUrl ? <FileText className="w-3.5 h-3.5" /> : <FileType2 className="w-3.5 h-3.5" />}
-                        <span>{lesson.type === 'video' || lesson.videoUrl ? 'فيديو' : lesson.type === 'pdf' || lesson.pdfUrl ? 'ملف PDF' : lesson.content ? 'مقال' : 'درس'}</span>
+                        <span>{lesson.type === 'video' || lesson.videoUrl ? 'فيديو' : lesson.type === 'pdf' || lesson.pdfUrl ? 'ملف PDF' : lesson.content ? 'درس قراءة' : 'درس'}</span>
                       </div>
 
                       {/* Live Status Badge */}
@@ -1663,56 +1689,6 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   <input value={form.title} onChange={e => { setForm(p => ({ ...p, title: e.target.value })); setErrors(p => { const x = { ...p }; delete x.title; return x; }); }} placeholder="مثال: حل المعادلات من الدرجة الأولى" className={inputCls(!!errors.title, 'font-semibold')} />
                 </Field>
 
-                <Field
-                  label="وصف الدرس"
-                  error={errors.description}
-                  helperText="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس (يدعم Markdown)."
-                  action={
-                    <button
-                      type="button"
-                      onClick={() => setPreviewLessonDesc(p => !p)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${
-                        previewLessonDesc
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      {previewLessonDesc ? (
-                        <>
-                          <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>تحرير</span>
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="w-3.5 h-3.5 text-slate-500" />
-                          <span>معاينة Markdown</span>
-                        </>
-                      )}
-                    </button>
-                  }
-                >
-                  {previewLessonDesc ? (
-                    <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[220px] max-h-[500px] overflow-y-auto custom-scrollbar select-text">
-                      {form.description?.trim() ? (
-                        <MarkdownRenderer content={form.description} />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-2">
-                          <Eye className="w-6 h-6 opacity-40" />
-                          <p className="text-xs font-semibold">لا يوجد نص للمعاينة بعد، اكتب الوصف في وضع التحرير أولاً.</p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <textarea
-                      value={form.description}
-                      onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
-                      placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
-                      rows={10}
-                      className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed min-h-[220px]`}
-                    />
-                  )}
-                </Field>
-
                 <Field label="أهداف الدرس" helperText="اختياري — يمكنك إضافة أهداف لمساعدة الطالب على معرفة ما سيحققه من هذا الدرس.">
                   <div className="space-y-2">
                     {form.objectives.map((objective, index) => (
@@ -1802,27 +1778,147 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   المحتوى المعرفي
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-1">نوع المادة العلمية <span className="text-red-500">*</span></label>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-bold text-slate-700 flex items-center gap-1">
+                      نوع المادة العلمية <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      انقر على أيقونة <Info className="w-3 h-3 inline text-slate-500 mx-0.5" /> لمعرفة تفاصيل كل نوع
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     {(Object.entries(TYPE_CONFIG) as [LocalContentType, typeof TYPE_CONFIG[LocalContentType]][]).map(([type, cfg]) => {
                       const isActive = form.type === type;
+                      const isHelpActive = activeHelpType === type;
                       return (
                         <button
                           key={type}
                           type="button"
-                          onClick={() => setForm(p => ({ ...p, type }))}
-                          className={`flex flex-col items-center gap-2 p-3 rounded-xl sm:rounded-2xl border-2 transition-all ${isActive ? 'shadow-sm' : 'hover:bg-slate-50'}`}
-                          style={isActive ? { background: cfg.bg, borderColor: cfg.color } : { background: '#FAFAFA', borderColor: '#E2E8F0' }}
+                          onClick={() => {
+                            setForm(p => ({ ...p, type }));
+                            setActiveHelpType(type);
+                          }}
+                          className={`relative flex flex-col items-center gap-2 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border-2 transition-all text-center ${
+                            isActive ? 'shadow-sm ring-2 ring-offset-1' : 'hover:bg-slate-50'
+                          }`}
+                          style={
+                            isActive
+                              ? ({ background: cfg.bg, borderColor: cfg.color, '--tw-ring-color': `${cfg.color}40` } as any)
+                              : { background: '#FAFAFA', borderColor: '#E2E8F0' }
+                          }
                         >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive ? 'bg-white shadow-sm' : ''}`}>
+                          {/* Info Button in Top Corner */}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            title={`توضيح عن ${cfg.label}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveHelpType(prev => prev === type ? null : type);
+                            }}
+                            className={`absolute top-2 left-2 p-1 rounded-full transition-all cursor-pointer ${
+                              isHelpActive
+                                ? 'bg-slate-800 text-white shadow-xs scale-110'
+                                : 'bg-white/90 text-slate-400 hover:text-slate-700 hover:bg-white border border-slate-200/80 shadow-2xs'
+                            }`}
+                          >
+                            <Info className="w-3.5 h-3.5" />
+                          </span>
+
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform ${isActive ? 'bg-white shadow-sm scale-105' : 'bg-white/60'}`}>
                             <cfg.icon className="w-5 h-5" style={{ color: isActive ? cfg.color : '#94A3B8' }} />
                           </div>
-                          <span style={{ fontSize: 12, fontWeight: isActive ? 700 : 600, color: isActive ? cfg.color : '#64748B' }}>{cfg.label}</span>
+                          <div className="flex items-center gap-1">
+                            <span style={{ fontSize: 13, fontWeight: isActive ? 700 : 600, color: isActive ? cfg.color : '#64748B' }}>
+                              {cfg.label}
+                            </span>
+                          </div>
                         </button>
                       );
                     })}
                   </div>
+
+                  {/* Explanatory Info Card */}
+                  {(() => {
+                    const currentType = activeHelpType || form.type;
+                    const cfg = TYPE_CONFIG[currentType];
+                    return (
+                      <div
+                        className="mt-3.5 p-3.5 rounded-xl border flex items-start gap-3 text-xs leading-relaxed transition-all duration-200"
+                        style={{
+                          backgroundColor: cfg.bg,
+                          borderColor: `${cfg.color}35`,
+                        }}
+                      >
+                        <div
+                          className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                          style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
+                        >
+                          <Info className="w-4 h-4" />
+                        </div>
+                        <div className="text-slate-800 flex-1">
+                          <span className="font-bold ml-1.5 inline-block" style={{ color: cfg.color }}>
+                            {cfg.label}:
+                          </span>
+                          <span className="font-medium text-slate-700">{cfg.info}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
+
+                {/* Lesson Description (Hidden when type is PDF) */}
+                {form.type !== 'pdf' && (
+                  <Field
+                    label="وصف الدرس"
+                    error={errors.description}
+                    helperText="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس (يدعم Markdown)."
+                    action={
+                      <button
+                        type="button"
+                        onClick={() => setPreviewLessonDesc(p => !p)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${
+                          previewLessonDesc
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {previewLessonDesc ? (
+                          <>
+                            <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>تحرير</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>معاينة Markdown</span>
+                          </>
+                        )}
+                      </button>
+                    }
+                  >
+                    {previewLessonDesc ? (
+                      <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[160px] max-h-[400px] overflow-y-auto custom-scrollbar select-text">
+                        {form.description?.trim() ? (
+                          <MarkdownRenderer content={form.description} />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-32 text-slate-400 gap-2">
+                            <Eye className="w-6 h-6 opacity-40" />
+                            <p className="text-xs font-semibold">لا يوجد نص للمعاينة بعد، اكتب الوصف في وضع التحرير أولاً.</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={form.description}
+                        onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
+                        placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
+                        rows={6}
+                        className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed min-h-[160px]`}
+                      />
+                    )}
+                  </Field>
+                )}
 
                 {(form.type === 'video' || form.type === 'live') && (
                   <Field label={form.type === 'live' ? 'رابط جلسة الفيديو (اختياري)' : 'رابط يوتيوب (YouTube URL)'} required={form.type === 'video'} error={errors.videoUrl}>
@@ -1853,7 +1949,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                 {form.type === 'markdown' && (
                   <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <Field
-                      label="محتوى نصي (Markdown مدعوم)"
+                      label="محتوى درس القراءة (Markdown مدعوم)"
                       required
                       error={errors.content}
                       helperText="يمكنك استخدام Markdown للتنسيق، وإدراج روابط، نصوص عريضة، كود برمجي، وصور."
@@ -1896,7 +1992,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                         <textarea
                           value={form.content}
                           onChange={e => { setForm(p => ({ ...p, content: e.target.value })); setErrors(p => { const x = { ...p }; delete x.content; return x; }); }}
-                          placeholder="اكتب المحتوى النصي هنا..."
+                          placeholder="اكتب محتوى درس القراءة هنا..."
                           rows={14}
                           className={`${inputCls(!!errors.content)} resize-y text-sm leading-relaxed min-h-[320px]`}
                         />
