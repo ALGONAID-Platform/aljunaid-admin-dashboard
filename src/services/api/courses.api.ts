@@ -40,6 +40,7 @@ function adaptCourse(bc: BackendCourse): Course {
     title: bc.title,
     description: bc.description ?? '',
     thumbnail: rawThumbnail,
+    lessonOrderMode: (bc as any).lessonOrderMode || 'BY_DATE',
     lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? 0,
     enrolledStudentsCount: course.enrollmentsCount ?? bc._count?.enrollments,
     modulesCount: course.modulesCount ?? bc._count?.modules ?? 0,
@@ -149,6 +150,7 @@ export const courseService = {
       objectives: rawBody.objectives,
       certificateMinScore: rawBody.certificateMinScore,
       certificateMinAttendance: rawBody.certificateMinAttendance,
+      lessonOrderMode: rawBody.lessonOrderMode,
     };
 
     // Remove undefined or null keys
@@ -197,6 +199,7 @@ export const courseService = {
       objectives: rawBody.objectives,
       certificateMinScore: rawBody.certificateMinScore,
       certificateMinAttendance: rawBody.certificateMinAttendance,
+      lessonOrderMode: rawBody.lessonOrderMode,
     };
 
     for (const key of Object.keys(body)) {

@@ -24,6 +24,7 @@ interface LessonsState {
   updateLesson: (payload: UpdateLessonPayload & { pdf?: File }, onUploadProgress?: (progressEvent: any) => void) => Promise<void>;
   deleteLesson: (id: string) => Promise<void>;
   togglePublish: (id: string) => Promise<void>;
+  reorderLessons: (courseId: string, orderedLessonIds: string[]) => Promise<void>;
   clearError: () => void;
   /** Clear lessons array immediately (e.g. when switching course scope) */
   clearLessons: () => void;
@@ -148,6 +149,31 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
     }
   },
 
+  reorderLessons: async (courseId, orderedLessonIds) => {
+    const prevLessons = get().lessons;
+    const orderMap = new Map<string, number>();
+    orderedLessonIds.forEach((id, index) => {
+      orderMap.set(String(id), index + 1);
+    });
+
+    const updatedLessons = prevLessons.map((lesson) => {
+      const newOrder = orderMap.get(String(lesson.id));
+      if (newOrder !== undefined) {
+        return { ...lesson, order: newOrder };
+      }
+      return lesson;
+    });
+
+    set({ lessons: updatedLessons });
+
+    try {
+      await lessonService.reorder(courseId, orderedLessonIds);
+      lessonsMutationVersion += 1;
+    } catch (err) {
+      set({ lessons: prevLessons, error: resolveErrorMessage(err) });
+      throw err;
+    }
+  },
 
   clearError: () => set({ error: null }),
 

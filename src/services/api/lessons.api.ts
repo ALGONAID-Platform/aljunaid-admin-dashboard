@@ -226,6 +226,17 @@ export const lessonService = {
   async updateLiveStatus(id: string, liveStatus: 'SCHEDULED' | 'LIVE_NOW' | 'COMPLETED', recordingVideoUrl?: string): Promise<void> {
     await api.patch(`/lessons/${id}/live-status`, { liveStatus, ...(recordingVideoUrl ? { recordingVideoUrl } : {}) });
   },
+  /** Reorder lessons in a course */
+  async reorder(courseId: string, lessonIds: (string | number)[]): Promise<any> {
+    const numericIds = lessonIds.map(Number);
+    try {
+      const { data } = await api.patch(`/lessons/course/${courseId}/reorder`, { lessonIds: numericIds });
+      return data;
+    } catch {
+      const { data } = await api.patch('/lessons/reorder', { lessonIds: numericIds });
+      return data;
+    }
+  },
   /**
    * Fetch all lessons across all modules.
    * Strategy: GET /modules → for each module GET /lessons/module/{id}

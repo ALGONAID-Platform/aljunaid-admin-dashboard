@@ -33,12 +33,13 @@ interface FormState {
   thumbnailFile: File | null;
   isPaid: boolean;
   courseType: 'RECORDED' | 'LIVE';
+  lessonOrderMode: 'BY_DATE' | 'BY_ORDER';
   priceYerOld: string; discountedPriceYerOld: string; priceYerNew: string; discountedPriceYerNew: string;
   priceSar: string; discountedPriceSar: string; price: string; discountedPrice: string;
   maxStudents: string; startDate: string; endDate: string; durationWeeks: string;
   scheduleDaysText: string; objectives: string[]; certificateMinScore: string; certificateMinAttendance: string;
 }
-const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thumbnailFile: null, isPaid: false, courseType: 'RECORDED', priceYerOld: '', discountedPriceYerOld: '', priceYerNew: '', discountedPriceYerNew: '', priceSar: '', discountedPriceSar: '', price: '', discountedPrice: '', maxStudents: '', startDate: '', endDate: '', durationWeeks: '', scheduleDaysText: '', objectives: [], certificateMinScore: '70', certificateMinAttendance: '80' };
+const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thumbnailFile: null, isPaid: false, courseType: 'RECORDED', lessonOrderMode: 'BY_DATE', priceYerOld: '', discountedPriceYerOld: '', priceYerNew: '', discountedPriceYerNew: '', priceSar: '', discountedPriceSar: '', price: '', discountedPrice: '', maxStudents: '', startDate: '', endDate: '', durationWeeks: '', scheduleDaysText: '', objectives: [], certificateMinScore: '70', certificateMinAttendance: '80' };
 
 const normalizeSearchText = (value: unknown) => String(value ?? '')
   .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
@@ -240,6 +241,7 @@ export function CoursesPage() {
       thumbnailFile: null,
       isPaid: Boolean(editableCourse.isPaid),
       courseType: (editableCourse.courseType as FormState['courseType']) ?? 'RECORDED',
+      lessonOrderMode: ((editableCourse as any).lessonOrderMode as FormState['lessonOrderMode']) || 'BY_DATE',
       ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, (editableCourse as any)[k] == null ? '' : String((editableCourse as any)[k])])) as Partial<FormState>,
       startDate: editableCourse.startDate?.slice(0, 10) ?? '', endDate: editableCourse.endDate?.slice(0, 10) ?? '',
       scheduleDaysText: String((editableCourse as any).scheduleDaysText ?? ''), objectives: Array.isArray((editableCourse as any).objectives) ? [...(editableCourse as any).objectives] : []
@@ -290,6 +292,7 @@ export function CoursesPage() {
         thumbnail: finalThumbnailUrl,
         isPaid: form.isPaid,
         courseType: form.courseType,
+        lessonOrderMode: form.lessonOrderMode,
         ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, form[k as keyof FormState] ? Number(form[k as keyof FormState]) : undefined])),
         startDate: form.startDate || undefined,
         endDate: form.endDate || undefined,
@@ -821,9 +824,10 @@ export function CoursesPage() {
                       />
                     )}
                   </Field>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={form.isPaid} onChange={e=>setForm(p=>({...p,isPaid:e.target.checked}))}/>مقرر مدفوع</label>
                     <label className="text-sm font-bold">نوع المقرر<select className={inputCls(false)} value={form.courseType} onChange={e=>setForm(p=>({...p,courseType:e.target.value as FormState['courseType']}))}><option value="RECORDED">مسجل</option><option value="LIVE">معسكر مباشر</option></select></label>
+                    <label className="text-sm font-bold">طريقة ترتيب الدروس<select className={inputCls(false)} value={form.lessonOrderMode} onChange={e=>setForm(p=>({...p,lessonOrderMode:e.target.value as FormState['lessonOrderMode']}))}><option value="BY_DATE">حسب تاريخ الإنشاء (الافتراضي)</option><option value="BY_ORDER">ترتيب مخصص يدوي (بالأوردر)</option></select></label>
                   </div>
                   {form.isPaid && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['price','Base price (USD) *'],['discountedPrice','Discounted price (USD)'],['priceSar','Price (SAR)'],['discountedPriceSar','Discounted price (SAR)'],['priceYerOld','Price (YER old)'],['discountedPriceYerOld','Discounted price (YER old)'],['priceYerNew','Price (YER new)'],['discountedPriceYerNew','Discounted price (YER new)']].map(([key,label])=><label key={key} className="text-xs font-bold text-slate-600">{label}{key === 'price' && <span className="mt-1 block font-normal leading-relaxed text-slate-500">This field is required for paid courses. It represents the base price in US dollars ($ USD) and is the primary reference for international students and payments through Karty and bank cards.</span>}<input type="number" min="0" required={key === 'price'} value={form[key as keyof FormState] as string} onChange={e=>{setForm(p=>({...p,[key]:e.target.value})); setErrors(p=>({...p,price:undefined}));}} className={`${inputCls(key === 'price' && !!errors.price)} mt-1`} />{key === 'price' && errors.price && <span className="text-red-600">{errors.price}</span>}</label>)}</div>}
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, ChevronUp, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2
 } from 'lucide-react';
 import type { Lesson } from '../../../types';
 import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
@@ -147,8 +147,8 @@ type SaveStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId?: string; scopedLessonId?: string } = {}) {
   const navigate = useNavigate();
-  const { courses, fetchCourses } = useCoursesStore();
-  const { lessons, addLesson, updateLesson, deleteLesson, fetchLessons, fetchLessonsPage, serverPage, serverTotalPages, serverTotal, serverLimit, error, isLoading, clearLessons } = useLessonsStore();
+  const { courses, fetchCourses, updateCourse } = useCoursesStore();
+  const { lessons, addLesson, updateLesson, deleteLesson, reorderLessons, fetchLessons, fetchLessonsPage, serverPage, serverTotalPages, serverTotal, serverLimit, error, isLoading, clearLessons } = useLessonsStore();
   const { modules: allModules, fetchModules, fetchModulesByCourse } = useModulesStore();
 
   const [showModal, setShowModal] = useState(false);
@@ -340,10 +340,12 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     const defaultModuleId = isNonModuleCourse
       ? effectiveCourseId
       : (filteredModules[0]?.id ? String(filteredModules[0].id) : '');
+    const currentMaxOrder = courseLessons.length > 0 ? Math.max(...courseLessons.map(l => l.order || 0)) : 0;
     setForm({
       ...emptyLessonForm,
       courseId: effectiveCourseId,
       moduleId: defaultModuleId,
+      order: String(currentMaxOrder + 1),
     });
     sessionStorage.removeItem('create_lesson_form_state');
     setShowModal(true);
@@ -682,29 +684,90 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     healthScore: courseLessons.length ? Math.round((courseLessons.filter(l => l.hasContent && l.isPublished).length / courseLessons.length) * 100) : 0
   };
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('text/plain', id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    e.currentTarget.classList.remove('bg-emerald-50/50', 'border-emerald-200');
-    const sourceId = e.dataTransfer.getData('text/plain');
-    if (sourceId === targetId) return;
+  const effectiveCourseId = scopedCourseId || (courseFilter !== 'all' ? courseFilter : (form.courseId || ''));
+  const currentCourse = courses.find(c => String(c.id) === String(effectiveCourseId)) || selectedCourse;
+  const isOrderByOrder = currentCourse?.lessonOrderMode === 'BY_ORDER';
 
-    const src = lessons.find(l => l.id === sourceId);
-    const tgt = lessons.find(l => l.id === targetId);
-    if (src && tgt) {
-      const srcOrder = src.order;
-      updateLesson({ id: src.id, order: tgt.order });
-      updateLesson({ id: tgt.id, order: srcOrder });
+  const [isUpdatingOrderMode, setIsUpdatingOrderMode] = useState(false);
+  const handleChangeOrderMode = async (mode: 'BY_DATE' | 'BY_ORDER') => {
+    if (!currentCourse || currentCourse.lessonOrderMode === mode) return;
+    setIsUpdatingOrderMode(true);
+    try {
+      await updateCourse({ id: currentCourse.id, lessonOrderMode: mode });
+      toast.success(
+        mode === 'BY_ORDER'
+          ? 'تم تفعيل الترتيب المخصص: سيتم عرض الدروس في التطبيق حسب الترتيب المحدد'
+          : 'تم ضبط الترتيب: سيتم عرض الدروس في التطبيق حسب تاريخ الإنشاء',
+      );
+    } catch {
+      toast.error('حدث خطأ أثناء حفظ نظام الترتيب');
+    } finally {
+      setIsUpdatingOrderMode(false);
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('text/plain', String(id));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('bg-emerald-50/50', 'border-emerald-200');
+    const sourceId = e.dataTransfer.getData('text/plain');
+    if (!sourceId || String(sourceId) === String(targetId)) return;
+
+    const list = [...filteredLessons].sort((a, b) => a.order - b.order);
+    const sourceIndex = list.findIndex(l => String(l.id) === String(sourceId));
+    const targetIndex = list.findIndex(l => String(l.id) === String(targetId));
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const [moved] = list.splice(sourceIndex, 1);
+    list.splice(targetIndex, 0, moved);
+    const newOrderedIds = list.map(l => String(l.id));
+
+    try {
+      const courseIdForReorder = effectiveCourseId || (list[0] ? String(list[0].courseId) : '');
+      await reorderLessons(courseIdForReorder, newOrderedIds);
+      toast.success('تم تحديث ترتيب الدروس تلقائياً');
+    } catch {
+      toast.error('حدث خطأ أثناء حفظ الترتيب');
+    }
+  };
+
+  const handleMoveLesson = async (lessonId: string, direction: 'up' | 'down') => {
+    const list = [...filteredLessons].sort((a, b) => a.order - b.order);
+    const index = list.findIndex(l => String(l.id) === String(lessonId));
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= list.length) return;
+
+    const [moved] = list.splice(index, 1);
+    list.splice(targetIndex, 0, moved);
+    const newOrderedIds = list.map(l => String(l.id));
+
+    try {
+      const courseIdForReorder = effectiveCourseId || (list[0] ? String(list[0].courseId) : '');
+      await reorderLessons(courseIdForReorder, newOrderedIds);
+      toast.success('تم تحديث الترتيب');
+    } catch {
+      toast.error('تعذر تحديث الترتيب');
+    }
+  };
+
+  const lessonSortComparator = (a: Lesson, b: Lesson) => {
+    if (isOrderByOrder) {
+      if (a.order !== b.order) return a.order - b.order;
+    }
+    const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (diff !== 0) return diff;
+    return Number(a.id) - Number(b.id);
+  };
+
   const paginatedLessons = useServerPagination
-    ? [...filteredLessons].sort((a, b) => a.order - b.order)
+    ? [...filteredLessons].sort(lessonSortComparator)
     : [...filteredLessons]
-        .sort((a, b) => a.order - b.order)
+        .sort(lessonSortComparator)
         .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const hasFetchedOnceRef = useRef(false);
@@ -744,6 +807,58 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
           </button>
         </div>
       </div>
+
+      {/* Course Ordering Mode Bar */}
+      {currentCourse && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/70 via-white to-slate-50/60 p-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
+              <Sliders className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">نظام ترتيب وعرض الدروس في مقرر:</span>
+                <span className="text-xs font-black text-slate-800">{currentCourse.title}</span>
+              </div>
+              <div className="text-sm font-extrabold text-emerald-900 mt-0.5">
+                {currentCourse.lessonOrderMode === 'BY_ORDER'
+                  ? 'ترتيب مخصص يدوي (يتم العرض للطلاب في التطبيق حسب الأوردر وتسلسل السحب)'
+                  : 'حسب تاريخ الإنشاء الافتراضي (يتم العرض للطلاب في التطبيق من الأقدم للأحدث)'}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
+            <button
+              type="button"
+              disabled={isUpdatingOrderMode}
+              onClick={() => void handleChangeOrderMode('BY_DATE')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                currentCourse.lessonOrderMode !== 'BY_ORDER'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              حسب تاريخ الإنشاء (الافتراضي)
+            </button>
+
+            <button
+              type="button"
+              disabled={isUpdatingOrderMode}
+              onClick={() => void handleChangeOrderMode('BY_ORDER')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                currentCourse.lessonOrderMode === 'BY_ORDER'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              ترتيب مخصص يدوي (بالأوردر)
+            </button>
+          </div>
+        </div>
+      )}
 
       <PageGuide
         title="دليل إدارة الدروس"
@@ -928,8 +1043,26 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex flex-col">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void handleMoveLesson(lesson.id, 'up'); }}
+                            className="p-0.5 text-slate-400 hover:text-emerald-600 rounded"
+                            title="تقديم للأعلى"
+                          >
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); void handleMoveLesson(lesson.id, 'down'); }}
+                            className="p-0.5 text-slate-400 hover:text-emerald-600 rounded"
+                            title="تأخير للأسفل"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs" title={`الترتيب: ${lesson.order}`}>
                           {lesson.order}
                         </div>
                         <StatusBadge status={lesson.isPublished ? 'published' : 'draft'} />
@@ -1200,8 +1333,26 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     className={`hover:bg-slate-50/80 transition-colors group ${selectedLessons.includes(lesson.id) ? 'bg-emerald-50/30' : ''}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap w-12">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <GripVertical className="w-4 h-4 text-slate-300 cursor-grab hover:text-slate-500 active:cursor-grabbing" title="اسحب لإعادة الترتيب" />
+                        <div className="flex flex-col">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void handleMoveLesson(lesson.id, 'up'); }}
+                            className="p-0.5 text-slate-400 hover:text-emerald-600 rounded transition-colors"
+                            title="تقديم الدرس للأعلى"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); void handleMoveLesson(lesson.id, 'down'); }}
+                            className="p-0.5 text-slate-400 hover:text-emerald-600 rounded transition-colors"
+                            title="تأخير الدرس للأسفل"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                         <button onClick={() => setSelectedLessons(p => p.includes(lesson.id) ? p.filter(id => id !== lesson.id) : [...p, lesson.id])} className="text-slate-400 hover:text-emerald-500 transition-colors">
                           {selectedLessons.includes(lesson.id) ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5" />}
                         </button>

@@ -1,5 +1,7 @@
 import type { ID } from './common.types';
 
+export type LessonOrderMode = 'BY_DATE' | 'BY_ORDER';
+
 export interface Course {
   id: ID;
   title: string;
@@ -9,6 +11,7 @@ export interface Course {
   enrolledStudentsCount?: number;
   isPaid?: boolean;
   courseType?: 'RECORDED' | 'LIVE';
+  lessonOrderMode?: LessonOrderMode;
   maxStudents?: number | null;
   startDate?: string;
   endDate?: string;
@@ -23,15 +26,18 @@ export interface CreateCoursePayload {
   title: string;
   description: string;
   thumbnail?: string;
+  lessonOrderMode?: LessonOrderMode;
   [key: string]: unknown;
 }
 
 export interface UpdateCoursePayload extends Partial<CreateCoursePayload> {
   id: ID;
+  lessonOrderMode?: LessonOrderMode;
 }
 
 export interface CourseFormValues {
   title: string;
   description: string;
   thumbnail?: string;
+  lessonOrderMode?: LessonOrderMode;
 }
