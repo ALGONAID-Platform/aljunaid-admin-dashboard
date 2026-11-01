@@ -234,7 +234,6 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [videoUploadError, setVideoUploadError] = useState('');
   const [videoFileInfo, setVideoFileInfo] = useState<{name: string; size: number} | null>(null);
   const [previewLessonDesc, setPreviewLessonDesc] = useState(false);
-  const [previewLessonContent, setPreviewLessonContent] = useState(false);
   const [activeHelpType, setActiveHelpType] = useState<LocalContentType | null>(null);
   const [updatingField, setUpdatingField] = useState<{ id: string; field: 'isPublished' | 'isMandatory' | 'isFreePreview' | 'liveStatus' } | null>(null);
 
@@ -345,7 +344,6 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     setVideoUploadError('');
     setVideoFileInfo(null);
     setPreviewLessonDesc(false);
-    setPreviewLessonContent(false);
     setActiveHelpType(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
     setFormStep(1);
@@ -406,11 +404,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       ? 'live'
       : 'video';
 
+    const resolvedDescription = rawDesc || rawContent || '';
+
     const merged = {
       ...lesson,
       ...(canonicalLesson || {}),
-      description: rawDesc,
-      content: rawContent,
+      description: resolvedDescription,
+      content: resolvedDescription,
       type: resolvedType,
     };
     lesson = merged;
@@ -429,13 +429,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         courseId: String(lessonCourseId),
         moduleId: lesson.courseId,
         title: lesson.title,
-        description: rawDesc,
+        description: resolvedDescription,
         objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
         type: resolvedType,
         videoUrl: (lesson as any).videoUrl || '',
         pdfUrl: (lesson as any).pdfUrl || '',
-        content: rawContent,
+        content: resolvedDescription,
         scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
@@ -449,13 +449,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         courseId: String(lessonCourseId),
         moduleId: lessonIsNonModule ? String(lessonCourseId) : lesson.courseId,
         title: lesson.title,
-        description: rawDesc,
+        description: resolvedDescription,
         objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
         type: resolvedType,
         videoUrl: (lesson as any).videoUrl || '',
         pdfUrl: (lesson as any).pdfUrl || '',
-        content: rawContent,
+        content: resolvedDescription,
         scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
@@ -555,6 +555,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     if (step === 3) {
       if (form.type === 'video' && !form.videoUrl.trim()) e.videoUrl = 'رابط الفيديو مطلوب';
       if (form.type === 'pdf' && !form.pdfUrl && !lessonPdfs.length) e.pdfUrl = 'يرجى اختيار ملف PDF';
+      if (form.type === 'markdown' && !form.description.trim()) e.description = 'محتوى درس القراءة مطلوب';
     }
     setErrors(e);
     if (step === 3 && (e.moduleId || e.title || e.order)) setFormStep(1);
@@ -577,17 +578,19 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     }
     try {
 
+      const effectiveDescription = form.type === 'pdf' ? undefined : (form.description.trim() || undefined);
+
       const payload: any = {
         courseId: courseIdToUse,
         isPaidCourse: isNonModuleCourse,
         courseName: course?.title || '',
         title: form.title.trim(),
-        description: form.type === 'pdf' ? undefined : (form.description.trim() || undefined),
+        description: effectiveDescription,
         objectives: form.objectives.map(objective => objective.trim()).filter(Boolean),
         order: Number(form.order),
         type: form.type, // إرسال النوع الحقيقي للباكاند بدون تحايل
         videoUrl: (form.type === 'video' || form.type === 'live') && form.videoUrl.trim() ? form.videoUrl.trim() : undefined,
-        content: form.content.trim() || undefined,
+        content: effectiveDescription,
         pdfUrl: (form.type === 'pdf' || form.type === 'video') ? (lessonPdfs.find(pdf => pdf.url)?.url || form.pdfUrl.trim() || undefined) : undefined,
         pdfFiles: lessonPdfs.length
           ? lessonPdfs.map((pdf, index) => ({ title: pdf.title || `PDF ${index + 1}`, url: pdf.url || '', file: pdf.file, order: index }))
@@ -1881,12 +1884,25 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   })()}
                 </div>
 
-                {/* Lesson Description (Hidden when type is PDF) */}
+                {/* Lesson Description / Content (Hidden when type is PDF) */}
                 {form.type !== 'pdf' && (
                   <Field
-                    label="وصف الدرس"
+                    label={
+                      form.type === 'markdown'
+                        ? 'محتوى وشرح درس القراءة'
+                        : form.type === 'live'
+                        ? 'وصف وموضوعات الجلسة المباشرة'
+                        : 'وصف الدرس'
+                    }
+                    required={form.type === 'markdown'}
                     error={errors.description}
-                    helperText="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس (يدعم Markdown)."
+                    helperText={
+                      form.type === 'markdown'
+                        ? 'اكتب المحتوى التعليمي والشرح الكامل لدرس القراءة (يدعم Markdown والصور والمعادلات).'
+                        : form.type === 'live'
+                        ? 'اكتب نبذة أو المحاور التي ستتم مناقشتها في الجلسة المباشرة (يدعم Markdown).'
+                        : 'اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس (يدعم Markdown).'
+                    }
                     action={
                       <button
                         type="button"
@@ -1912,91 +1928,37 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                     }
                   >
                     {previewLessonDesc ? (
-                      <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[160px] max-h-[400px] overflow-y-auto custom-scrollbar select-text">
+                      <div className={`w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 overflow-y-auto custom-scrollbar select-text ${
+                        form.type === 'markdown' ? 'min-h-[280px] max-h-[550px]' : 'min-h-[160px] max-h-[400px]'
+                      }`}>
                         {form.description?.trim() ? (
                           <MarkdownRenderer content={form.description} />
                         ) : (
                           <div className="flex flex-col items-center justify-center h-32 text-slate-400 gap-2">
                             <Eye className="w-6 h-6 opacity-40" />
-                            <p className="text-xs font-semibold">لا يوجد نص للمعاينة بعد، اكتب الوصف في وضع التحرير أولاً.</p>
+                            <p className="text-xs font-semibold">لا يوجد نص للمعاينة بعد، اكتب النص في وضع التحرير أولاً.</p>
                           </div>
                         )}
                       </div>
                     ) : (
                       <textarea
                         value={form.description}
-                        onChange={e => { setForm(p => ({ ...p, description: e.target.value })); setErrors(p => { const x = { ...p }; delete x.description; return x; }); }}
-                        placeholder="اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس..."
-                        rows={6}
-                        className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed min-h-[160px]`}
-                      />
-                    )}
-                  </Field>
-                )}
-
-                {/* حقل محتوى الدرس (المحتوى النصي) - متاح لنقل ونسخ المحتوى بسهولة */}
-                {form.type !== 'pdf' && (
-                  <Field
-                    label="محتوى الدرس (المحتوى النصي)"
-                    helperText="المحتوى النصي للدرس (يدعم Markdown). يمكنك مراجعته أو نسخه مباشرة إلى حقل الوصف أعلاه."
-                    action={
-                      <div className="flex items-center gap-2">
-                        {form.content?.trim() && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setForm(p => ({ ...p, description: p.content }));
-                              toast.success('تم نسخ المحتوى إلى حقل الوصف بنجاح!');
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all shadow-xs"
-                            title="نسخ المحتوى بالكامل إلى حقل وصف الدرس أعلاه"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>نسخ إلى حقل الوصف</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setPreviewLessonContent(p => !p)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all border ${
-                            previewLessonContent
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-sm'
-                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          {previewLessonContent ? (
-                            <>
-                              <Edit3 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>تحرير</span>
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="w-3.5 h-3.5 text-slate-500" />
-                              <span>معاينة Markdown</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    }
-                  >
-                    {previewLessonContent ? (
-                      <div className="w-full px-3.5 py-3 rounded-lg sm:rounded-xl border border-slate-200 bg-white text-slate-800 min-h-[200px] max-h-[500px] overflow-y-auto custom-scrollbar select-text">
-                        {form.content?.trim() ? (
-                          <MarkdownRenderer content={form.content} />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center h-32 text-slate-400 gap-2">
-                            <Eye className="w-6 h-6 opacity-40" />
-                            <p className="text-xs font-semibold">لا يوجد محتوى للمعاينة بعد.</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <textarea
-                        value={form.content}
-                        onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
-                        placeholder="اكتب المحتوى النصي هنا..."
-                        rows={8}
-                        className={`${inputCls(false)} resize-y text-sm leading-relaxed min-h-[200px]`}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setForm(p => ({ ...p, description: val, content: val }));
+                          setErrors(p => { const x = { ...p }; delete x.description; return x; });
+                        }}
+                        placeholder={
+                          form.type === 'markdown'
+                            ? 'اكتب محتوى وشرح درس القراءة هنا بالتفصيل (يدعم Markdown والصور والمعادلات)...'
+                            : form.type === 'live'
+                            ? 'اكتب محاور وموضوعات الجلسة المباشرة...'
+                            : 'اكتب وصفاً موجزاً يوضح ما سيتعلمه الطالب في هذا الدرس...'
+                        }
+                        rows={form.type === 'markdown' ? 12 : 6}
+                        className={`${inputCls(!!errors.description)} resize-y font-medium leading-relaxed ${
+                          form.type === 'markdown' ? 'min-h-[280px]' : 'min-h-[160px]'
+                        }`}
                       />
                     )}
                   </Field>

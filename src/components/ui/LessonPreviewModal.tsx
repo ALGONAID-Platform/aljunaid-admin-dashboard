@@ -71,7 +71,8 @@ export function LessonPreviewModal({ lesson, onClose }: { lesson: Lesson; onClos
   };
 
   const orderedPdfs = pdfFiles.length ? [...pdfFiles].sort((a, b) => a.order - b.order) : lesson.pdfUrl ? [{ title: 'مستند مرفق (PDF)', url: lesson.pdfUrl, order: 0 }] : [];
-  const hasContent = !!(lesson.content || lesson.videoUrl || orderedPdfs.length);
+  const lessonText = lesson.description || lesson.content;
+  const hasContent = !!(lessonText || lesson.videoUrl || orderedPdfs.length);
   const videoEmbedUrl = youtubeEmbedUrl(lesson.videoUrl);
 
   return (
@@ -153,14 +154,21 @@ export function LessonPreviewModal({ lesson, onClose }: { lesson: Lesson; onClos
               </div>
             )}
           </div>
-          {lesson.content && <div className="mt-6 rounded-3xl border border-slate-100 bg-white p-4 sm:p-6 shadow-sm">
-            <div className="mb-4 flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><FileText className="h-5 w-5" /></div><h4 className="text-sm font-bold text-slate-800">محتوى درس القراءة</h4></div>
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm font-medium leading-relaxed text-slate-700">{lesson.content}</div>
-          </div>}
-          <div className="mt-6 bg-white rounded-3xl p-4 sm:p-6 border border-slate-100 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-800 mb-3 pb-2 border-b border-slate-50">نبذة عن الدرس</h3>
-            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">{lesson.description || 'لا يوجد وصف متاح.'}</p>
-          </div>
+          {lessonText && (
+            <div className="mt-6 rounded-3xl border border-slate-100 bg-white p-4 sm:p-6 shadow-sm">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">
+                  {lesson.type === 'markdown' || (lesson as any).isReading ? 'محتوى وشرح درس القراءة' : 'وصف الدرس'}
+                </h4>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm font-medium leading-relaxed text-slate-700 whitespace-pre-wrap select-text">
+                {lessonText}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
