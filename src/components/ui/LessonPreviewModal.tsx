@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, PlayCircle, FileText, FileType2 } from 'lucide-react';
+import { X, PlayCircle, FileText, FileType2, Radio, ExternalLink } from 'lucide-react';
 import type { Lesson } from '../../types';
 import { lessonService } from '../../services/api/lessons.api';
 
@@ -72,7 +72,7 @@ export function LessonPreviewModal({ lesson, onClose }: { lesson: Lesson; onClos
 
   const orderedPdfs = pdfFiles.length ? [...pdfFiles].sort((a, b) => a.order - b.order) : lesson.pdfUrl ? [{ title: 'مستند مرفق (PDF)', url: lesson.pdfUrl, order: 0 }] : [];
   const lessonText = lesson.description || lesson.content;
-  const hasContent = !!(lessonText || lesson.videoUrl || orderedPdfs.length);
+  const hasContent = !!(lessonText || lesson.videoUrl || lesson.liveMeetingUrl || orderedPdfs.length);
   const videoEmbedUrl = youtubeEmbedUrl(lesson.videoUrl);
 
   return (
@@ -105,6 +105,35 @@ export function LessonPreviewModal({ lesson, onClose }: { lesson: Lesson; onClos
             ) : (
               <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
                 
+                {lesson.liveMeetingUrl && (
+                  <div className="mb-6 rounded-2xl border-2 border-rose-200 bg-rose-50/50 p-4 sm:p-5">
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner bg-rose-100 text-rose-600">
+                          <Radio className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-800 text-sm">لقاء البث المباشر</h4>
+                          <span className="text-xs text-rose-600 font-semibold">
+                            {lesson.liveStatus === 'LIVE_NOW' ? 'البث مباشر الآن' : lesson.liveStatus === 'COMPLETED' ? 'اكتمل البث' : 'جلسة مجدولة قادمة'}
+                          </span>
+                        </div>
+                      </div>
+                      <a
+                        href={lesson.liveMeetingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        الانضمام للقاء المباشر
+                      </a>
+                    </div>
+                    <div className="text-xs text-slate-600 font-mono break-all bg-white/70 p-2 rounded-lg border border-rose-100" dir="ltr">
+                      {lesson.liveMeetingUrl}
+                    </div>
+                  </div>
+                )}
                 {lesson.videoUrl && (
                   <div className="mb-6">
                     <div className="flex items-center gap-3 mb-4">

@@ -388,6 +388,17 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     }
 
     const targetLesson = canonicalLesson || lesson;
+    const isMeetingUrl = (url?: string | null) => Boolean(
+      url && (
+        url.includes('zoom.us') ||
+        url.includes('meet.google.com') ||
+        url.includes('teams.microsoft.com') ||
+        url.includes('teams.live.com')
+      )
+    );
+    const rawLiveUrl = (targetLesson as any).liveMeetingUrl || (isMeetingUrl((targetLesson as any).videoUrl) ? (targetLesson as any).videoUrl : '');
+    const cleanVideoUrl = isMeetingUrl((targetLesson as any).videoUrl) ? '' : ((targetLesson as any).videoUrl || '');
+
     const rawDesc = (targetLesson?.description && String(targetLesson.description).trim())
       ? targetLesson.description
       : (fallbackDesc || '');
@@ -397,11 +408,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
 
     const resolvedType: LocalContentType = (targetLesson as any).type
       ? (targetLesson as any).type
-      : ((targetLesson as any).liveMeetingUrl || (targetLesson as any).liveStatus)
+      : (rawLiveUrl || (targetLesson as any).liveStatus)
       ? 'live'
       : (targetLesson as any).isReading
       ? (rawDesc || rawContent ? 'markdown' : 'pdf')
-      : ((targetLesson as any).videoUrl ? 'video' : 'video');
+      : (cleanVideoUrl ? 'video' : 'video');
 
     const resolvedDescription = resolvedType === 'pdf' ? '' : (rawDesc || rawContent || '');
 
@@ -411,6 +422,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       description: resolvedDescription,
       content: resolvedDescription,
       type: resolvedType,
+      videoUrl: cleanVideoUrl,
+      liveMeetingUrl: rawLiveUrl,
     };
     lesson = merged;
 
@@ -432,14 +445,14 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
         type: resolvedType,
-        videoUrl: (lesson as any).videoUrl || '',
+        videoUrl: cleanVideoUrl,
         pdfUrl: (lesson as any).pdfUrl || '',
         content: resolvedDescription,
         scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
         liveStatus: (lesson as any).liveStatus ?? 'SCHEDULED',
-        liveMeetingUrl: (lesson as any).liveMeetingUrl ?? '', recordingVideoUrl: (lesson as any).recordingVideoUrl ?? '',
+        liveMeetingUrl: rawLiveUrl, recordingVideoUrl: (lesson as any).recordingVideoUrl ?? '',
         status: (lesson as any).isPublished ? 'PUBLISHED' : 'DRAFT',
       });
     } else {
@@ -452,14 +465,14 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         objectives: Array.isArray((lesson as any).objectives) && (lesson as any).objectives.length ? (lesson as any).objectives.map(String) : [''],
         order: String(lesson.order),
         type: resolvedType,
-        videoUrl: (lesson as any).videoUrl || '',
+        videoUrl: cleanVideoUrl,
         pdfUrl: (lesson as any).pdfUrl || '',
         content: resolvedDescription,
         scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
         liveStatus: (lesson as any).liveStatus ?? 'SCHEDULED',
-        liveMeetingUrl: (lesson as any).liveMeetingUrl ?? '', recordingVideoUrl: (lesson as any).recordingVideoUrl ?? '',
+        liveMeetingUrl: rawLiveUrl, recordingVideoUrl: (lesson as any).recordingVideoUrl ?? '',
         status: (lesson as any).isPublished ? 'PUBLISHED' : 'DRAFT',
       });
     }
@@ -555,6 +568,20 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       if (form.type === 'video' && !form.videoUrl.trim()) e.videoUrl = 'رابط الفيديو مطلوب';
       if (form.type === 'pdf' && !form.pdfUrl && !lessonPdfs.length) e.pdfUrl = 'يرجى اختيار ملف PDF';
       if (form.type === 'markdown' && !form.description.trim()) e.description = 'محتوى درس القراءة مطلوب';
+      if (form.type === 'live') {
+        if (!form.liveMeetingUrl.trim()) {
+          e.liveMeetingUrl = 'رابط اللقاء المباشر مطلوب (Zoom أو Google Meet)';
+        } else {
+          try {
+            const parsed = new URL(form.liveMeetingUrl.trim());
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+              e.liveMeetingUrl = 'يجب أن يبدأ الرابط بـ http أو https';
+            }
+          } catch {
+            e.liveMeetingUrl = 'يرجى إدخال رابط لقاء صحيح';
+          }
+        }
+      }
     }
     setErrors(e);
     if (step === 3 && (e.moduleId || e.title || e.order)) setFormStep(1);
@@ -594,7 +621,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         objectives: form.objectives.map(objective => objective.trim()).filter(Boolean),
         order: Number(form.order),
         type: form.type,
-        videoUrl: (isVideo || isLive) && form.videoUrl.trim() ? form.videoUrl.trim() : null,
+        videoUrl: isVideo && form.videoUrl.trim() ? form.videoUrl.trim() : null,
         pdfUrl: (isPdf || isVideo || isLive || isReading)
           ? (lessonPdfs.find(pdf => pdf.url)?.url || form.pdfUrl.trim() || null)
           : null,
@@ -609,7 +636,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         dayNumber: form.dayNumber ? Number(form.dayNumber) : null,
         isMandatory: form.isMandatory,
         isFreePreview: form.isFreePreview,
-        liveStatus: isLive ? form.liveStatus : null,
+        liveStatus: isLive ? (form.liveStatus || 'SCHEDULED') : null,
         liveMeetingUrl: isLive && form.liveMeetingUrl.trim() ? form.liveMeetingUrl.trim() : null,
         recordingVideoUrl: isLive && form.recordingVideoUrl.trim() ? form.recordingVideoUrl.trim() : null,
       };
@@ -1454,7 +1481,16 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                             <AlertCircle className="w-3.5 h-3.5" /> قيد الإعداد
                           </span>
                         )}
-                        {(lesson.type === 'video' || lesson.type === 'live') && lesson.videoUrl && <a href={lesson.videoUrl} target="_blank" rel="noreferrer" dir="ltr" title={lesson.videoUrl} className="inline-flex max-w-[220px] items-center gap-1 text-xs font-semibold text-blue-700 hover:underline"><Link className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{lesson.videoUrl}</span></a>}
+                        {lesson.type === 'live' && lesson.liveMeetingUrl && (
+                          <a href={lesson.liveMeetingUrl} target="_blank" rel="noreferrer" dir="ltr" title={lesson.liveMeetingUrl} className="inline-flex max-w-[220px] items-center gap-1 text-xs font-semibold text-rose-600 hover:underline">
+                            <Radio className="h-3.5 w-3.5 shrink-0 animate-pulse" /><span className="truncate">{lesson.liveMeetingUrl}</span>
+                          </a>
+                        )}
+                        {lesson.type === 'video' && lesson.videoUrl && (
+                          <a href={lesson.videoUrl} target="_blank" rel="noreferrer" dir="ltr" title={lesson.videoUrl} className="inline-flex max-w-[220px] items-center gap-1 text-xs font-semibold text-blue-700 hover:underline">
+                            <Link className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{lesson.videoUrl}</span>
+                          </a>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -1987,8 +2023,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   </Field>
                 )}
 
-                {(form.type === 'video' || form.type === 'live') && (
-                  <Field label={form.type === 'live' ? 'رابط جلسة الفيديو (اختياري)' : 'رابط يوتيوب (YouTube URL)'} required={form.type === 'video'} error={errors.videoUrl}>
+                {form.type === 'video' && (
+                  <Field label="رابط يوتيوب (YouTube URL)" required error={errors.videoUrl}>
                     <input
                       value={form.videoUrl}
                       onChange={e => { setForm(p => ({ ...p, videoUrl: e.target.value })); setErrors(p => { const x = { ...p }; delete x.videoUrl; return x; }); }}
@@ -2011,6 +2047,86 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                       {videoUploadError && <p role="alert" className="text-xs font-semibold text-red-600">{videoUploadError}</p>}
                     </div>
                   </Field>
+                )}
+
+                {form.type === 'live' && (
+                  <div className="space-y-4 rounded-2xl border-2 border-rose-200/80 bg-rose-50/40 p-4 sm:p-5">
+                    <div className="flex items-center gap-2 text-rose-700 font-bold text-sm">
+                      <Radio className="w-5 h-5 text-rose-600 animate-pulse" />
+                      <span>بيانات وتفاصيل الدرس المباشر (Live Session)</span>
+                    </div>
+
+                    <Field label="رابط اللقاء المباشر (Zoom / Google Meet)" required error={errors.liveMeetingUrl}>
+                      <input
+                        value={form.liveMeetingUrl}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setForm(p => ({ ...p, liveMeetingUrl: val }));
+                          setErrors(p => { const x = { ...p }; delete x.liveMeetingUrl; return x; });
+                        }}
+                        placeholder="https://us05web.zoom.us/j/... أو https://meet.google.com/..."
+                        className={inputCls(!!errors.liveMeetingUrl, 'font-mono text-left bg-white')}
+                        dir="ltr"
+                      />
+                      <p className="mt-1 text-xs text-slate-500">
+                        الرابط الذي سينضم الطلاب من خلاله مباشرة عبر التطبيق لحضور المحاضرة التفاعلية.
+                      </p>
+                    </Field>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">وقت بدء اللقاء</label>
+                        <input
+                          type="datetime-local"
+                          value={form.scheduledAt}
+                          min={selectedCourse?.startDate?.slice(0, 16)}
+                          max={selectedCourse?.endDate?.slice(0, 16)}
+                          onChange={e => setForm(p => ({ ...p, scheduledAt: e.target.value }))}
+                          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">المدة التقديرية (بالدقائق)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={form.durationMinutes}
+                          onChange={e => setForm(p => ({ ...p, durationMinutes: e.target.value }))}
+                          placeholder="مثلاً: 60"
+                          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">حالة البث</label>
+                        <select
+                          value={form.liveStatus}
+                          onChange={e => setForm(p => ({ ...p, liveStatus: e.target.value as FormState['liveStatus'] }))}
+                          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-bold text-slate-700"
+                        >
+                          <option value="SCHEDULED">مجدولة (قادمة)</option>
+                          <option value="LIVE_NOW">بث مباشر الآن</option>
+                          <option value="COMPLETED">مكتملة</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <Field label="رابط تسجيل المحاضرة (اختياري - بعد انتهاء البث)" error={errors.recordingVideoUrl}>
+                      <input
+                        value={form.recordingVideoUrl}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setForm(p => ({ ...p, recordingVideoUrl: val }));
+                          setErrors(p => { const x = { ...p }; delete x.recordingVideoUrl; return x; });
+                        }}
+                        placeholder="https://youtube.com/watch?v=... أو رابط التسجيل"
+                        className={inputCls(!!errors.recordingVideoUrl, 'font-mono text-left bg-white')}
+                        dir="ltr"
+                      />
+                      <p className="mt-1 text-xs text-slate-500">
+                        يمكن إضافة رابط التسجيل هنا بعد انتهاء المحاضرة المباشرة ليشاهدها الطلاب لاحقاً.
+                      </p>
+                    </Field>
+                  </div>
                 )}
 
 

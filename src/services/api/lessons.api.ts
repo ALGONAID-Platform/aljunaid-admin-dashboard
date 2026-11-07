@@ -57,6 +57,19 @@ function readLessonPage(response: unknown, pageSize: number): LessonPage {
 function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; title?: string; courseTitle?: string; courseId?: number }): Lesson {
   const isPub = bl.status === 'PUBLISHED' || bl.isPublished === true;
   const rawPdfs = (bl as any).pdfFiles ?? (bl as any).pdfs ?? [];
+  const isMeetingUrl = (url?: string | null) => Boolean(
+    url && (
+      url.includes('zoom.us') ||
+      url.includes('meet.google.com') ||
+      url.includes('teams.microsoft.com') ||
+      url.includes('teams.live.com')
+    )
+  );
+  const effectiveLiveMeetingUrl = (bl.liveMeetingUrl && String(bl.liveMeetingUrl).trim() !== '')
+    ? bl.liveMeetingUrl
+    : (isMeetingUrl(bl.videoUrl) ? bl.videoUrl : undefined);
+  const effectiveVideoUrl = isMeetingUrl(bl.videoUrl) ? undefined : (bl.videoUrl ?? undefined);
+
   return {
     id: String(bl.id),
     courseId: String(bl.moduleId),
@@ -65,8 +78,8 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; 
     description: bl.description ?? '',
     order: bl.order ?? 0,
     isPublished: isPub,
-    hasContent: !!(bl.videoUrl ?? bl.pdfUrl ?? bl.content ?? (Array.isArray(rawPdfs) && rawPdfs.length) ?? (bl.isReading ? bl.description : undefined)),
-    videoUrl: bl.videoUrl ?? undefined,
+    hasContent: !!(effectiveVideoUrl ?? bl.pdfUrl ?? bl.content ?? (Array.isArray(rawPdfs) && rawPdfs.length) ?? effectiveLiveMeetingUrl ?? (bl.isReading ? bl.description : undefined)),
+    videoUrl: effectiveVideoUrl,
     pdfUrl: bl.pdfUrl ?? undefined,
     pdfFiles: (Array.isArray(rawPdfs) ? rawPdfs : []).map((pdf: any, index: number) => ({ id: pdf.id == null ? undefined : String(pdf.id), title: pdf.title ?? `PDF ${index + 1}`, url: pdf.url, order: pdf.order ?? index })).filter((pdf: any) => !!pdf.url).sort((a: any, b: any) => a.order - b.order),
     content: (bl.isReading && !bl.pdfUrl) ? (bl.description ?? undefined) : (bl.content ?? undefined),
@@ -74,10 +87,10 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; 
       if ((bl as any).type && ['video', 'markdown', 'pdf', 'live'].includes((bl as any).type)) {
         return (bl as any).type;
       }
-      if (bl.liveMeetingUrl && String(bl.liveMeetingUrl).trim() !== '') {
+      if (effectiveLiveMeetingUrl && String(effectiveLiveMeetingUrl).trim() !== '') {
         return 'live';
       }
-      if ((bl as any).liveStatus && !bl.isReading && !bl.videoUrl) {
+      if ((bl as any).liveStatus && !bl.isReading && !effectiveVideoUrl) {
         return 'live';
       }
       const hasTextContent = Boolean((bl.description && String(bl.description).trim()) || (bl.content && String(bl.content).trim()));
@@ -88,13 +101,13 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; 
       if (bl.isReading && !hasTextContent && hasPdf) {
         return 'pdf';
       }
-      if (bl.videoUrl && String(bl.videoUrl).trim() !== '' && !bl.isReading) {
+      if (effectiveVideoUrl && String(effectiveVideoUrl).trim() !== '' && !bl.isReading) {
         return 'video';
       }
       if (bl.isReading) {
         return hasTextContent ? 'markdown' : (hasPdf ? 'pdf' : 'markdown');
       }
-      if (hasPdf && !bl.videoUrl && !hasTextContent) {
+      if (hasPdf && !effectiveVideoUrl && !hasTextContent) {
         return 'pdf';
       }
       return 'video';
@@ -109,7 +122,7 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; 
     isMandatory: (bl as any).isMandatory ?? true,
     isFreePreview: (bl as any).isFreePreview ?? false,
     objectives: (bl as any).objectives ?? [],
-    liveMeetingUrl: (bl as any).liveMeetingUrl ?? undefined,
+    liveMeetingUrl: effectiveLiveMeetingUrl ?? (bl as any).liveMeetingUrl ?? undefined,
     recordingVideoUrl: (bl as any).recordingVideoUrl ?? undefined,
   };
 }
