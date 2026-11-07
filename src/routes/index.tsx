@@ -54,6 +54,9 @@ const NotificationBroadcastPage = lazy(() =>
 const DatabaseBackupPage = lazy(() =>
   import('../modules/backup/pages/DatabaseBackupPage').then((m) => ({ default: m.DatabaseBackupPage }))
 );
+const CourseStudentsPage = lazy(() =>
+  import('../modules/courses/pages/CourseStudentsPage').then((m) => ({ default: m.CourseStudentsPage }))
+);
 
 function CourseWorkspace() {
   const { courseId = '' } = useParams();
@@ -67,6 +70,7 @@ function CourseWorkspace() {
     { path: 'exams', label: 'الاختبارات' },
     { path: 'assignments', label: 'الواجبات والتسليمات' },
     { path: 'exam-models', label: 'إضافة مراجع أو كتب' },
+    { path: 'students', label: 'المشتركون' },
   ];
   return <section dir="rtl" className="space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-4">
@@ -95,6 +99,7 @@ function CourseLessonsRoute() { const { courseId = '' } = useParams(); return <L
 function CourseExamsRoute() { const { courseId = '' } = useParams(); return <ExamsDashboardPage scopedCourseId={courseId} />; }
 function CourseAssignmentsRoute() { const { courseId = '' } = useParams(); return <AssignmentsPage key={courseId} scopedCourseId={courseId} />; }
 function CourseExamModelsRoute() { const { courseId = '' } = useParams(); return <ExamModelsPage key={courseId} scopedCourseId={courseId} />; }
+function CourseStudentsRoute() { const { courseId = '' } = useParams(); return <CourseStudentsPage scopedCourseId={courseId} />; }
 
 function LessonWorkspace() {
   const { lessonId = '' } = useParams();
@@ -170,6 +175,7 @@ function DashboardRoutes() {
             <Route path="exams" element={<CourseExamsRoute />} />
             <Route path="assignments" element={<CourseAssignmentsRoute />} />
             <Route path="exam-models" element={<CourseExamModelsRoute />} />
+            <Route path="students" element={<CourseStudentsRoute />} />
           </Route>
           <Route path="lessons/new" element={<Navigate to="/admin/lessons" replace />} />
           <Route path="lessons/:lessonId" element={<LessonWorkspace />}>
