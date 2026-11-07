@@ -2050,83 +2050,22 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                 )}
 
                 {form.type === 'live' && (
-                  <div className="space-y-4 rounded-2xl border-2 border-rose-200/80 bg-rose-50/40 p-4 sm:p-5">
-                    <div className="flex items-center gap-2 text-rose-700 font-bold text-sm">
-                      <Radio className="w-5 h-5 text-rose-600 animate-pulse" />
-                      <span>بيانات وتفاصيل الدرس المباشر (Live Session)</span>
-                    </div>
-
-                    <Field label="رابط اللقاء المباشر (Zoom / Google Meet)" required error={errors.liveMeetingUrl}>
-                      <input
-                        value={form.liveMeetingUrl}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setForm(p => ({ ...p, liveMeetingUrl: val }));
-                          setErrors(p => { const x = { ...p }; delete x.liveMeetingUrl; return x; });
-                        }}
-                        placeholder="https://us05web.zoom.us/j/... أو https://meet.google.com/..."
-                        className={inputCls(!!errors.liveMeetingUrl, 'font-mono text-left bg-white')}
-                        dir="ltr"
-                      />
-                      <p className="mt-1 text-xs text-slate-500">
-                        الرابط الذي سينضم الطلاب من خلاله مباشرة عبر التطبيق لحضور المحاضرة التفاعلية.
-                      </p>
-                    </Field>
-
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">وقت بدء اللقاء</label>
-                        <input
-                          type="datetime-local"
-                          value={form.scheduledAt}
-                          min={selectedCourse?.startDate?.slice(0, 16)}
-                          max={selectedCourse?.endDate?.slice(0, 16)}
-                          onChange={e => setForm(p => ({ ...p, scheduledAt: e.target.value }))}
-                          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">المدة التقديرية (بالدقائق)</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={form.durationMinutes}
-                          onChange={e => setForm(p => ({ ...p, durationMinutes: e.target.value }))}
-                          placeholder="مثلاً: 60"
-                          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">حالة البث</label>
-                        <select
-                          value={form.liveStatus}
-                          onChange={e => setForm(p => ({ ...p, liveStatus: e.target.value as FormState['liveStatus'] }))}
-                          className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-bold text-slate-700"
-                        >
-                          <option value="SCHEDULED">مجدولة (قادمة)</option>
-                          <option value="LIVE_NOW">بث مباشر الآن</option>
-                          <option value="COMPLETED">مكتملة</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <Field label="رابط تسجيل المحاضرة (اختياري - بعد انتهاء البث)" error={errors.recordingVideoUrl}>
-                      <input
-                        value={form.recordingVideoUrl}
-                        onChange={e => {
-                          const val = e.target.value;
-                          setForm(p => ({ ...p, recordingVideoUrl: val }));
-                          setErrors(p => { const x = { ...p }; delete x.recordingVideoUrl; return x; });
-                        }}
-                        placeholder="https://youtube.com/watch?v=... أو رابط التسجيل"
-                        className={inputCls(!!errors.recordingVideoUrl, 'font-mono text-left bg-white')}
-                        dir="ltr"
-                      />
-                      <p className="mt-1 text-xs text-slate-500">
-                        يمكن إضافة رابط التسجيل هنا بعد انتهاء المحاضرة المباشرة ليشاهدها الطلاب لاحقاً.
-                      </p>
-                    </Field>
-                  </div>
+                  <Field label="رابط اللقاء المباشر (Zoom / Google Meet)" required error={errors.liveMeetingUrl}>
+                    <input
+                      value={form.liveMeetingUrl}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setForm(p => ({ ...p, liveMeetingUrl: val }));
+                        setErrors(p => { const x = { ...p }; delete x.liveMeetingUrl; return x; });
+                      }}
+                      placeholder="https://us05web.zoom.us/j/... أو https://meet.google.com/..."
+                      className={inputCls(!!errors.liveMeetingUrl, 'font-mono text-left')}
+                      dir="ltr"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      أدخل رابط اللقاء الذي سينضم إليه الطلاب مباشرة عبر التطبيق لحضور المحاضرة.
+                    </p>
+                  </Field>
                 )}
 
 
