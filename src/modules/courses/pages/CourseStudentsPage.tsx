@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../lib/api';
+import { usersService } from '../../../services/api/users.api';
 import {
   UserPlus,
   Search,
@@ -18,6 +19,8 @@ import {
   X,
   Users,
   AlertCircle,
+  Mail,
+  GraduationCap,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Pagination } from '../../../components/ui/Pagination';
@@ -129,19 +132,18 @@ function AddStudentModal({
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const search = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); return; }
+    const trimmed = q.trim();
+    if (!trimmed) {
+      setResults([]);
+      return;
+    }
     setSearching(true);
     try {
-      const { data } = await api.get<any>('/users/unverified', {
-        params: { search: q.trim(), limit: 10, page: 1 },
-      });
-      const root = data?.data ?? data;
-      const users: UserSearchResult[] = Array.isArray(root)
-        ? root
-        : root?.users ?? root?.items ?? root?.results ?? [];
+      const users = await usersService.searchUsers(trimmed, 15);
       setResults(users);
-    } catch {
+    } catch (err) {
       setResults([]);
+      toast.error('تعذر البحث عن المستخدمين');
     } finally {
       setSearching(false);
     }
@@ -149,7 +151,13 @@ function AddStudentModal({
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => void search(query), 400);
+    if (!query.trim()) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    searchTimer.current = setTimeout(() => void search(query), 300);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [query, search]);
 
@@ -207,43 +215,82 @@ function AddStudentModal({
             </div>
 
             {/* Search Results */}
-            {(results.length > 0 || searching) && !selected && (
-              <div className="mt-1 max-h-48 overflow-y-auto rounded-xl border bg-white shadow-lg">
+            {query.trim().length > 0 && !selected && (
+              <div className="mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
                 {searching ? (
-                  <div className="p-3 text-center text-sm text-slate-500">جارٍ البحث...</div>
+                  <div className="flex items-center justify-center gap-2 p-4 text-sm text-slate-500">
+                    <RefreshCw size={15} className="animate-spin text-emerald-600" />
+                    <span>جارٍ البحث في قاعدة البيانات...</span>
+                  </div>
                 ) : results.length === 0 ? (
-                  <div className="p-3 text-center text-sm text-slate-500">لا توجد نتائج</div>
+                  <div className="p-4 text-center text-sm text-slate-500">
+                    لا يوجد مستخدم مطابق لـ "{query.trim()}"
+                  </div>
                 ) : (
-                  results.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => { setSelected(u); setQuery(u.name); setResults([]); }}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-right hover:bg-emerald-50 transition-colors"
-                    >
-                      <div className="size-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm flex-shrink-0">
-                        {u.name?.charAt(0) ?? '?'}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-800">{u.name}</p>
-                        <p className="text-xs text-slate-500">{u.email}</p>
-                      </div>
-                    </button>
-                  ))
+                  <div className="divide-y divide-slate-100">
+                    {results.map((u) => {
+                      const academicId = u.studentProfile?.academicId;
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            setSelected(u);
+                            setQuery('');
+                            setResults([]);
+                          }}
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-right hover:bg-emerald-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {u.avatar ? (
+                              <img src={u.avatar} alt="" className="size-9 rounded-full object-cover flex-shrink-0" />
+                            ) : (
+                              <div className="size-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm flex-shrink-0">
+                                {u.name?.charAt(0) ?? '?'}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-800 truncate">{u.name}</p>
+                              <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                            </div>
+                          </div>
+                          {academicId && (
+                            <span className="flex-shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-mono font-bold text-slate-600">
+                              {academicId}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             )}
 
             {/* Selected User Badge */}
             {selected && (
-              <div className="mt-2 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5">
-                <UserCheck size={18} className="text-emerald-600 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-emerald-900">{selected.name}</p>
-                  <p className="text-xs text-emerald-700">{selected.email}</p>
+              <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="size-9 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-800 font-bold text-sm flex-shrink-0">
+                    <UserCheck size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-emerald-950 truncate">{selected.name}</p>
+                    <p className="text-xs text-emerald-700 truncate">{selected.email}</p>
+                    {selected.studentProfile?.academicId && (
+                      <p className="text-[11px] font-mono text-emerald-600">
+                        الرقم الأكاديمي: {selected.studentProfile.academicId}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <button onClick={() => { setSelected(null); setQuery(''); }} className="text-emerald-600 hover:text-emerald-800">
-                  <X size={15} />
+                <button
+                  type="button"
+                  onClick={() => { setSelected(null); setQuery(''); }}
+                  className="rounded-lg p-1.5 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                  title="إلغاء التحديد"
+                >
+                  <X size={16} />
                 </button>
               </div>
             )}

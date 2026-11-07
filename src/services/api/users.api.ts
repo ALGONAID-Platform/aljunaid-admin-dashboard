@@ -63,6 +63,15 @@ export const usersService = {
     return { users, meta: { total, page, limit, totalPages } };
   },
 
+  async searchUsers(query: string, limit: number = 20): Promise<any[]> {
+    const q = query.trim();
+    if (!q) return [];
+    const { data } = await api.get<any>('/users/search', {
+      params: { q, limit },
+    });
+    return data?.data ?? (Array.isArray(data) ? data : []);
+  },
+
   async verifyAccount(id: string | number): Promise<void> {
     await api.post(`/users/${encodeURIComponent(String(id))}/verify`, { verified: true });
   },
