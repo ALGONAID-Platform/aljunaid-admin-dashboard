@@ -33,6 +33,14 @@ const normalizeSearchText = (value: unknown) => String(value ?? '')
   .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
   .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').toLocaleLowerCase().trim();
 
+function toLocalDatetimeString(dateInput?: string | Date | null): string {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function PortalSelect({ value, onChange, options, placeholder, className, disabled }: any) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -448,7 +456,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         videoUrl: cleanVideoUrl,
         pdfUrl: (lesson as any).pdfUrl || '',
         content: resolvedDescription,
-        scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
+        scheduledAt: toLocalDatetimeString((lesson as any).scheduledAt),
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
         liveStatus: (lesson as any).liveStatus ?? 'SCHEDULED',
@@ -468,7 +476,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         videoUrl: cleanVideoUrl,
         pdfUrl: (lesson as any).pdfUrl || '',
         content: resolvedDescription,
-        scheduledAt: (lesson as any).scheduledAt ? new Date((lesson as any).scheduledAt).toISOString().slice(0,16) : '',
+        scheduledAt: toLocalDatetimeString((lesson as any).scheduledAt),
         durationMinutes: String((lesson as any).durationMinutes ?? ''), dayNumber: String((lesson as any).dayNumber ?? ''),
         isMandatory: (lesson as any).isMandatory !== false, isFreePreview: Boolean((lesson as any).isFreePreview),
         liveStatus: (lesson as any).liveStatus ?? 'SCHEDULED',
@@ -631,8 +639,10 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         pdf: undefined,
         isReading: isReading || isPdf,
         status: form.status,
-        scheduledAt: isLive && form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null,
-        durationMinutes: isLive && form.durationMinutes ? Number(form.durationMinutes) : null,
+        scheduledAt: form.scheduledAt && !isNaN(new Date(form.scheduledAt).getTime())
+          ? new Date(form.scheduledAt).toISOString()
+          : null,
+        durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : null,
         dayNumber: form.dayNumber ? Number(form.dayNumber) : null,
         isMandatory: form.isMandatory,
         isFreePreview: form.isFreePreview,
@@ -1828,7 +1838,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   {selectedCourse?.startDate && <p className="text-xs text-indigo-800">فترة المقرر: {new Date(selectedCourse.startDate).toLocaleDateString('ar')} {selectedCourse.endDate ? `– ${new Date(selectedCourse.endDate).toLocaleDateString('ar')}` : ''}</p>}
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <label className="text-sm font-semibold">رقم اليوم<input type="number" min={1} value={form.dayNumber} onChange={e=>setForm(p=>({...p,dayNumber:e.target.value}))} placeholder="1" className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
-                    <label className="text-sm font-semibold">وقت بدء الدرس<input type="datetime-local" value={form.scheduledAt} min={selectedCourse?.startDate?.slice(0,16)} max={selectedCourse?.endDate?.slice(0,16)} onChange={e=>setForm(p=>({...p,scheduledAt:e.target.value}))} className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
+                    <label className="text-sm font-semibold">وقت بدء الدرس<input type="datetime-local" value={form.scheduledAt} min={toLocalDatetimeString(selectedCourse?.startDate) || undefined} max={toLocalDatetimeString(selectedCourse?.endDate) || undefined} onChange={e=>setForm(p=>({...p,scheduledAt:e.target.value}))} className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
                     <label className="text-sm font-semibold">المدة بالدقائق<input type="number" min={1} value={form.durationMinutes} onChange={e=>setForm(p=>({...p,durationMinutes:e.target.value}))} placeholder="مثلاً 60" className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
                     <label className="text-sm font-semibold">حالة المحاضرة<select value={form.liveStatus} onChange={e=>setForm(p=>({...p,liveStatus:e.target.value as FormState['liveStatus']}))} className="mt-1 w-full rounded-xl border bg-white p-3"><option value="SCHEDULED">مجدولة</option><option value="LIVE_NOW">مباشرة الآن</option><option value="COMPLETED">انتهت</option></select></label>
                     <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.isMandatory} onChange={e=>setForm(p=>({...p,isMandatory:e.target.checked}))}/>درس إلزامي للشهادة</label>
