@@ -16,6 +16,8 @@ export interface Course {
   startDate?: string;
   endDate?: string;
   durationWeeks?: number;
+  scheduleDays?: string[];
+  scheduleDaysText?: string;
   certificateMinScore?: number;
   certificateMinAttendance?: number;
   [key: string]: unknown;
@@ -27,12 +29,16 @@ export interface CreateCoursePayload {
   description: string;
   thumbnail?: string;
   lessonOrderMode?: LessonOrderMode;
+  scheduleDays?: string[];
+  scheduleDaysText?: string;
   [key: string]: unknown;
 }
 
 export interface UpdateCoursePayload extends Partial<CreateCoursePayload> {
   id: ID;
   lessonOrderMode?: LessonOrderMode;
+  scheduleDays?: string[];
+  scheduleDaysText?: string;
 }
 
 export interface CourseFormValues {
@@ -40,4 +46,6 @@ export interface CourseFormValues {
   description: string;
   thumbnail?: string;
   lessonOrderMode?: LessonOrderMode;
+  scheduleDays?: string[];
+  scheduleDaysText?: string;
 }

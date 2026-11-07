@@ -41,6 +41,8 @@ function adaptCourse(bc: BackendCourse): Course {
     description: bc.description ?? '',
     thumbnail: rawThumbnail,
     lessonOrderMode: (bc as any).lessonOrderMode || 'BY_DATE',
+    scheduleDays: Array.isArray((bc as any).scheduleDays) ? (bc as any).scheduleDays : [],
+    scheduleDaysText: (bc as any).scheduleDaysText ?? '',
     lessonsCount: bc.lessonsCount ?? bc.totalLessons ?? 0,
     enrolledStudentsCount: course.enrollmentsCount ?? bc._count?.enrollments,
     modulesCount: course.modulesCount ?? bc._count?.modules ?? 0,

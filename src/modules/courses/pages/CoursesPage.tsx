@@ -26,6 +26,8 @@ import { courseService } from '../../../services/api/courses.api';
 import { useNavigate } from 'react-router';
 import { toast } from 'react-hot-toast';
 
+const WEEK_DAYS = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'] as const;
+
 interface FormState {
   title: string;
   description: string;
@@ -37,9 +39,10 @@ interface FormState {
   priceYerOld: string; discountedPriceYerOld: string; priceYerNew: string; discountedPriceYerNew: string;
   priceSar: string; discountedPriceSar: string; price: string; discountedPrice: string;
   maxStudents: string; startDate: string; endDate: string; durationWeeks: string;
+  scheduleDays: string[];
   scheduleDaysText: string; objectives: string[]; certificateMinScore: string; certificateMinAttendance: string;
 }
-const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thumbnailFile: null, isPaid: false, courseType: 'RECORDED', lessonOrderMode: 'BY_DATE', priceYerOld: '', discountedPriceYerOld: '', priceYerNew: '', discountedPriceYerNew: '', priceSar: '', discountedPriceSar: '', price: '', discountedPrice: '', maxStudents: '', startDate: '', endDate: '', durationWeeks: '', scheduleDaysText: '', objectives: [], certificateMinScore: '70', certificateMinAttendance: '80' };
+const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thumbnailFile: null, isPaid: false, courseType: 'RECORDED', lessonOrderMode: 'BY_DATE', priceYerOld: '', discountedPriceYerOld: '', priceYerNew: '', discountedPriceYerNew: '', priceSar: '', discountedPriceSar: '', price: '', discountedPrice: '', maxStudents: '', startDate: '', endDate: '', durationWeeks: '', scheduleDays: [], scheduleDaysText: '', objectives: [], certificateMinScore: '70', certificateMinAttendance: '80' };
 
 const normalizeSearchText = (value: unknown) => String(value ?? '')
   .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
@@ -244,6 +247,7 @@ export function CoursesPage() {
       lessonOrderMode: ((editableCourse as any).lessonOrderMode as FormState['lessonOrderMode']) || 'BY_DATE',
       ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, (editableCourse as any)[k] == null ? '' : String((editableCourse as any)[k])])) as Partial<FormState>,
       startDate: editableCourse.startDate?.slice(0, 10) ?? '', endDate: editableCourse.endDate?.slice(0, 10) ?? '',
+      scheduleDays: Array.isArray((editableCourse as any).scheduleDays) ? [...(editableCourse as any).scheduleDays] : [],
       scheduleDaysText: String((editableCourse as any).scheduleDaysText ?? ''), objectives: Array.isArray((editableCourse as any).objectives) ? [...(editableCourse as any).objectives] : []
     });
     if (editableCourse.thumbnail) setPreviewUrl(editableCourse.thumbnail);
@@ -296,8 +300,8 @@ export function CoursesPage() {
         ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, form[k as keyof FormState] ? Number(form[k as keyof FormState]) : undefined])),
         startDate: form.startDate || undefined,
         endDate: form.endDate || undefined,
-        scheduleDaysText: form.scheduleDaysText || undefined,
-        scheduleDays: form.scheduleDaysText ? form.scheduleDaysText.split(',').map(s => s.trim()).filter(Boolean) : [],
+        scheduleDays: form.scheduleDays,
+        scheduleDaysText: form.scheduleDaysText.trim() || (form.scheduleDays.length ? form.scheduleDays.join('، ') : undefined),
         objectives: form.objectives.map(s => s.trim()).filter(Boolean),
       };
 
@@ -835,7 +839,55 @@ export function CoursesPage() {
                     <label className="text-xs font-bold text-slate-600">تاريخ البداية<input type="date" value={form.startDate} onChange={e=>setForm(p=>({...p,startDate:e.target.value}))} className={`${inputCls(false)} mt-1`}/></label>
                     <label className="text-xs font-bold text-slate-600">تاريخ النهاية<input type="date" value={form.endDate} onChange={e=>setForm(p=>({...p,endDate:e.target.value}))} className={`${inputCls(false)} mt-1`}/></label>
                   </div>
-                  {form.courseType === 'LIVE' && <Field label="أيام ومواعيد اللقاءات" helperText="افصل بين المواعيد بفاصلة."><input value={form.scheduleDaysText} onChange={e=>setForm(p=>({...p,scheduleDaysText:e.target.value}))} className={inputCls(false)} placeholder="الأحد 8 مساءً، الثلاثاء 8 مساءً"/></Field>}
+                  <Field
+                    label="أيام الدراسة والمحاضرات (أيام الأسبوع)"
+                    helperText="اختر الأيام التي ستتم فيها دراسة هذا المقرر لتظهر في الخارطة الزمنية وجدول الطالب بالتطبيق."
+                  >
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {WEEK_DAYS.map((day) => {
+                        const isSelected = form.scheduleDays.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              setForm((current) => {
+                                const nextDays = isSelected
+                                  ? current.scheduleDays.filter((d) => d !== day)
+                                  : [...current.scheduleDays, day];
+                                nextDays.sort((a, b) => WEEK_DAYS.indexOf(a as any) - WEEK_DAYS.indexOf(b as any));
+                                return {
+                                  ...current,
+                                  scheduleDays: nextDays,
+                                  scheduleDaysText: current.scheduleDaysText || nextDays.join('، '),
+                                };
+                              });
+                            }}
+                            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-200'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                            }`}
+                          >
+                            <span>{day}</span>
+                            {isSelected && <span className="text-white text-xs">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+
+                  <Field
+                    label="تفاصيل أو توقيت المواعيد (اختياري)"
+                    helperText="يمكنك كتابة نص توضيحي إضافي للمواعيد (مثال: السبت والأحد والخميس 8:00 مساءً)"
+                  >
+                    <input
+                      value={form.scheduleDaysText}
+                      onChange={(e) => setForm((p) => ({ ...p, scheduleDaysText: e.target.value }))}
+                      className={inputCls(false)}
+                      placeholder="مثلاً: السبت والأحد والخميس 8:00 مساءً"
+                    />
+                  </Field>
                   <div className="space-y-2"><div className="flex items-center justify-between"><span className="text-sm font-bold text-slate-700">أهداف المقرر</span><button type="button" onClick={()=>setForm(p=>({...p,objectives:[...p.objectives,'']}))} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">+ إضافة هدف</button></div>{form.objectives.map((objective,index)=><div key={index} className="flex gap-2"><input value={objective} onChange={e=>setForm(p=>({...p,objectives:p.objectives.map((item,i)=>i===index?e.target.value:item)}))} className={inputCls(false)} placeholder={`الهدف ${index+1}`}/><button type="button" aria-label={`حذف الهدف ${index+1}`} onClick={()=>setForm(p=>({...p,objectives:p.objectives.filter((_,i)=>i!==index)}))} className="rounded-lg border px-3 text-red-600">×</button></div>)}{form.objectives.length===0&&<p className="text-xs text-slate-400">أضف أهداف المقرر واحداً تلو الآخر.</p>}</div>
                 </div>
 
