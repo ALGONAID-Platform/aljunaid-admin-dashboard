@@ -95,6 +95,12 @@ api.interceptors.response.use(
 
 export function normalizeAxiosError(error: AxiosError): Error {
   if (error.response) {
+    if (error.response.status === 413) {
+      const err = new Error('حجم الملف كبير جداً وتجاوز الحد الأقصى المسموح به في السيرفر (HTTP 413 Payload Too Large).');
+      (err as Error & { status: number; code?: string }).status = 413;
+      (err as Error & { status?: number; code?: string }).code = 'PAYLOAD_TOO_LARGE';
+      return err;
+    }
     const data = error.response.data as { message?: string | string[]; error?: string };
     const rawMessage = data?.message;
     const message = Array.isArray(rawMessage)

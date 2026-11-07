@@ -97,7 +97,7 @@ export const mediaApi = {
     const allowed = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
     if (!allowed.includes(ext)) throw new Error('صيغة الفيديو غير مدعومة. استخدم MP4 أو MOV أو AVI أو MKV أو WebM.');
-    if (file.size > 1024 * 1024 * 1024) throw new Error('حجم الفيديو يتجاوز الحد الأقصى 1 GB.');
+    if (file.size > 2 * 1024 * 1024 * 1024) throw new Error('حجم الفيديو يتجاوز الحد الأقصى 2 GB.');
     const body = new FormData(); body.append('file', file);
     const reportProgress = createUploadProgressReporter(onProgress, file.size);
     const { data } = await api.post(`/media/courses/${courseId}/videos`, body, {
