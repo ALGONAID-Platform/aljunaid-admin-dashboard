@@ -1205,6 +1205,13 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                           <span>محاضرة مجدولة</span>
                         </div>
                       )}
+
+                      {lesson.scheduledAt && (
+                        <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg border border-indigo-100 font-bold text-xs" title="موعد الدرس المجدول">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span>الموعد: {new Date(lesson.scheduledAt).toLocaleString('ar', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        </div>
+                      )}
                     </div>
                     {lesson.videoUrl && (
                       <a href={lesson.videoUrl} target="_blank" rel="noreferrer" dir="ltr" className="inline-flex max-w-full items-center gap-1.5 self-start break-all text-xs font-semibold text-blue-700 hover:underline">
@@ -1545,6 +1552,12 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                             {lesson.isFreePreview ? 'معاينة مجانية' : 'مدفوع'}
                           </button>
                         </div>
+                        {lesson.scheduledAt && (
+                          <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 self-start" title="موعد الدرس المجدول">
+                            <Calendar className="w-3 h-3 text-indigo-600 shrink-0" />
+                            <span>الموعد: {new Date(lesson.scheduledAt).toLocaleString('ar', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                          </div>
+                        )}
                         {/* Live Status buttons in desktop table */}
                         <div className="flex items-center gap-1 pt-1 border-t border-slate-100">
                           <button
@@ -1838,7 +1851,20 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                   {selectedCourse?.startDate && <p className="text-xs text-indigo-800">فترة المقرر: {new Date(selectedCourse.startDate).toLocaleDateString('ar')} {selectedCourse.endDate ? `– ${new Date(selectedCourse.endDate).toLocaleDateString('ar')}` : ''}</p>}
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <label className="text-sm font-semibold">رقم اليوم<input type="number" min={1} value={form.dayNumber} onChange={e=>setForm(p=>({...p,dayNumber:e.target.value}))} placeholder="1" className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
-                    <label className="text-sm font-semibold">وقت بدء الدرس<input type="datetime-local" value={form.scheduledAt} min={toLocalDatetimeString(selectedCourse?.startDate) || undefined} max={toLocalDatetimeString(selectedCourse?.endDate) || undefined} onChange={e=>setForm(p=>({...p,scheduledAt:e.target.value}))} className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
+                    <label className="text-sm font-semibold">
+                      وقت بدء الدرس
+                      <input
+                        type="datetime-local"
+                        value={form.scheduledAt}
+                        onChange={e => setForm(p => ({ ...p, scheduledAt: e.target.value }))}
+                        className="mt-1 w-full rounded-xl border bg-white p-3"
+                      />
+                      {form.scheduledAt && (
+                        <span className="block mt-1 text-[11px] text-emerald-700 font-bold">
+                          الموعد المحدد: {new Date(form.scheduledAt).toLocaleString('ar', { dateStyle: 'full', timeStyle: 'short' })}
+                        </span>
+                      )}
+                    </label>
                     <label className="text-sm font-semibold">المدة بالدقائق<input type="number" min={1} value={form.durationMinutes} onChange={e=>setForm(p=>({...p,durationMinutes:e.target.value}))} placeholder="مثلاً 60" className="mt-1 w-full rounded-xl border bg-white p-3"/></label>
                     <label className="text-sm font-semibold">حالة المحاضرة<select value={form.liveStatus} onChange={e=>setForm(p=>({...p,liveStatus:e.target.value as FormState['liveStatus']}))} className="mt-1 w-full rounded-xl border bg-white p-3"><option value="SCHEDULED">مجدولة</option><option value="LIVE_NOW">مباشرة الآن</option><option value="COMPLETED">انتهت</option></select></label>
                     <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.isMandatory} onChange={e=>setForm(p=>({...p,isMandatory:e.target.checked}))}/>درس إلزامي للشهادة</label>
