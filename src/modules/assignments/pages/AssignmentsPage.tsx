@@ -67,18 +67,39 @@ export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCour
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createError, setCreateError] = useState('');
   const [grades, setGrades] = useState<Record<number, {score: string; feedback: string; feedbackImageUrl: string; status: string}>>({});
+  const [coursesList, setCoursesList] = useState<Array<{ id: number | string; title: string }>>([]);
+  const [modalCourseId, setModalCourseId] = useState('');
+  const [modalLoadingLessons, setModalLoadingLessons] = useState(false);
+  const [modalLessons, setModalLessons] = useState<Array<{ id: string; title: string }>>([]);
+
+  const handleModalCourseFilter = async (cid: string) => {
+    setModalCourseId(cid);
+    setModalLoadingLessons(true);
+    try {
+      const names = await lessonService.getLessonNames(cid || undefined);
+      setModalLessons(names);
+      if (names.length > 0 && !names.some(n => n.id === assignmentForm.lessonId)) {
+        setAssignmentForm(cur => ({ ...cur, lessonId: names[0].id }));
+      }
+    } catch {
+      setModalLessons([]);
+    } finally {
+      setModalLoadingLessons(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true); setError(''); setLoadWarning('');
     try {
       const courses = await courseService.getAll();
+      setCoursesList(courses);
       const modules = await modulesService.getAll();
 
       // Fetch lesson names only (id + title) for the dropdown — much lighter than
       // getByCourseId which loads full content, PDF lists, etc.
       const lessonNames = scopedCourseId
         ? await lessonService.getLessonNames(String(scopedCourseId)).catch(() => [] as Array<{ id: string; title: string; courseTitle?: string }>)
-        : (await Promise.all(courses.map(c => lessonService.getLessonNames(String(c.id)).catch(() => [] as Array<{ id: string; title: string; courseTitle?: string }>)))).flat();
+        : await lessonService.getLessonNames().catch(() => [] as Array<{ id: string; title: string; courseTitle?: string }>);
 
       const filteredNames = scopedLessonId
         ? lessonNames.filter(l => l.id === String(scopedLessonId))
@@ -183,9 +204,22 @@ export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCour
     {showCreateModal && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={event=>{if(event.target===event.currentTarget&&!creating)setShowCreateModal(false);}}>
       <form onSubmit={createAssignment} className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="create-assignment-title">
         <header className="flex items-center justify-between"><h3 id="create-assignment-title" className="text-lg font-black text-slate-900">إضافة واجب لدرس</h3><button type="button" onClick={()=>setShowCreateModal(false)} disabled={creating} aria-label="إغلاق" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={18}/></button></header>
+        {!scopedCourseId && coursesList.length > 0 && (
+          <label className="block text-sm font-bold text-slate-700">المقرر (تصفية الدروس)
+            <select
+              value={modalCourseId}
+              onChange={e => void handleModalCourseFilter(e.target.value)}
+              className="mt-1 w-full rounded-lg border px-3 py-2 bg-slate-50 font-normal"
+            >
+              <option value="">جميع المقررات</option>
+              {coursesList.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+          </label>
+        )}
         <label className="block text-sm font-bold text-slate-700">الدرس
-          <select required value={assignmentForm.lessonId} onChange={e=>setAssignmentForm(current=>({...current,lessonId:e.target.value}))} className="mt-1 w-full rounded-lg border px-3 py-2" disabled={!!scopedLessonId}>
-            <option value="">اختر الدرس</option>{lessonOptions.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.courseTitle} · {lesson.title}</option>)}
+          <select required value={assignmentForm.lessonId} onChange={e=>setAssignmentForm(current=>({...current,lessonId:e.target.value}))} className="mt-1 w-full rounded-lg border px-3 py-2 font-normal" disabled={!!scopedLessonId}>
+            <option value="">{modalLoadingLessons ? 'جارٍ تحميل الدروس…' : 'اختر الدرس'}</option>
+            {(modalLessons.length > 0 ? modalLessons : lessonOptions).map(lesson=><option key={lesson.id} value={lesson.id}>{(lesson as any).courseTitle ? `${(lesson as any).courseTitle} · ` : ''}{lesson.title}</option>)}
           </select>
         </label>
         <label className="block text-sm font-bold text-slate-700">عنوان الواجب

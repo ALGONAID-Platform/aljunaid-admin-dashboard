@@ -96,13 +96,13 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
 
   // Load lightweight lesson names (id + title only) whenever the selected course changes
   useEffect(() => {
-    if (!form.courseId) { setLessonNames([]); return; }
+    const targetCourse = form.courseId || scopedCourseId;
     setLessonNamesLoading(true);
-    void lessonService.getLessonNames(form.courseId)
+    void lessonService.getLessonNames(targetCourse ? String(targetCourse) : undefined)
       .then(names => setLessonNames(names))
       .catch(() => setLessonNames([]))
       .finally(() => setLessonNamesLoading(false));
-  }, [form.courseId]);
+  }, [form.courseId, scopedCourseId]);
 
   const filteredLessons = useMemo(() => {
     return scopedLessonId ? lessonNames.filter(l => String(l.id) === String(scopedLessonId)) : lessonNames;

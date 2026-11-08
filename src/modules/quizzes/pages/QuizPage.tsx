@@ -5,6 +5,7 @@ import {
   Settings2, FileEdit, Image as ImageIcon
 } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useQuizzesStore, useModulesStore } from '../../../store';
+import { lessonService } from '../../../services/api/lessons.api';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { Loader } from '../../../components/feedback/Loader';
 import { QuestionImageUpload } from '../components/QuestionImageUpload';
@@ -140,6 +141,20 @@ export function QuizPage() {
   const [qErrors, setQErrors] = useState<Record<string, string>>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
+  const [courseLessonNames, setCourseLessonNames] = useState<Array<{ id: string; title: string }>>([]);
+  const [loadingLessonNames, setLoadingLessonNames] = useState(false);
+
+  useEffect(() => {
+    if (!courseId) {
+      setCourseLessonNames([]);
+      return;
+    }
+    setLoadingLessonNames(true);
+    void lessonService.getLessonNames(courseId)
+      .then(names => setCourseLessonNames(names))
+      .catch(() => setCourseLessonNames([]))
+      .finally(() => setLoadingLessonNames(false));
+  }, [courseId]);
 
   const resetModal = () => {
     setStep('info'); setCourseId(''); setLessonId(''); setTitle(''); setDescription('');
@@ -239,8 +254,8 @@ export function QuizPage() {
       return;
     }
     setSaveStatus('loading');
-    const course = courses.find(c => c.id === courseId)!;
-    const lesson = lessons.find(l => l.id === lessonId)!;
+    const course = courses.find(c => c.id === courseId);
+    const lesson = lessons.find(l => l.id === lessonId) || courseLessonNames.find(l => l.id === lessonId);
     
     try {
       if (editingQuizId) {
@@ -659,15 +674,15 @@ export function QuizPage() {
                           <PortalSelect
                             value={lessonId}
                             onChange={(val: string) => { setLessonId(val); setInfoErrors(p => { const x = { ...p }; delete x.lessonId; return x; }); }}
-                            placeholder={courseId ? 'الرجاء اختيار الدرس...' : 'اختر المقرر أولاً'}
+                            placeholder={loadingLessonNames ? 'جارٍ تحميل الدروس…' : (courseId ? 'الرجاء اختيار الدرس...' : 'اختر المقرر أولاً')}
                             className={`${inputCls(!!infoErrors.lessonId)} pr-11 bg-white`}
                             disabled={!courseId}
-                            options={availableLessons.map(l => {
+                            options={courseLessonNames.map(l => {
                               const existingQuiz = examByLessonId.get(l.id);
                               const locked = Boolean(existingQuiz && existingQuiz.id !== editingQuizId);
                               return {
                                 value: locked ? '' : l.id,
-                                label: l.title + (locked ? ' - Exam Already Created' : '')
+                                label: l.title + (locked ? ' - تم إنشاء اختبار له مسبقاً' : '')
                               };
                             }).filter(opt => opt.value !== '')}
                           />
