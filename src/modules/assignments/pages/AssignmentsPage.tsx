@@ -91,15 +91,12 @@ export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCour
   const load = useCallback(async () => {
     setLoading(true); setError(''); setLoadWarning('');
     try {
-      const courses = await courseService.getAll();
+      const [courses, modules, lessonNames] = await Promise.all([
+        courseService.getAll().catch(() => []),
+        modulesService.getAll().catch(() => []),
+        lessonService.getLessonNames(scopedCourseId ? String(scopedCourseId) : undefined).catch(() => [] as Array<{ id: string; title: string; courseTitle?: string }>),
+      ]);
       setCoursesList(courses);
-      const modules = await modulesService.getAll();
-
-      // Fetch lesson names only (id + title) for the dropdown — much lighter than
-      // getByCourseId which loads full content, PDF lists, etc.
-      const lessonNames = scopedCourseId
-        ? await lessonService.getLessonNames(String(scopedCourseId)).catch(() => [] as Array<{ id: string; title: string; courseTitle?: string }>)
-        : await lessonService.getLessonNames().catch(() => [] as Array<{ id: string; title: string; courseTitle?: string }>);
 
       const filteredNames = scopedLessonId
         ? lessonNames.filter(l => l.id === String(scopedLessonId))
@@ -116,30 +113,40 @@ export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCour
       });
 
       const requestErrors: string[] = [];
+      let finalRows: ReviewRow[] = [];
 
-      // Fetch assignments one-by-one but in parallel batches of 5 to reduce
-      // total wall-clock time while not overwhelming the server.
-      const BATCH = 5;
-      const finalRows: ReviewRow[] = [];
-      for (let i = 0; i < availableLessons.length; i += BATCH) {
-        const batch = availableLessons.slice(i, i + BATCH);
-        const batchResults = await Promise.all(batch.map(async lesson => {
-          try {
-            const response = await api.get(`/assignments/lesson/${lesson.id}`);
-            const assignment = resultOf(response.data) as Assignment | null;
-            if (!assignment) return null;
-            let submissions: Submission[] = [];
-            if (assignment.type !== 'QUIZ') {
-              submissions = await getAllSubmissions(assignment.id, status);
+      try {
+        // Fast path: ONE single instant request to GET /assignments/admin/overview
+        const params: Record<string, unknown> = {};
+        if (scopedCourseId) params.courseId = scopedCourseId;
+        if (scopedLessonId) params.lessonId = scopedLessonId;
+        if (status) params.status = status;
+
+        const res = await api.get<any>('/assignments/admin/overview', { params });
+        const overviewData = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+        finalRows = overviewData as ReviewRow[];
+      } catch {
+        // Fallback: one-by-one loop if the endpoint is temporarily unavailable
+        const BATCH = 5;
+        for (let i = 0; i < availableLessons.length; i += BATCH) {
+          const batch = availableLessons.slice(i, i + BATCH);
+          const batchResults = await Promise.all(batch.map(async lesson => {
+            try {
+              const response = await api.get(`/assignments/lesson/${lesson.id}`);
+              const assignment = resultOf(response.data) as Assignment | null;
+              if (!assignment) return null;
+              let submissions: Submission[] = [];
+              if (assignment.type !== 'QUIZ') {
+                submissions = await getAllSubmissions(assignment.id, status);
+              }
+              return { assignment, lessonTitle: lesson.title, courseTitle: lesson.courseTitle ?? '', courseId: '', submissions } as ReviewRow;
+            } catch (e: any) {
+              if (e?.response?.status !== 404) requestErrors.push(`${lesson.title}: ${errorOf(e)}`);
+              return null;
             }
-            return { assignment, lessonTitle: lesson.title, courseTitle: lesson.courseTitle ?? '', courseId: '', submissions } as ReviewRow;
-          } catch (e: any) {
-            // A lesson without an assignment is expected — the API returns 404.
-            if (e?.response?.status !== 404) requestErrors.push(`${lesson.title}: ${errorOf(e)}`);
-            return null;
-          }
-        }));
-        finalRows.push(...batchResults.filter((r): r is ReviewRow => r !== null));
+          }));
+          finalRows.push(...batchResults.filter((r): r is ReviewRow => r !== null));
+        }
       }
 
       setRows(finalRows);
