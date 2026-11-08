@@ -36,7 +36,7 @@ export type UploadError =
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ALLOWED_IMAGE_EXTS = ['JPG', 'PNG', 'WEBP'];
 const MAX_IMAGE_MB = 5;
-const MAX_PDF_MB = 50;
+const MAX_PDF_MB = 100;
 
 /** Classify upload errors into human-readable Arabic messages */
 export function classifyUploadError(err: unknown): UploadError {
