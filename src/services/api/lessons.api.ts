@@ -190,9 +190,10 @@ export const lessonService = {
    * Falls back to the student-facing /lessons/course/:courseId if search fails.
    */
   async getCoursePage(courseId: string, page: number, limit: number): Promise<{ items: Lesson[]; totalPages: number; total: number }> {
-    // Use the admin search endpoint so drafts are visible in the dashboard
+    // Use the admin search endpoint so drafts are visible in the dashboard.
+    // excludeDescription=true skips description/content fields for faster response.
     const { data } = await api.get<any>('/lessons/search', {
-      params: { q: '', courseId, page, limit },
+      params: { q: '', courseId, page, limit, excludeDescription: 'true' },
     });
     const { items, totalPages } = readLessonPage(data, limit);
     const rawTotal = data?.meta?.total ?? data?.meta?.totalItems ?? data?.meta?.count ?? null;
@@ -279,36 +280,43 @@ export const lessonService = {
     }
   },
   /**
-   * Lightweight lesson list for dropdowns — returns only id + title per lesson.
-   * Uses the same paginated search endpoint but strips all heavy fields client-side,
-   * so the network payload is identical but the in-memory/render cost is minimal.
-   * Pass courseId to scope to a single course.
+   * Lightweight lesson names list for dropdowns — returns only id + title.
+   * Calls the dedicated GET /lessons/names?courseId=X backend endpoint.
+   * Falls back to /lessons/search with excludeDescription=true if unavailable.
    */
   async getLessonNames(courseId?: string): Promise<Array<{ id: string; title: string; courseTitle?: string }>> {
-    const limit = 50;
-    const results: Array<{ id: string; title: string; courseTitle?: string }> = [];
-    let page = 1;
-    let totalPages: number | null = null;
-    const seenSigs = new Set<string>();
-    do {
-      const params: Record<string, unknown> = { q: '', page, limit };
+    try {
+      // Use the dedicated lightweight endpoint
+      const params: Record<string, unknown> = {};
       if (courseId) params.courseId = courseId;
-      const { data } = await api.get<any>('/lessons/search', { params });
-      const { items, totalPages: reported } = readLessonPage(data, limit);
-      for (const item of items) {
-        results.push({
-          id: String(item.id),
-          title: item.title ?? '',
-          courseTitle: (item as any).module?.title ?? (item as any).course?.title ?? undefined,
-        });
-      }
-      const sig = items.map((item: BackendLesson) => String(item.id)).join(',');
-      if (page > 1 && sig && seenSigs.has(sig)) break;
-      if (sig) seenSigs.add(sig);
-      totalPages = reported ?? (items.length === limit ? page + 1 : page);
-      page += 1;
-    } while (page <= (totalPages ?? 1));
-    return results;
+      const { data } = await api.get<any>('/lessons/names', { params });
+      const list: Array<{ id: number | string; title: string }> = Array.isArray(data)
+        ? data
+        : (data?.data ?? data?.items ?? []);
+      return list.map(l => ({ id: String(l.id), title: l.title ?? '' }));
+    } catch {
+      // Fallback: search endpoint with excludeDescription to reduce payload
+      const limit = 50;
+      const results: Array<{ id: string; title: string; courseTitle?: string }> = [];
+      let page = 1;
+      let totalPages: number | null = null;
+      const seenSigs = new Set<string>();
+      do {
+        const params: Record<string, unknown> = { q: '', page, limit, excludeDescription: 'true' };
+        if (courseId) params.courseId = courseId;
+        const { data } = await api.get<any>('/lessons/search', { params });
+        const { items, totalPages: reported } = readLessonPage(data, limit);
+        for (const item of items) {
+          results.push({ id: String(item.id), title: item.title ?? '' });
+        }
+        const sig = items.map((item: BackendLesson) => String(item.id)).join(',');
+        if (page > 1 && sig && seenSigs.has(sig)) break;
+        if (sig) seenSigs.add(sig);
+        totalPages = reported ?? (items.length === limit ? page + 1 : page);
+        page += 1;
+      } while (page <= (totalPages ?? 1));
+      return results;
+    }
   },
 
   /**
