@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ExternalLink, RefreshCw, ClipboardCheck, Save, Plus, X, Paperclip } from 'lucide-react';
+import { ExternalLink, RefreshCw, ClipboardCheck, Save, Plus, X, Paperclip, Trash2 } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { lessonService } from '../../../services/api/lessons.api';
 import { modulesService } from '../../../services/api/modules.api';
@@ -71,6 +71,8 @@ export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCour
   const [modalCourseId, setModalCourseId] = useState('');
   const [modalLoadingLessons, setModalLoadingLessons] = useState(false);
   const [modalLessons, setModalLessons] = useState<Array<{ id: string; title: string }>>([]);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const handleModalCourseFilter = async (cid: string) => {
     setModalCourseId(cid);
@@ -206,6 +208,21 @@ export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCour
   const filtered = rows.filter(row => `${row.assignment.title} ${row.lessonTitle} ${row.courseTitle}`.toLowerCase().includes(query.toLowerCase()));
   const patchGrade = (id: number, patch: Partial<{score: string; feedback: string; feedbackImageUrl: string; status: string}>) => setGrades(current => ({...current, [id]: {...current[id], ...patch}}));
 
+  const deleteAssignment = async (assignmentId: number) => {
+    setDeletingId(assignmentId);
+    setNotice('');
+    try {
+      await api.delete(`/assignments/${assignmentId}`);
+      setNotice('تم حذف التكليف بنجاح.');
+      setConfirmDeleteId(null);
+      await load();
+    } catch (e) {
+      setNotice(errorOf(e));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return <section dir="rtl" className="space-y-5"><header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-black text-slate-900">مراجعة الواجبات والتسليمات</h2><p className="mt-1 text-sm text-slate-500">عرض ملفات الطلاب والروابط وتصحيح المهام العملية. الاختبارات القصيرة تبقى مصححة آلياً.</p></div><div className="flex gap-2"><button onClick={()=>{setCreateError('');setShowCreateModal(true);}} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white"><Plus className="inline ml-2" size={16}/>إضافة واجب</button><button onClick={()=>void load()} className="rounded-xl border bg-white px-4 py-2 text-sm font-bold"><RefreshCw className="inline ml-2" size={16}/>تحديث</button></div></header>
     {notice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{notice}</div>}
     {showCreateModal && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={event=>{if(event.target===event.currentTarget&&!creating)setShowCreateModal(false);}}>
@@ -249,9 +266,37 @@ export function AssignmentsPage({ scopedCourseId, scopedLessonId }: { scopedCour
         <button disabled={creating || lessonOptions.length === 0} className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{creating?'جارٍ إنشاء الواجب…':'إنشاء الواجب'}</button>
       </form>
     </div>}
+
+    {/* مودال تأكيد الحذف */}
+    {confirmDeleteId !== null && <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 p-4">
+      <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100"><Trash2 className="text-red-600" size={20}/></span>
+          <h3 className="text-lg font-black text-slate-900">تأكيد الحذف</h3>
+        </div>
+        <p className="text-sm text-slate-600">هل أنت متأكد من حذف هذا التكليف؟ سيتم حذف جميع التسليمات المرتبطة به نهائياً.</p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => void deleteAssignment(confirmDeleteId)}
+            disabled={deletingId === confirmDeleteId}
+            className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {deletingId === confirmDeleteId ? 'جارٍ الحذف…' : 'نعم، احذف'}
+          </button>
+          <button
+            onClick={() => setConfirmDeleteId(null)}
+            disabled={deletingId !== null}
+            className="flex-1 rounded-xl border px-4 py-2.5 text-sm font-bold text-slate-700"
+          >
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>}
+
     <div className="flex flex-wrap gap-3 rounded-2xl border bg-white p-4"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="ابحث باسم الواجب أو الدرس" className="min-w-48 flex-1 rounded-lg border px-3 py-2 text-sm"/><select value={status} onChange={e=>setStatus(e.target.value)} className="rounded-lg border px-3 py-2 text-sm"><option value="">كل الحالات</option><option value="SUBMITTED">مسلّم</option><option value="GRADED">مقيّم</option><option value="RESUBMISSION_REQUESTED">إعادة تسليم مطلوبة</option></select></div>
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
     {loadWarning && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{loadWarning}</div>}
-    {loading ? <div className="rounded-2xl border bg-white p-10 text-center text-slate-500">جارٍ تحميل الواجبات والتسليمات…</div> : filtered.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-slate-500">{loadedLessonCount === 0 ? 'لا توجد دروس متاحة ضمن النطاق المحدد.' : 'لم يُعثر على واجب أو تسليم مطابق ضمن الدروس المحددة.'}</div> : <div className="space-y-5">{filtered.map(({assignment,lessonTitle,courseTitle,submissions})=><article key={assignment.id} className="overflow-hidden rounded-2xl border bg-white"><header className="flex flex-wrap items-center gap-2 border-b bg-slate-50 p-4"><ClipboardCheck className="text-emerald-600" size={19}/><h3 className="font-extrabold">{assignment.title}</h3><span className="rounded-full bg-indigo-100 px-2 py-1 text-xs font-bold text-indigo-800">{assignment.type}</span><span className="text-xs text-slate-500">{courseTitle} · {lessonTitle}</span><span className="mr-auto text-xs text-slate-500">الدرجة القصوى: {assignment.maxScore}</span></header>{(assignment.description || assignment.dueDate || assignment.attachmentUrl) && <div className="space-y-2 border-b px-4 py-3 text-sm text-slate-600">{assignment.description && <p className="whitespace-pre-wrap">{assignment.description}</p>}{assignment.dueDate && <p>موعد التسليم: {new Date(assignment.dueDate).toLocaleString('ar')}</p>}{assignment.attachmentUrl && <a className="inline-flex items-center gap-1 font-bold text-blue-700 underline" href={assignment.attachmentUrl} target="_blank" rel="noreferrer">فتح الملف المرفق<ExternalLink size={14}/></a>}</div>}{assignment.type === 'QUIZ' ? <p className="p-4 text-sm text-slate-500">اختبار آلي · لا يتطلب تصحيحاً يدوياً. إجمالي التسليمات: {assignment._count?.submissions ?? 0}.</p> : submissions.length === 0 ? <p className="p-5 text-center text-sm text-slate-500">لا توجد تسليمات بهذه الحالة.</p> : <div className="divide-y">{submissions.map(sub=>{const student=sub.student?.user??sub.student;const form=grades[sub.id]??{score:'',feedback:'',feedbackImageUrl:'',status:'GRADED'};return <div key={sub.id} className="grid gap-4 p-4 xl:grid-cols-[1fr_1fr]"><div className="space-y-2"><div className="flex flex-wrap items-center gap-2"><strong>{student?.name??'طالب'}</strong><span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{sub.status}</span><span className="text-xs text-slate-500">{sub.submittedAt?new Date(sub.submittedAt).toLocaleString('ar'):'—'}</span></div>{sub.content&&<p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm">{sub.content}</p>}{sub.fileUrl&&<a className="inline-flex items-center gap-1 text-sm font-bold text-blue-700 underline" href={sub.fileUrl} target="_blank" rel="noreferrer">فتح الملف أو الرابط<ExternalLink size={14}/></a>}{sub.score!=null&&<p className="text-sm font-bold">الدرجة المحفوظة: {sub.score} / {assignment.maxScore}</p>}</div><div className="grid gap-2 sm:grid-cols-2"><label className="text-xs font-bold">الدرجة<input type="number" min={0} max={assignment.maxScore} value={form.score} onChange={e=>patchGrade(sub.id,{score:e.target.value})} className="mt-1 w-full rounded-lg border p-2"/></label><label className="text-xs font-bold">حالة المراجعة<select value={form.status} onChange={e=>patchGrade(sub.id,{status:e.target.value})} className="mt-1 w-full rounded-lg border p-2"><option value="GRADED">تم التقييم</option><option value="RESUBMISSION_REQUESTED">طلب إعادة التسليم</option></select></label><label className="text-xs font-bold sm:col-span-2">ملاحظات التصحيح<textarea rows={2} value={form.feedback} onChange={e=>patchGrade(sub.id,{feedback:e.target.value})} className="mt-1 w-full rounded-lg border p-2"/></label><label className="text-xs font-bold sm:col-span-2">رابط صورة التصحيح<input type="url" value={form.feedbackImageUrl} onChange={e=>patchGrade(sub.id,{feedbackImageUrl:e.target.value})} className="mt-1 w-full rounded-lg border p-2" dir="ltr"/></label><button disabled={saving===sub.id} onClick={()=>void gradeSubmission(sub,assignment)} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2"><Save className="inline ml-2" size={15}/>{saving===sub.id?'جارٍ الحفظ…':'حفظ التقييم'}</button></div></div>;})}</div>}</article>)}</div>}
+    {loading ? <div className="rounded-2xl border bg-white p-10 text-center text-slate-500">جارٍ تحميل الواجبات والتسليمات…</div> : filtered.length === 0 ? <div className="rounded-2xl border bg-white p-10 text-center text-slate-500">{loadedLessonCount === 0 ? 'لا توجد دروس متاحة ضمن النطاق المحدد.' : 'لم يُعثر على واجب أو تسليم مطابق ضمن الدروس المحددة.'}</div> : <div className="space-y-5">{filtered.map(({assignment,lessonTitle,courseTitle,submissions})=><article key={assignment.id} className="overflow-hidden rounded-2xl border bg-white"><header className="flex flex-wrap items-center gap-2 border-b bg-slate-50 p-4"><ClipboardCheck className="text-emerald-600" size={19}/><h3 className="font-extrabold">{assignment.title}</h3><span className="rounded-full bg-indigo-100 px-2 py-1 text-xs font-bold text-indigo-800">{assignment.type}</span><span className="text-xs text-slate-500">{courseTitle} · {lessonTitle}</span><span className="mr-auto text-xs text-slate-500">الدرجة القصوى: {assignment.maxScore}</span><button onClick={()=>setConfirmDeleteId(assignment.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="حذف التكليف"><Trash2 size={16}/></button></header>{(assignment.description || assignment.dueDate || assignment.attachmentUrl) && <div className="space-y-2 border-b px-4 py-3 text-sm text-slate-600">{assignment.description && <p className="whitespace-pre-wrap">{assignment.description}</p>}{assignment.dueDate && <p>موعد التسليم: {new Date(assignment.dueDate).toLocaleString('ar')}</p>}{assignment.attachmentUrl && <a className="inline-flex items-center gap-1 font-bold text-blue-700 underline" href={assignment.attachmentUrl} target="_blank" rel="noreferrer">فتح الملف المرفق<ExternalLink size={14}/></a>}</div>}{assignment.type === 'QUIZ' ? <p className="p-4 text-sm text-slate-500">اختبار آلي · لا يتطلب تصحيحاً يدوياً. إجمالي التسليمات: {assignment._count?.submissions ?? 0}.</p> : submissions.length === 0 ? <p className="p-5 text-center text-sm text-slate-500">لا توجد تسليمات بهذه الحالة.</p> : <div className="divide-y">{submissions.map(sub=>{const student=sub.student?.user??sub.student;const form=grades[sub.id]??{score:'',feedback:'',feedbackImageUrl:'',status:'GRADED'};return <div key={sub.id} className="grid gap-4 p-4 xl:grid-cols-[1fr_1fr]"><div className="space-y-2"><div className="flex flex-wrap items-center gap-2"><strong>{student?.name??'طالب'}</strong><span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{sub.status}</span><span className="text-xs text-slate-500">{sub.submittedAt?new Date(sub.submittedAt).toLocaleString('ar'):'—'}</span></div>{sub.content&&<p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm">{sub.content}</p>}{sub.fileUrl&&<a className="inline-flex items-center gap-1 text-sm font-bold text-blue-700 underline" href={sub.fileUrl} target="_blank" rel="noreferrer">فتح الملف أو الرابط<ExternalLink size={14}/></a>}{sub.score!=null&&<p className="text-sm font-bold">الدرجة المحفوظة: {sub.score} / {assignment.maxScore}</p>}</div><div className="grid gap-2 sm:grid-cols-2"><label className="text-xs font-bold">الدرجة<input type="number" min={0} max={assignment.maxScore} value={form.score} onChange={e=>patchGrade(sub.id,{score:e.target.value})} className="mt-1 w-full rounded-lg border p-2"/></label><label className="text-xs font-bold">حالة المراجعة<select value={form.status} onChange={e=>patchGrade(sub.id,{status:e.target.value})} className="mt-1 w-full rounded-lg border p-2"><option value="GRADED">تم التقييم</option><option value="RESUBMISSION_REQUESTED">طلب إعادة التسليم</option></select></label><label className="text-xs font-bold sm:col-span-2">ملاحظات التصحيح<textarea rows={2} value={form.feedback} onChange={e=>patchGrade(sub.id,{feedback:e.target.value})} className="mt-1 w-full rounded-lg border p-2"/></label><label className="text-xs font-bold sm:col-span-2">رابط صورة التصحيح<input type="url" value={form.feedbackImageUrl} onChange={e=>patchGrade(sub.id,{feedbackImageUrl:e.target.value})} className="mt-1 w-full rounded-lg border p-2" dir="ltr"/></label><button disabled={saving===sub.id} onClick={()=>void gradeSubmission(sub,assignment)} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2"><Save className="inline ml-2" size={15}/>{saving===sub.id?'جارٍ الحفظ…':'حفظ التقييم'}</button></div></div>;})}</div>}</article>)}</div>}
   </section>;
 }
