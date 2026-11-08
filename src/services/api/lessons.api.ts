@@ -189,12 +189,28 @@ export const lessonService = {
    * Uses /lessons/search?courseId=X (returns ALL lessons including drafts for admin).
    * Falls back to the student-facing /lessons/course/:courseId if search fails.
    */
+  /**
+   * Fetch a single page of lessons for a course using the dedicated admin endpoint.
+   * Endpoint: GET /lessons/admin/course/:courseId?page=X&limit=Y
+   * - Returns all lessons including drafts
+   * - Excludes heavy description & content for high response speed
+   * Falls back to /lessons/search if the dedicated endpoint is unavailable.
+   */
   async getCoursePage(courseId: string, page: number, limit: number): Promise<{ items: Lesson[]; totalPages: number; total: number }> {
-    // Use the admin search endpoint so drafts are visible in the dashboard.
-    // excludeDescription=true skips description/content fields for faster response.
-    const { data } = await api.get<any>('/lessons/search', {
-      params: { q: '', courseId, page, limit, excludeDescription: 'true' },
-    });
+    let data: any;
+    try {
+      const response = await api.get<any>(`/lessons/admin/course/${courseId}`, {
+        params: { page, limit },
+      });
+      data = response.data;
+    } catch {
+      // Fallback: search endpoint with excludeDescription=true
+      const response = await api.get<any>('/lessons/search', {
+        params: { q: '', courseId, page, limit, excludeDescription: 'true' },
+      });
+      data = response.data;
+    }
+
     const { items, totalPages } = readLessonPage(data, limit);
     const rawTotal = data?.meta?.total ?? data?.meta?.totalItems ?? data?.meta?.count ?? null;
     const resolvedTotal = Number.isFinite(Number(rawTotal)) ? Number(rawTotal) : (totalPages ?? 1) * limit;
@@ -370,12 +386,21 @@ export const lessonService = {
     const seenPageSignatures = new Set<string>();
 
     try {
-      // Use the dedicated paginated endpoint GET /lessons/course/:courseId
+      // Use the dedicated admin paginated endpoint with fallback
       do {
-        const { data } = await api.get<any>(`/lessons/course/${courseId}`, {
-          params: { page, limit },
-        });
-        const { items, totalPages: reported } = readLessonPage(data, limit);
+        let responseData: any;
+        try {
+          const res = await api.get<any>(`/lessons/admin/course/${courseId}`, {
+            params: { page, limit },
+          });
+          responseData = res.data;
+        } catch {
+          const res = await api.get<any>(`/lessons/course/${courseId}`, {
+            params: { page, limit },
+          });
+          responseData = res.data;
+        }
+        const { items, totalPages: reported } = readLessonPage(responseData, limit);
         lessons.push(...items);
         const signature = items.map((item: BackendLesson) => String(item.id)).join(',');
         if (page > 1 && signature && seenPageSignatures.has(signature)) break;
