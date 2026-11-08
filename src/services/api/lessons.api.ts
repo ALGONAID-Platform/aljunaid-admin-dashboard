@@ -164,6 +164,14 @@ function buildLessonFormData(payload: {
   if (payload.courseId !== undefined) fd.append('courseId', String(payload.courseId));
   // Free preview is sent in the JSON follow-up patch so false stays boolean.
   if (payload.pdf instanceof File) fd.append('pdf', payload.pdf);
+  if (payload.scheduledAt) fd.append('scheduledAt', payload.scheduledAt);
+  if (payload.durationMinutes !== undefined && payload.durationMinutes !== null) fd.append('durationMinutes', String(payload.durationMinutes));
+  if (payload.dayNumber !== undefined && payload.dayNumber !== null) fd.append('dayNumber', String(payload.dayNumber));
+  if (payload.isMandatory !== undefined && payload.isMandatory !== null) fd.append('isMandatory', String(payload.isMandatory));
+  if (payload.liveStatus) fd.append('liveStatus', payload.liveStatus);
+  if (payload.liveMeetingUrl) fd.append('liveMeetingUrl', payload.liveMeetingUrl);
+  if (payload.recordingVideoUrl) fd.append('recordingVideoUrl', payload.recordingVideoUrl);
+  if (payload.isFreePreview !== undefined && payload.isFreePreview !== null) fd.append('isFreePreview', String(payload.isFreePreview));
   if (payload.status !== undefined) {
     fd.append('status', payload.status);
   } else if (payload.isPublished !== undefined) {
@@ -468,15 +476,27 @@ export const lessonService = {
       status,
       isPublished: payload.isPublished ?? true,
       pdfFiles: (payload as any).pdfFiles,
+      scheduledAt: (payload as any).scheduledAt,
+      durationMinutes: (payload as any).durationMinutes,
+      dayNumber: (payload as any).dayNumber,
+      isMandatory: (payload as any).isMandatory,
+      liveStatus: (payload as any).liveStatus,
+      liveMeetingUrl: (payload as any).liveMeetingUrl,
+      recordingVideoUrl: (payload as any).recordingVideoUrl,
     });
 
     const { data } = await api.post<BackendLesson | { data: BackendLesson }>('/lessons', fd, { onUploadProgress, timeout: 0 });
     let lesson = (data as { data?: BackendLesson }).data ?? (data as BackendLesson);
 
-    // Send isReading explicitly via JSON to bypass FormData boolean/string strict validation in backend
+    // Send extra fields explicitly via JSON to ensure complete persistence
     const extraFields = Object.fromEntries(
       ['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives','videoUrl','pdfUrl','description','content']
-        .filter(key => (payload as any)[key] !== undefined)
+        .filter(key => {
+          const val = (payload as any)[key];
+          if (val === undefined || val === '') return false;
+          if (['liveStatus', 'liveMeetingUrl', 'recordingVideoUrl', 'videoUrl', 'pdfUrl'].includes(key) && val === null) return false;
+          return true;
+        })
         .map(key => [key, (payload as any)[key]])
     );
     const extraPayload = {
@@ -521,6 +541,13 @@ export const lessonService = {
       status: (payload as any).status ?? (payload.isPublished !== undefined ? (payload.isPublished ? 'PUBLISHED' : 'DRAFT') : undefined),
       moduleId: courseId !== undefined ? Number(courseId) : undefined,
       pdfFiles: (payload as any).pdfFiles,
+      scheduledAt: (payload as any).scheduledAt,
+      durationMinutes: (payload as any).durationMinutes,
+      dayNumber: (payload as any).dayNumber,
+      isMandatory: (payload as any).isMandatory,
+      liveStatus: (payload as any).liveStatus,
+      liveMeetingUrl: (payload as any).liveMeetingUrl,
+      recordingVideoUrl: (payload as any).recordingVideoUrl,
     });
 
     console.info(`[Lesson ${id}] Updating request sent`);
@@ -531,7 +558,12 @@ export const lessonService = {
 
     const extraFields = Object.fromEntries(
       ['scheduledAt','durationMinutes','dayNumber','liveStatus','isMandatory','isFreePreview','liveMeetingUrl','recordingVideoUrl','objectives','videoUrl','pdfUrl','description','content']
-        .filter(key => (payload as any)[key] !== undefined)
+        .filter(key => {
+          const val = (payload as any)[key];
+          if (val === undefined || val === '') return false;
+          if (['liveStatus', 'liveMeetingUrl', 'recordingVideoUrl', 'videoUrl', 'pdfUrl'].includes(key) && val === null) return false;
+          return true;
+        })
         .map(key => [key, (payload as any)[key]])
     );
     const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
