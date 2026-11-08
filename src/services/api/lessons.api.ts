@@ -279,6 +279,39 @@ export const lessonService = {
     }
   },
   /**
+   * Lightweight lesson list for dropdowns — returns only id + title per lesson.
+   * Uses the same paginated search endpoint but strips all heavy fields client-side,
+   * so the network payload is identical but the in-memory/render cost is minimal.
+   * Pass courseId to scope to a single course.
+   */
+  async getLessonNames(courseId?: string): Promise<Array<{ id: string; title: string; courseTitle?: string }>> {
+    const limit = 50;
+    const results: Array<{ id: string; title: string; courseTitle?: string }> = [];
+    let page = 1;
+    let totalPages: number | null = null;
+    const seenSigs = new Set<string>();
+    do {
+      const params: Record<string, unknown> = { q: '', page, limit };
+      if (courseId) params.courseId = courseId;
+      const { data } = await api.get<any>('/lessons/search', { params });
+      const { items, totalPages: reported } = readLessonPage(data, limit);
+      for (const item of items) {
+        results.push({
+          id: String(item.id),
+          title: item.title ?? '',
+          courseTitle: (item as any).module?.title ?? (item as any).course?.title ?? undefined,
+        });
+      }
+      const sig = items.map((item: BackendLesson) => String(item.id)).join(',');
+      if (page > 1 && sig && seenSigs.has(sig)) break;
+      if (sig) seenSigs.add(sig);
+      totalPages = reported ?? (items.length === limit ? page + 1 : page);
+      page += 1;
+    } while (page <= (totalPages ?? 1));
+    return results;
+  },
+
+  /**
    * Fetch all lessons across all modules.
    * Strategy: GET /modules → for each module GET /lessons/module/{id}
    */

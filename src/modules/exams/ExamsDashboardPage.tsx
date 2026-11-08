@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, BarChart3, Check, ExternalLink, FileImage, Loader2, Medal, Pencil, Plus, RefreshCw, Search, Trash2, Trophy, X } from 'lucide-react';
-import { useCoursesStore, useLessonsStore, useModulesStore } from '../../store';
+import { useCoursesStore, useModulesStore } from '../../store';
+import { lessonService } from '../../services/api/lessons.api';
 import { examManagementService } from '../../services/api/examManagement.api';
 import { resolveErrorMessage } from '../../lib/errors';
 import { getImageUrl } from '../../utils/helpers';
@@ -57,8 +58,9 @@ function examStatus(exam: AdminExam) {
 
 export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedCourseId?: string; scopedLessonId?: string } = {}) {
   const { courses, fetchCourses } = useCoursesStore();
-  const { lessons, fetchLessons } = useLessonsStore();
   const { modules, fetchModules } = useModulesStore();
+  const [lessonNames, setLessonNames] = useState<Array<{ id: string; title: string }>>([]);
+  const [lessonNamesLoading, setLessonNamesLoading] = useState(false);
   const [exams, setExams] = useState<AdminExam[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -89,14 +91,22 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
   };
 
   useEffect(() => {
-    void fetchCourses(); void fetchLessons(); void fetchModules(); void reload();
-  }, [fetchCourses, fetchLessons, fetchModules]);
+    void fetchCourses(); void fetchModules(); void reload();
+  }, [fetchCourses, fetchModules]);
+
+  // Load lightweight lesson names (id + title only) whenever the selected course changes
+  useEffect(() => {
+    if (!form.courseId) { setLessonNames([]); return; }
+    setLessonNamesLoading(true);
+    void lessonService.getLessonNames(form.courseId)
+      .then(names => setLessonNames(names))
+      .catch(() => setLessonNames([]))
+      .finally(() => setLessonNamesLoading(false));
+  }, [form.courseId]);
 
   const filteredLessons = useMemo(() => {
-    if (!form.courseId) return [];
-    const moduleIds = new Set(modules.filter((module) => String(module.courseId) === form.courseId).map((module) => String(module.id)));
-    return lessons.filter((lesson) => moduleIds.has(String(lesson.courseId)));
-  }, [form.courseId, lessons, modules]);
+    return scopedLessonId ? lessonNames.filter(l => String(l.id) === String(scopedLessonId)) : lessonNames;
+  }, [lessonNames, scopedLessonId]);
 
   const filteredExams = useMemo(() => exams.filter((exam) => {
     const searchMatch = !search || [exam.title, exam.courseTitle, exam.lessonTitle].some((value) => value?.toLowerCase().includes(search.toLowerCase()));
@@ -271,7 +281,7 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
           : examManagementService.addQuestion(savedExam.id, questionPayload(question))));
       }
       const selectedCourse = courses.find((course) => String(course.id) === form.courseId);
-      const selectedLesson = lessons.find((lesson) => String(lesson.id) === form.lessonId);
+      const selectedLesson = lessonNames.find((lesson) => String(lesson.id) === form.lessonId);
       const examForList: AdminExam = {
         ...savedExam,
         imageUrl: savedExam.imageUrl ?? editing?.imageUrl,
@@ -365,7 +375,7 @@ export function ExamsDashboardPage({ scopedCourseId, scopedLessonId }: { scopedC
             ) : (
               <label className="text-sm font-semibold">المقرر<select required disabled={Boolean(editing || scopedLessonId)} value={form.courseId} onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value, lessonId: '' }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">اختر المقرر</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}</select></label>
             )}
-            {form.examType === 'LESSON_QUIZ' && <label className="text-sm font-semibold">الدرس<select required disabled={Boolean(editing || scopedLessonId)} value={form.lessonId} onChange={(event) => setForm((current) => ({ ...current, lessonId: event.target.value }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">اختر الدرس</option>{filteredLessons.filter(lesson => !scopedLessonId || String(lesson.id) === String(scopedLessonId)).map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}</select></label>}
+            {form.examType === 'LESSON_QUIZ' && <label className="text-sm font-semibold">الدرس<select required disabled={Boolean(editing || scopedLessonId)} value={form.lessonId} onChange={(event) => setForm((current) => ({ ...current, lessonId: event.target.value }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal disabled:bg-slate-100"><option value="">{lessonNamesLoading ? 'جارٍ التحميل…' : 'اختر الدرس'}</option>{filteredLessons.map((lesson) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}</select></label>}
             <label className="text-sm font-semibold">عنوان الاختبار<input required value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal" /></label>
             <label className="text-sm font-semibold sm:col-span-2">الوصف<textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} rows={2} className="mt-1.5 w-full rounded-xl border p-3 font-normal" /></label>
             <label className="text-sm font-semibold">معيار الترتيب<select value={form.rankingCriteria} onChange={(event) => setForm((current) => ({ ...current, rankingCriteria: event.target.value as RankingCriteria }))} className="mt-1.5 w-full rounded-xl border p-3 font-normal"><option value="BOTH">الدرجة ثم السرعة</option><option value="SCORE">الدرجة</option><option value="SPEED">السرعة</option></select></label>
