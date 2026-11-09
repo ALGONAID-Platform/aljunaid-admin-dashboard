@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   BookOpen, BookMarked, ClipboardList, CheckCircle2, Clock,
-  AlertCircle, TrendingUp, Sparkles, GraduationCap, ArrowUpRight
+  AlertCircle, Sparkles, GraduationCap
 } from 'lucide-react';
 import { useCoursesStore, useLessonsStore, useQuizzesStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
 import { PageGuide } from '../../../components/ui/PageGuide';
+import { DashboardInteractionsCard } from '../components/DashboardInteractionsCard';
 export function DashboardHome() {
   const courses = useCoursesStore((s) => s.courses);
   const fetchCourses = useCoursesStore((s) => s.fetchCourses);
@@ -27,14 +28,6 @@ export function DashboardHome() {
   const publishedLessons = lessons.filter((l) => l.isPublished);
   const unpublishedLessons = lessons.filter((l) => !l.isPublished);
   const completionPercentage = lessons.length > 0 ? Math.round((publishedLessons.length / lessons.length) * 100) : 0;
-
-  const recentActivity = [
-    ...courses.map((c) => ({ type: 'course' as const, label: `تم تأسيس المقرر: ${c.title}`, date: c.createdAt, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' })),
-    ...lessons.map((l) => ({ type: 'lesson' as const, label: `تمت صياغة الدرس: ${l.title}`, date: l.createdAt, icon: BookMarked, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' })),
-    ...quizzes.map((q) => ({ type: 'quiz' as const, label: `تم إعداد الاختبار: ${q.title}`, date: q.createdAt, icon: ClipboardList, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-100' })),
-  ]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 7);
 
   if (isLoading && courses.length === 0) return <Loader fullPage />;
 
@@ -164,44 +157,8 @@ export function DashboardHome() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
-        {/* Activity Feed Section */}
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shadow-sm border border-emerald-100">
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div>
-              <h3 className="text-slate-800 font-bold text-base">سجل العمليات الأخيرة</h3>
-              <p className="text-xs font-medium text-slate-400 mt-0.5">أحدث التغييرات التي تمت على المنصة</p>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto max-h-[450px] custom-scrollbar p-2">
-            {recentActivity.length === 0 ? (
-              <div className="p-12 text-center h-full flex flex-col items-center justify-center">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                  <Clock className="w-8 h-8 text-slate-300" />
-                </div>
-                <h4 className="text-slate-700 font-bold mb-1">لا يوجد نشاط مسجل</h4>
-                <p className="text-slate-400 text-sm">ستظهر العمليات الجديدة هنا فور حدوثها.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-50/80">
-                {recentActivity.map((item, i) => (
-                  <div key={i} className="interactive-surface px-4 py-4 flex items-start sm:items-center gap-4 hover:bg-slate-50/80 transition-colors rounded-xl mx-2 my-1 group">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm ${item.bg} ${item.border} group-hover:scale-110 transition-transform duration-300`}>
-                      <item.icon className={`w-5 h-5 ${item.color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-slate-700 font-bold text-sm truncate mb-1">{item.label}</p>
-                      <p className="text-slate-400 text-xs font-medium font-mono">{new Date(item.date).toLocaleString('ar-SA')}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Interactions, Mentions & Reviews Section (Replaces Activity Feed) */}
+        <DashboardInteractionsCard courses={courses} />
 
         {/* Content Publishing Progress */}
         <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full">

@@ -12,6 +12,7 @@ export { progressService } from './progress.api';
 export { usersService } from './users.api';
 export { notificationsService } from './notifications.api';
 export { backupService } from './backup.api';
+export { interactionsService } from './interactions.api';
 
 export { api };
 export default api;
