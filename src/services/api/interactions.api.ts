@@ -103,6 +103,16 @@ export const interactionsService = {
   },
 
   /**
+   * Upload an image to attach with a comment or reply
+   */
+  async uploadCommentImage(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('image', file);
+    const res = await api.post<{ imageUrl: string }>('/comments/upload-image', formData);
+    return res.data?.imageUrl;
+  },
+
+  /**
    * Reply to a lesson or exam comment
    */
   async replyToLessonOrExamComment(payload: {
@@ -111,6 +121,7 @@ export const interactionsService = {
     lessonId?: number;
     examId?: number;
     mentionedUserIds?: number[];
+    imageUrl?: string;
   }) {
     const res = await api.post('/comments', payload);
     return res.data;
@@ -125,6 +136,7 @@ export const interactionsService = {
       text: string;
       parentId?: number;
       mentionedUserIds?: number[];
+      imageUrl?: string;
     }
   ) {
     const res = await api.post(`/posts/${postId}/comments`, payload);

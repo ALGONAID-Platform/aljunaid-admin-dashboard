@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import {
   MessageSquare, Star, Reply, Send, CheckCheck, Clock,
   RefreshCw, BookOpen, ClipboardList, AlertCircle,
-  FileText, CornerDownLeft, Sparkles, X, ChevronDown, CheckCircle2
+  FileText, CornerDownLeft, Sparkles, X, ChevronDown, CheckCircle2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import {
@@ -54,8 +55,11 @@ export function DashboardInteractionsCard({ courses }: Props) {
   // Replying state
   const [replyingToId, setReplyingToId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [replyImage, setReplyImage] = useState<File | null>(null);
+  const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null);
   const [submittingReply, setSubmittingReply] = useState(false);
-  const [sentReplies, setSentReplies] = useState<Record<number, { text: string; date: Date }>>({});
+  const [sentReplies, setSentReplies] = useState<Record<number, { text: string; imageUrl?: string; date: Date }>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reviews state
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
@@ -128,11 +132,51 @@ export function DashboardInteractionsCard({ courses }: Props) {
     }
   };
 
+  // Image Selection & Removal Handlers
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('يرجى اختيار ملف صورة صالح (PNG, JPG, WEBP)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('حجم الصورة كبير جداً، الحد الأقصى هو 5 ميجابايت');
+      return;
+    }
+
+    if (replyImagePreview) {
+      URL.revokeObjectURL(replyImagePreview);
+    }
+
+    setReplyImage(file);
+    setReplyImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveImage = () => {
+    if (replyImagePreview) {
+      URL.revokeObjectURL(replyImagePreview);
+    }
+    setReplyImage(null);
+    setReplyImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const resetReplyForm = () => {
+    setReplyingToId(null);
+    setReplyText('');
+    handleRemoveImage();
+  };
+
   // Submit Reply
   const handleSendReply = async (mention: MentionItem) => {
     const text = replyText.trim();
-    if (!text) {
-      toast.error('يرجى كتابة نص الرد أولاً');
+    if (!text && !replyImage) {
+      toast.error('يرجى كتابة نص الرد أو إرفاق صورة أولاً');
       return;
     }
 
@@ -144,12 +188,24 @@ export function DashboardInteractionsCard({ courses }: Props) {
 
     setSubmittingReply(true);
     try {
+      let uploadedImageUrl: string | undefined;
+      if (replyImage) {
+        try {
+          uploadedImageUrl = await interactionsService.uploadCommentImage(replyImage);
+        } catch (uploadErr: any) {
+          toast.error(uploadErr.response?.data?.message || 'فشل في رفع الصورة المرفقة');
+          setSubmittingReply(false);
+          return;
+        }
+      }
+
       if (commentData.postId) {
         // Community post comment
         await interactionsService.replyToPostComment(commentData.postId, {
-          text,
+          text: text || 'رد مع مرفق صورة',
           parentId: commentData.id,
           mentionedUserIds: commentData.user?.id ? [commentData.user.id] : undefined,
+          imageUrl: uploadedImageUrl,
         });
       } else {
         // Lesson or Exam comment
@@ -157,11 +213,12 @@ export function DashboardInteractionsCard({ courses }: Props) {
         const examId = commentData.examId ?? commentData.exam?.id ?? undefined;
 
         await interactionsService.replyToLessonOrExamComment({
-          text,
+          text: text || 'رد مع مرفق صورة',
           parentId: commentData.id,
           lessonId,
           examId,
           mentionedUserIds: commentData.user?.id ? [commentData.user.id] : undefined,
+          imageUrl: uploadedImageUrl,
         });
       }
 
@@ -178,7 +235,7 @@ export function DashboardInteractionsCard({ courses }: Props) {
       // Record sent reply locally
       setSentReplies((prev) => ({
         ...prev,
-        [mention.id]: { text, date: new Date() },
+        [mention.id]: { text, imageUrl: uploadedImageUrl, date: new Date() },
       }));
 
       // Update mention read status in state
@@ -187,8 +244,7 @@ export function DashboardInteractionsCard({ courses }: Props) {
       );
 
       toast.success('تم إرسال ردك بنجاح');
-      setReplyText('');
-      setReplyingToId(null);
+      resetReplyForm();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'تعذر إرسال الرد، يرجى المحاولة مرة أخرى');
     } finally {
@@ -416,10 +472,10 @@ export function DashboardInteractionsCard({ courses }: Props) {
 
                   {/* Sent Reply Confirmation if teacher replied in this session */}
                   {hasRepliedLocally && (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 mb-3 flex items-start gap-2.5">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 mb-3 flex items-start gap-2.5">
                       <CornerDownLeft size={16} className="text-emerald-700 mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
                           <span className="text-xs font-bold text-emerald-900">
                             ردك على الطالب:
                           </span>
@@ -427,9 +483,21 @@ export function DashboardInteractionsCard({ courses }: Props) {
                             {timeAgo(sentReplies[item.id].date.toISOString())}
                           </span>
                         </div>
-                        <p className="text-xs text-emerald-950 font-medium whitespace-pre-wrap">
-                          {sentReplies[item.id].text}
-                        </p>
+                        {sentReplies[item.id].text && (
+                          <p className="text-xs sm:text-sm text-emerald-950 font-medium whitespace-pre-wrap leading-relaxed">
+                            {sentReplies[item.id].text}
+                          </p>
+                        )}
+                        {sentReplies[item.id].imageUrl && (
+                          <div className="mt-2.5">
+                            <img
+                              src={sentReplies[item.id].imageUrl}
+                              alt="الصورة المرفقة بالرد"
+                              className="max-h-48 rounded-xl border border-emerald-200 object-cover cursor-pointer hover:opacity-95 shadow-xs transition-opacity"
+                              onClick={() => window.open(sentReplies[item.id].imageUrl!, '_blank')}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -441,8 +509,8 @@ export function DashboardInteractionsCard({ courses }: Props) {
                         <button
                           type="button"
                           onClick={() => {
+                            resetReplyForm();
                             setReplyingToId(item.id);
-                            setReplyText('');
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition-colors"
                         >
@@ -452,10 +520,7 @@ export function DashboardInteractionsCard({ courses }: Props) {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => {
-                            setReplyingToId(null);
-                            setReplyText('');
-                          }}
+                          onClick={resetReplyForm}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-bold transition-colors"
                         >
                           <X size={13} />
@@ -478,46 +543,94 @@ export function DashboardInteractionsCard({ courses }: Props) {
 
                   {/* Inline Reply Form */}
                   {replyingToId === item.id && (
-                    <div className="mt-3 pt-3 border-t border-slate-200/80 animate-in fade-in duration-200">
-                      <div className="relative">
+                    <div className="mt-3 pt-3 border-t border-slate-200/80 animate-in fade-in duration-200 space-y-3">
+                      {/* Hidden File Input for image upload */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+
+                      <div className="space-y-2.5">
                         <textarea
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
-                          placeholder="اكتب ردك الأكاديمي للطالب هنا..."
-                          rows={3}
+                          placeholder="اكتب ردك الأكاديمي المفصل للطالب هنا... (يمكنك الضغط على Enter للنزول لأسطر متعددة)"
+                          rows={5}
                           disabled={submittingReply}
-                          className="w-full rounded-xl border border-emerald-300 bg-white p-3 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all custom-scrollbar resize-none"
+                          className="w-full rounded-xl border border-emerald-300 bg-white p-3.5 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all custom-scrollbar resize-y min-h-[140px] leading-relaxed"
                         />
-                        <div className="flex items-center justify-end gap-2 mt-2">
+
+                        {/* Selected Image Preview Thumbnail */}
+                        {replyImagePreview && (
+                          <div className="relative inline-flex items-center gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                            <img
+                              src={replyImagePreview}
+                              alt="معاينة الصورة المرفقة"
+                              className="w-16 h-16 rounded-lg object-cover border border-slate-300 shadow-xs"
+                            />
+                            <div className="text-right pr-1">
+                              <p className="text-xs font-bold text-slate-700 truncate max-w-[200px] sm:max-w-[280px]">
+                                {replyImage?.name}
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                {replyImage ? `${(replyImage.size / 1024).toFixed(0)} كيلوبايت` : ''}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              disabled={submittingReply}
+                              className="p-1.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition-colors mr-2"
+                              title="إزالة الصورة"
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Toolbar: Attach image & Action buttons */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                           <button
                             type="button"
-                            onClick={() => {
-                              setReplyingToId(null);
-                              setReplyText('');
-                            }}
+                            onClick={() => fileInputRef.current?.click()}
                             disabled={submittingReply}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 text-xs font-bold transition-all disabled:opacity-50"
                           >
-                            إلغاء
+                            <ImageIcon size={14} className="text-emerald-600" />
+                            <span>{replyImage ? 'تغيير الصورة' : 'إرفاق صورة'}</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleSendReply(item)}
-                            disabled={submittingReply || !replyText.trim()}
-                            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs"
-                          >
-                            {submittingReply ? (
-                              <>
-                                <RefreshCw size={13} className="animate-spin" />
-                                <span>جارٍ الإرسال...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Send size={13} />
-                                <span>إرسال الرد</span>
-                              </>
-                            )}
-                          </button>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={resetReplyForm}
+                              disabled={submittingReply}
+                              className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                            >
+                              إلغاء
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleSendReply(item)}
+                              disabled={submittingReply || (!replyText.trim() && !replyImage)}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs"
+                            >
+                              {submittingReply ? (
+                                <>
+                                  <RefreshCw size={13} className="animate-spin" />
+                                  <span>جارٍ إرسال الرد...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Send size={13} />
+                                  <span>إرسال الرد</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
