@@ -424,11 +424,11 @@ export function CourseStudentsPage({ scopedCourseId }: Props) {
   useEffect(() => { void load(); }, [load]);
 
   const handleRemove = async (student: CourseStudent['student']) => {
-    if (!confirm(`هل أنت متأكد من إلغاء تسجيل "${student.name}" من هذا الكورس؟`)) return;
+    if (!confirm(`هل أنت متأكد من إلغاء اشتراك وتسجيل "${student.name}" من هذا الكورس نهائياً؟`)) return;
     setRemovingId(student.id);
     try {
       await api.delete(`/payments/admin/enrollments/${scopedCourseId}/users/${student.id}`);
-      toast.success(`تم إلغاء تسجيل "${student.name}" بنجاح`);
+      toast.success(`تم إلغاء اشتراك "${student.name}" نهائياً من الكورس`);
       void load();
     } catch (err) {
       toast.error(errorMsg(err));
@@ -588,23 +588,19 @@ export function CourseStudentsPage({ scopedCourseId }: Props) {
                       )}
                       {/* Actions */}
                       <td className="px-5 py-4 text-center">
-                        {item.status === 'ACTIVE' ? (
-                          <button
-                            onClick={() => handleRemove(item.student)}
-                            disabled={removingId === item.student.id}
-                            title="إلغاء التسجيل"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors"
-                          >
-                            {removingId === item.student.id ? (
-                              <RefreshCw size={12} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={12} />
-                            )}
-                            إلغاء
-                          </button>
-                        ) : (
-                          <span className="text-xs text-slate-400">—</span>
-                        )}
+                        <button
+                          onClick={() => handleRemove(item.student)}
+                          disabled={removingId === item.student.id}
+                          title="إلغاء الاشتراك وحذف المشترك نهائياً"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                        >
+                          {removingId === item.student.id ? (
+                            <RefreshCw size={12} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={12} />
+                          )}
+                          إلغاء
+                        </button>
                       </td>
                     </tr>
                   );
