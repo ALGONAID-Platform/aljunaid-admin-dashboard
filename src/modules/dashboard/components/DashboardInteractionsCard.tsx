@@ -264,25 +264,25 @@ export function DashboardInteractionsCard({ courses }: Props) {
       : '0.0';
 
   return (
-    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full">
+    <section className="w-full space-y-4">
       {/* Header with Navigation Tabs */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="w-full p-4 sm:p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {/* Tab: Interactions & Comments */}
           <button
             type="button"
             onClick={() => setActiveTab('interactions')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeTab === 'interactions'
                 ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                : 'text-slate-600 hover:bg-slate-200/60'
+                : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <MessageSquare size={16} />
             <span>التعليقات والردود</span>
             {unreadCount > 0 && (
               <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                   activeTab === 'interactions'
                     ? 'bg-white text-emerald-700'
                     : 'bg-emerald-600 text-white animate-pulse'
@@ -297,10 +297,10 @@ export function DashboardInteractionsCard({ courses }: Props) {
           <button
             type="button"
             onClick={() => setActiveTab('reviews')}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
               activeTab === 'reviews'
                 ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
-                : 'text-slate-600 hover:bg-slate-200/60'
+                : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
             <Star size={16} className={activeTab === 'reviews' ? 'fill-white' : ''} />
@@ -314,10 +314,10 @@ export function DashboardInteractionsCard({ courses }: Props) {
             <button
               type="button"
               onClick={() => setFilterUnreadOnly((prev) => !prev)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
                 filterUnreadOnly
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
               }`}
             >
               {filterUnreadOnly ? 'عرض الكل' : 'غير المقروء فقط'}
@@ -331,7 +331,7 @@ export function DashboardInteractionsCard({ courses }: Props) {
               else if (selectedCourseId) void loadReviews(selectedCourseId);
             }}
             title="تحديث البيانات"
-            className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-emerald-600 hover:bg-slate-50 transition-colors"
+            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-emerald-600 hover:bg-slate-50 transition-colors"
           >
             <RefreshCw
               size={15}
@@ -343,25 +343,25 @@ export function DashboardInteractionsCard({ courses }: Props) {
 
       {/* Tab 1 Content: Interactions & Rapid Replies */}
       {activeTab === 'interactions' && (
-        <div className="flex-1 overflow-y-auto max-h-[500px] custom-scrollbar p-3 space-y-3">
+        <div className="w-full space-y-4">
           {loadingMentions && mentions.length === 0 ? (
-            <div className="p-12 text-center flex flex-col items-center justify-center text-slate-400">
-              <RefreshCw size={26} className="animate-spin text-emerald-600 mb-3" />
+            <div className="w-full rounded-2xl border border-slate-200/80 bg-white p-12 text-center flex flex-col items-center justify-center text-slate-400 shadow-xs">
+              <RefreshCw size={28} className="animate-spin text-emerald-600 mb-3" />
               <p className="text-sm font-bold text-slate-600">جارٍ جلب التفاعلات والتعليقات...</p>
             </div>
           ) : mentionsError && mentions.length === 0 ? (
-            <div className="p-8 text-center flex flex-col items-center justify-center">
+            <div className="w-full rounded-2xl border border-red-200 bg-red-50 p-8 text-center flex flex-col items-center justify-center shadow-xs">
               <AlertCircle size={32} className="text-red-500 mb-2" />
               <p className="text-sm font-bold text-slate-700 mb-2">{mentionsError}</p>
               <button
                 onClick={() => void loadMentions()}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors"
+                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors"
               >
                 إعادة المحاولة
               </button>
             </div>
           ) : displayedMentions.length === 0 ? (
-            <div className="p-12 text-center flex flex-col items-center justify-center">
+            <div className="w-full rounded-2xl border border-slate-200/80 bg-white p-12 text-center flex flex-col items-center justify-center shadow-xs">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
                 <MessageSquare className="w-8 h-8 text-slate-300" />
               </div>
@@ -394,45 +394,45 @@ export function DashboardInteractionsCard({ courses }: Props) {
               }
 
               return (
-                <div
+                <article
                   key={item.id}
-                  className={`rounded-2xl border p-4 transition-all duration-200 ${
+                  className={`w-full rounded-2xl border p-5 sm:p-6 shadow-xs transition-all duration-200 ${
                     !item.isRead
-                      ? 'border-emerald-200 bg-emerald-50/30 shadow-xs'
-                      : 'border-slate-100 bg-white hover:border-slate-200'
+                      ? 'border-emerald-300 bg-emerald-50/20 ring-1 ring-emerald-500/10'
+                      : 'border-slate-200/80 bg-white hover:border-slate-300'
                   }`}
                 >
                   {/* Top Bar: Author, Context, Type Badge */}
-                  <div className="flex items-start justify-between gap-3 mb-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       {/* Avatar */}
                       {author?.avatar ? (
                         <img
                           src={author.avatar}
                           alt={author.name}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                          className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
                         />
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-200">
+                        <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 font-black flex items-center justify-center text-sm shrink-0 border border-emerald-200">
                           {author?.name ? author.name.charAt(0) : 'ط'}
                         </div>
                       )}
 
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800 truncate">
+                          <span className="text-sm sm:text-base font-black text-slate-900 truncate">
                             {author?.name || 'مستخدم'}
                           </span>
                           {!item.isRead && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-bold">
-                              <Sparkles size={10} /> جديد
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[11px] font-bold">
+                              <Sparkles size={11} /> جديد
                             </span>
                           )}
                         </div>
 
                         {/* Relative Time */}
-                        <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                          <Clock size={11} />
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium mt-0.5">
+                          <Clock size={12} />
                           <span>{timeAgo(item.createdAt)}</span>
                         </div>
                       </div>
@@ -440,21 +440,22 @@ export function DashboardInteractionsCard({ courses }: Props) {
 
                     {/* Context Pill (Lesson / Exam / Post) */}
                     {contextTitle && (
-                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold max-w-[180px] sm:max-w-[240px] truncate shrink-0">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold shrink-0">
                         {contextLabel === 'درس' ? (
-                          <BookOpen size={12} className="text-blue-600 shrink-0" />
+                          <BookOpen size={14} className="text-blue-600 shrink-0" />
                         ) : contextLabel === 'اختبار' ? (
-                          <ClipboardList size={12} className="text-purple-600 shrink-0" />
+                          <ClipboardList size={14} className="text-purple-600 shrink-0" />
                         ) : (
-                          <FileText size={12} className="text-amber-600 shrink-0" />
+                          <FileText size={14} className="text-amber-600 shrink-0" />
                         )}
-                        <span className="truncate">{contextTitle}</span>
+                        <span className="text-slate-500 font-normal">{contextLabel}:</span>
+                        <span className="font-bold text-slate-800">{contextTitle}</span>
                       </div>
                     )}
                   </div>
 
                   {/* Comment Text */}
-                  <p className="text-slate-700 text-xs sm:text-sm font-medium leading-relaxed mb-3 whitespace-pre-wrap">
+                  <p className="text-slate-800 text-sm sm:text-base font-medium leading-relaxed mb-4 whitespace-pre-wrap">
                     {commentData?.text || item.post?.content || 'لا يوجد نص'}
                   </p>
 
@@ -635,7 +636,7 @@ export function DashboardInteractionsCard({ courses }: Props) {
                       </div>
                     </div>
                   )}
-                </div>
+                </article>
               );
             })
           )}
@@ -644,20 +645,21 @@ export function DashboardInteractionsCard({ courses }: Props) {
 
       {/* Tab 2 Content: Course Ratings & Student Reviews */}
       {activeTab === 'reviews' && (
-        <div className="flex-1 overflow-y-auto max-h-[500px] custom-scrollbar p-4 space-y-4">
+        <div className="w-full space-y-4">
           {/* Course Selector & Summary Box */}
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-4 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <label className="text-xs font-bold text-slate-700 shrink-0">
-                اختر المقرر لعرض تقييمات الطلاب:
-              </label>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800">تقييمات الطلاب للمقررات</h4>
+                <p className="text-xs text-slate-500 mt-0.5">اختر مقرراً لعرض آراء وتقييمات الطلاب المسجلين فيه</p>
+              </div>
 
               {courses.length > 0 ? (
                 <div className="relative">
                   <select
                     value={selectedCourseId ?? ''}
                     onChange={(e) => setSelectedCourseId(Number(e.target.value))}
-                    className="w-full sm:w-64 appearance-none rounded-xl border border-slate-300 bg-white px-3.5 py-1.5 pr-8 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all cursor-pointer"
+                    className="w-full sm:w-72 appearance-none rounded-xl border border-slate-300 bg-white px-4 py-2 pr-9 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all cursor-pointer shadow-xs"
                   >
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -666,8 +668,8 @@ export function DashboardInteractionsCard({ courses }: Props) {
                     ))}
                   </select>
                   <ChevronDown
-                    size={14}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
                   />
                 </div>
               ) : (
@@ -676,52 +678,54 @@ export function DashboardInteractionsCard({ courses }: Props) {
             </div>
 
             {/* Rating Summary Bar */}
-            <div className="flex items-center justify-between pt-2 border-t border-amber-200/60">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-black text-amber-600">{avgRating}</span>
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      size={14}
-                      className={
-                        star <= Math.round(Number(avgRating))
-                          ? 'text-amber-500 fill-amber-500'
-                          : 'text-slate-300'
-                      }
-                    />
-                  ))}
+            <div className="flex items-center justify-between pt-3 border-t border-amber-200/70">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl font-black text-amber-600">{avgRating}</span>
+                <div>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        size={16}
+                        className={
+                          star <= Math.round(Number(avgRating))
+                            ? 'text-amber-500 fill-amber-500'
+                            : 'text-slate-300'
+                        }
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs font-semibold text-slate-500 mt-0.5 block">متوسط التقييم من 5 نجوم</span>
                 </div>
-                <span className="text-xs font-medium text-slate-500">من 5 نجوم</span>
               </div>
 
-              <div className="text-xs font-bold text-slate-600">
-                {reviews.length} {reviews.length === 1 ? 'تقييم' : 'تقييمات'}
+              <div className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-100/70 text-amber-900 border border-amber-200">
+                إجمالي التقييمات: {reviews.length} {reviews.length === 1 ? 'تقييم' : 'تقييمات'}
               </div>
             </div>
           </div>
 
           {/* Reviews List */}
           {loadingReviews ? (
-            <div className="p-12 text-center flex flex-col items-center justify-center text-slate-400">
-              <RefreshCw size={26} className="animate-spin text-amber-500 mb-3" />
+            <div className="w-full rounded-2xl border border-slate-200/80 bg-white p-12 text-center flex flex-col items-center justify-center text-slate-400 shadow-xs">
+              <RefreshCw size={28} className="animate-spin text-amber-500 mb-3" />
               <p className="text-sm font-bold text-slate-600">جارٍ جلب تقييمات المقرر...</p>
             </div>
           ) : reviewsError ? (
-            <div className="p-8 text-center flex flex-col items-center justify-center">
+            <div className="w-full rounded-2xl border border-red-200 bg-red-50 p-8 text-center flex flex-col items-center justify-center shadow-xs">
               <AlertCircle size={32} className="text-red-500 mb-2" />
               <p className="text-sm font-bold text-slate-700 mb-2">{reviewsError}</p>
               {selectedCourseId && (
                 <button
                   onClick={() => void loadReviews(selectedCourseId)}
-                  className="px-4 py-2 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 transition-colors"
+                  className="px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition-colors shadow-xs"
                 >
                   إعادة المحاولة
                 </button>
               )}
             </div>
           ) : reviews.length === 0 ? (
-            <div className="p-12 text-center flex flex-col items-center justify-center">
+            <div className="w-full rounded-2xl border border-slate-200/80 bg-white p-12 text-center flex flex-col items-center justify-center shadow-xs">
               <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mb-3">
                 <Star className="w-8 h-8 text-amber-300" />
               </div>
@@ -731,55 +735,58 @@ export function DashboardInteractionsCard({ courses }: Props) {
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="w-full space-y-3">
               {reviews.map((rev) => (
-                <div key={rev.id} className="py-3.5 first:pt-0 last:pb-0">
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <div className="flex items-center gap-2">
+                <div key={rev.id} className="w-full rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs hover:border-slate-300 transition-all">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-3">
                       {rev.student?.user?.avatar ? (
                         <img
                           src={rev.student.user.avatar}
                           alt={rev.student.user.name}
-                          className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                          className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-xs shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-xs shrink-0 border border-amber-200">
                           {rev.student?.user?.name ? rev.student.user.name.charAt(0) : 'ط'}
                         </div>
                       )}
                       <div>
-                        <p className="text-xs font-bold text-slate-800">
+                        <p className="text-sm font-bold text-slate-900">
                           {rev.student?.user?.name || 'طالب'}
                         </p>
-                        <p className="text-[10px] text-slate-400 font-medium">
+                        <p className="text-xs text-slate-400 font-medium">
                           {timeAgo(rev.createdAt)}
                         </p>
                       </div>
                     </div>
 
                     {/* Star Rating */}
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star
-                          key={s}
-                          size={12}
-                          className={
-                            s <= rev.rating
-                              ? 'text-amber-500 fill-amber-500'
-                              : 'text-slate-200'
-                          }
-                        />
-                      ))}
+                    <div className="flex items-center gap-1 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-lg">
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star
+                            key={s}
+                            size={13}
+                            className={
+                              s <= rev.rating
+                                ? 'text-amber-500 fill-amber-500'
+                                : 'text-slate-200'
+                            }
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs font-black text-amber-700 mr-1">{rev.rating}</span>
                     </div>
                   </div>
 
                   {rev.comment ? (
-                    <p className="text-xs text-slate-700 font-medium mt-1 pr-10 whitespace-pre-wrap">
+                    <p className="text-sm text-slate-800 font-medium leading-relaxed pr-12 whitespace-pre-wrap">
                       "{rev.comment}"
                     </p>
                   ) : (
-                    <p className="text-[11px] text-slate-400 font-medium italic mt-1 pr-10">
-                      (تقييم بالنجوم دون تعليق كتابي)
+                    <p className="text-xs text-slate-400 font-medium italic pr-12">
+                      (تقييم بالنجوم فقط دون تعليق كتابي)
                     </p>
                   )}
                 </div>
@@ -788,6 +795,6 @@ export function DashboardInteractionsCard({ courses }: Props) {
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }
