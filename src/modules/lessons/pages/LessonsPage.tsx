@@ -3,7 +3,7 @@ import {
   Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, ChevronUp, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2, Info, BookOpen
 } from 'lucide-react';
 import type { Lesson } from '../../../types';
-import { useCoursesStore, useLessonsStore, useModulesStore } from '../../../store';
+import { useCoursesStore, useLessonsStore, useModulesStore, useVideoUploadStore } from '../../../store';
 import { Loader } from '../../../components/feedback/Loader';
 import { useKeyboardShortcut } from '../../../hooks/useKeyboardShortcuts';
 import { BulkActionBar } from '../../../components/ui/BulkActionBar';
@@ -238,9 +238,24 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const pdfUploadInFlightRef = useRef(false);
   const saveInFlightRef = useRef(false);
   const videoInputRef = useRef<HTMLInputElement>(null);
-  const [videoUploadProgress, setVideoUploadProgress] = useState<UploadProgress | null>(null);
-  const [videoUploadError, setVideoUploadError] = useState('');
-  const [videoFileInfo, setVideoFileInfo] = useState<{name: string; size: number} | null>(null);
+  const {
+    isUploading: isVideoUploading,
+    progress: videoUploadProgress,
+    status: videoUploadStatus,
+    fileInfo: videoFileInfo,
+    videoUrl: uploadedVideoUrl,
+    error: videoUploadError,
+    uploadSpeed: videoUploadSpeed,
+    timeRemaining: videoUploadRemaining,
+    startUpload: startVideoUpload,
+  } = useVideoUploadStore();
+
+  // Automatically link completed background upload to the active lesson form
+  useEffect(() => {
+    if (uploadedVideoUrl && (!form.videoUrl || form.videoUrl !== uploadedVideoUrl)) {
+      setForm(p => ({ ...p, videoUrl: uploadedVideoUrl }));
+    }
+  }, [uploadedVideoUrl]);
   const [previewLessonDesc, setPreviewLessonDesc] = useState(false);
   const [activeHelpType, setActiveHelpType] = useState<LocalContentType | null>(null);
   const [updatingField, setUpdatingField] = useState<{ id: string; field: 'isPublished' | 'isMandatory' | 'isFreePreview' | 'liveStatus' } | null>(null);
@@ -289,18 +304,18 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   };
 
   const uploadLessonVideo = async (file?: File) => {
-    if (!file || !form.courseId) return;
-    setVideoUploadError(''); setVideoUploadProgress({ percent: 0, loaded: 0, total: file.size });
+    if (!file) return;
+    if (!form.courseId) {
+      toast.error('يرجى اختيار المقرر أولاً لرفع الفيديو إلى مجلده.');
+      return;
+    }
     try {
-      const uploaded = await mediaApi.uploadVideo(file, form.courseId, setVideoUploadProgress);
-      const videoUrl = uploaded.videoUrl ?? uploaded.url;
-      if (!videoUrl) throw new Error('لم يُرجع الخادم رابط الفيديو.');
-      setForm(current => ({ ...current, videoUrl }));
-      setVideoFileInfo({ name: uploaded.originalName ?? file.name, size: uploaded.size ?? file.size });
-      setVideoUploadProgress({ percent: 100, loaded: file.size, total: file.size });
-    } catch (error: any) {
-      setVideoUploadError(error?.response?.data?.message ?? error?.message ?? 'فشل رفع الفيديو.');
-      setVideoUploadProgress(null);
+      const url = await startVideoUpload(file, form.courseId);
+      if (url) {
+        setForm(current => ({ ...current, videoUrl: url }));
+      }
+    } catch {
+      // Errors and progress notifications are handled globally by videoUploadStore
     }
   };
 
@@ -2077,19 +2092,101 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                       className={inputCls(!!errors.videoUrl, 'font-mono text-left')}
                       dir="ltr"
                     />
-                    <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-bold text-slate-600">أو ارفع فيديو للمقرر (MP4, MOV, AVI, MKV, WebM · حتى 1 GB)</span><button type="button" disabled={!form.courseId || videoUploadProgress?.percent !== undefined && videoUploadProgress.percent < 100} onClick={()=>videoInputRef.current?.click()} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">اختيار فيديو</button><input ref={videoInputRef} type="file" accept=".mp4,.mov,.avi,.mkv,.webm,video/*" className="hidden" onChange={e=>void uploadLessonVideo(e.target.files?.[0])}/></div>
-                      {!form.courseId && <p className="text-xs text-amber-700">اختر المقرر أولاً لرفع الفيديو إلى مجلده.</p>}
-                      {videoUploadProgress && <div role="status" aria-live="polite"><div
-                        role="progressbar"
-                        aria-label="تقدم رفع الفيديو"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={videoUploadProgress.percent}
-                        className="h-2 overflow-hidden rounded bg-slate-200"
-                      ><div className="h-full rounded bg-indigo-600 transition-[width] duration-200" style={{width:`${videoUploadProgress.percent}%`}}/></div><p className="mt-1 text-xs font-medium text-slate-600">{videoUploadProgress.percent === 100 ? 'اكتمل رفع الفيديو' : 'جارٍ رفع الفيديو'} · {videoUploadProgress.percent}% · {(videoUploadProgress.loaded/1024/1024).toFixed(1)} / {(videoUploadProgress.total/1024/1024).toFixed(1)} MB</p></div>}
-                      {videoFileInfo && <p className="break-all text-xs text-emerald-700">{videoFileInfo.name} · {(videoFileInfo.size/1024/1024).toFixed(1)} MB · {form.videoUrl}</p>}
-                      {videoUploadError && <p role="alert" className="text-xs font-semibold text-red-600">{videoUploadError}</p>}
+                    <div className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-bold text-slate-700 block">أو ارفع فيديو للمقرر (MP4, MOV, AVI, MKV, WebM · حتى 2 GB)</span>
+                          <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1 mt-0.5">
+                            <ShieldCheck className="w-3.5 h-3.5 inline text-emerald-600" />
+                            ميزة الحماية في الخلفية مفعلة: يستمر الرفع حتى لو خرجت بالزر الأوسط للشاشة.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!form.courseId || isVideoUploading}
+                          onClick={() => videoInputRef.current?.click()}
+                          className="rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3.5 py-2 text-xs font-bold text-white transition-all disabled:opacity-50 shadow-xs shrink-0"
+                        >
+                          {isVideoUploading ? 'جارٍ الرفع...' : 'اختيار فيديو'}
+                        </button>
+                        <input
+                          ref={videoInputRef}
+                          type="file"
+                          accept=".mp4,.mov,.avi,.mkv,.webm,video/*"
+                          className="hidden"
+                          onChange={e => void uploadLessonVideo(e.target.files?.[0])}
+                        />
+                      </div>
+
+                      {!form.courseId && (
+                        <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                          اختر المقرر أولاً في الخطوة الأولى لتحديد مجلد رفع الفيديو.
+                        </p>
+                      )}
+
+                      {/* Active Uploading Status */}
+                      {isVideoUploading && videoUploadProgress && (
+                        <div role="status" aria-live="polite" className="space-y-2 rounded-xl bg-white border border-indigo-100 p-3 shadow-xs">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-indigo-900 truncate max-w-[200px]" title={videoFileInfo?.name}>
+                              {videoFileInfo?.name || 'جارٍ رفع الفيديو...'}
+                            </span>
+                            <span className="font-bold font-mono text-indigo-600">{videoUploadProgress.percent}%</span>
+                          </div>
+
+                          <div
+                            role="progressbar"
+                            aria-label="تقدم رفع الفيديو"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={videoUploadProgress.percent}
+                            className="h-2.5 overflow-hidden rounded-full bg-slate-100"
+                          >
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-[width] duration-200"
+                              style={{ width: `${videoUploadProgress.percent}%` }}
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500 font-mono">
+                            <span>
+                              {(videoUploadProgress.loaded / 1024 / 1024).toFixed(1)} / {(videoUploadProgress.total / 1024 / 1024).toFixed(1)} MB
+                            </span>
+                            {videoUploadSpeed && (
+                              <span className="text-emerald-700 font-semibold">{videoUploadSpeed}</span>
+                            )}
+                            {videoUploadRemaining && (
+                              <span className="text-slate-600">{videoUploadRemaining}</span>
+                            )}
+                          </div>
+
+                          <p className="text-[11px] text-emerald-800 bg-emerald-50 p-1.5 rounded-lg font-medium flex items-center gap-1.5">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                            الرفع نشط في الخلفية: يمكنك تصغير المتصفح أو التنقل في النظام بأمان.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Completed Status */}
+                      {!isVideoUploading && videoUploadStatus === 'completed' && uploadedVideoUrl && (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                          <p className="font-bold flex items-center gap-1 text-emerald-900">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            تم رفع الفيديو وربطه بنجاح:
+                          </p>
+                          <p className="font-mono text-[11px] break-all text-emerald-700">
+                            {videoFileInfo?.name ? `${videoFileInfo.name} · ` : ''}
+                            {uploadedVideoUrl}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Error Status */}
+                      {videoUploadError && (
+                        <p role="alert" className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                          {videoUploadError}
+                        </p>
+                      )}
                     </div>
                   </Field>
                 )}

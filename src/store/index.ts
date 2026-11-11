@@ -6,3 +6,4 @@ export { useContentStore } from './content.store';
 export { useQuizzesStore } from './quizzes.store';
 export { useExamModelsStore } from './examModels.store';
 export { useUIStore } from './ui.store';
+export { useVideoUploadStore } from './videoUpload.store';

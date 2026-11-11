@@ -93,7 +93,12 @@ export function validateImageFile(file: File): UploadError | null {
 
 
 export const mediaApi = {
-  uploadVideo: async (file: File, courseId: string | number, onProgress?: (evt: UploadProgress) => void) => {
+  uploadVideo: async (
+    file: File,
+    courseId: string | number,
+    onProgress?: (evt: UploadProgress) => void,
+    signal?: AbortSignal
+  ) => {
     const allowed = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
     if (!allowed.includes(ext)) throw new Error('صيغة الفيديو غير مدعومة. استخدم MP4 أو MOV أو AVI أو MKV أو WebM.');
@@ -102,6 +107,7 @@ export const mediaApi = {
     const reportProgress = createUploadProgressReporter(onProgress, file.size);
     const { data } = await api.post(`/media/courses/${courseId}/videos`, body, {
       timeout: 0,
+      signal,
       onUploadProgress: event => reportProgress(event.loaded, event.total),
     });
     // Admin endpoints may wrap successful payloads in `{ data: ... }`.
