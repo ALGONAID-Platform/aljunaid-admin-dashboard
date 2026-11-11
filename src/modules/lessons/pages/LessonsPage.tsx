@@ -363,9 +363,6 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     setModulesError(null);
     setEditingLessonId(null);
     setLessonPdfs([]); setNewPdfUrl(''); setNewPdfTitle(''); setPdfManagementError(''); setPdfManagementLoading(false); setPdfManagementProgress(null); setPdfListLoadFailed(false);
-    setVideoUploadProgress(null);
-    setVideoUploadError('');
-    setVideoFileInfo(null);
     setPreviewLessonDesc(false);
     setActiveHelpType(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
