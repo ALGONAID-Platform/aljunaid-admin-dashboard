@@ -414,13 +414,22 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       ? targetLesson.content
       : (fallbackContent || '');
 
-    const resolvedType: LocalContentType = (targetLesson as any).type
-      ? (targetLesson as any).type
-      : (rawLiveUrl || (targetLesson as any).liveStatus)
-      ? 'live'
-      : (targetLesson as any).isReading
-      ? (rawDesc || rawContent ? 'markdown' : 'pdf')
-      : (cleanVideoUrl ? 'video' : 'video');
+    const resolvedType: LocalContentType = (() => {
+      if (cleanVideoUrl) return 'video';
+      if (rawLiveUrl) return 'live';
+      if ((targetLesson as any).type && ['video', 'markdown', 'pdf', 'live'].includes((targetLesson as any).type)) {
+        return (targetLesson as any).type;
+      }
+      if ((targetLesson as any).liveStatus && (targetLesson as any).liveStatus !== 'SCHEDULED' && !cleanVideoUrl) {
+        return 'live';
+      }
+      const hasPdf = Boolean((targetLesson as any).pdfUrl || ((targetLesson as any).pdfFiles && (targetLesson as any).pdfFiles.length > 0));
+      const hasText = Boolean((rawDesc && String(rawDesc).trim()) || (rawContent && String(rawContent).trim()));
+      if (hasPdf && !hasText) return 'pdf';
+      if ((targetLesson as any).isReading || hasText) return 'markdown';
+      if (hasPdf) return 'pdf';
+      return 'video';
+    })();
 
     const resolvedDescription = resolvedType === 'pdf' ? '' : (rawDesc || rawContent || '');
 
@@ -637,7 +646,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
           ? lessonPdfs.map((pdf, index) => ({ title: pdf.title || `PDF ${index + 1}`, url: pdf.url || '', file: pdf.file, order: index }))
           : form.pdfUrl.trim() ? [{ title: form.pdfUrl.trim().split('/').pop() || form.title.trim(), url: form.pdfUrl.trim(), order: 0 }] : [],
         pdf: undefined,
-        isReading: isReading || isPdf,
+        isReading: isReading,
         status: form.status,
         scheduledAt: form.scheduledAt && !isNaN(new Date(form.scheduledAt).getTime())
           ? new Date(form.scheduledAt).toISOString()

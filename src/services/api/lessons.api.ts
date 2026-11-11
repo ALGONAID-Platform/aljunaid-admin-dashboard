@@ -87,27 +87,24 @@ function adaptLesson(bl: BackendLesson, module?: BackendModule | { id?: number; 
       if ((bl as any).type && ['video', 'markdown', 'pdf', 'live'].includes((bl as any).type)) {
         return (bl as any).type;
       }
+      if (effectiveVideoUrl && String(effectiveVideoUrl).trim() !== '') {
+        return 'video';
+      }
       if (effectiveLiveMeetingUrl && String(effectiveLiveMeetingUrl).trim() !== '') {
         return 'live';
       }
       if ((bl as any).liveStatus && !bl.isReading && !effectiveVideoUrl) {
         return 'live';
       }
-      const hasTextContent = Boolean((bl.description && String(bl.description).trim()) || (bl.content && String(bl.content).trim()));
-      if (bl.isReading && hasTextContent) {
-        return 'markdown';
-      }
       const hasPdf = Boolean(bl.pdfUrl || (Array.isArray(rawPdfs) && rawPdfs.length > 0));
-      if (bl.isReading && !hasTextContent && hasPdf) {
+      const hasTextContent = Boolean((bl.description && String(bl.description).trim()) || (bl.content && String(bl.content).trim()));
+      if (hasPdf && !hasTextContent) {
         return 'pdf';
       }
-      if (effectiveVideoUrl && String(effectiveVideoUrl).trim() !== '' && !bl.isReading) {
-        return 'video';
+      if (bl.isReading || hasTextContent) {
+        return 'markdown';
       }
-      if (bl.isReading) {
-        return hasTextContent ? 'markdown' : (hasPdf ? 'pdf' : 'markdown');
-      }
-      if (hasPdf && !effectiveVideoUrl && !hasTextContent) {
+      if (hasPdf) {
         return 'pdf';
       }
       return 'video';
@@ -494,7 +491,6 @@ export const lessonService = {
         .filter(key => {
           const val = (payload as any)[key];
           if (val === undefined || val === '') return false;
-          if (['liveStatus', 'liveMeetingUrl', 'recordingVideoUrl', 'videoUrl', 'pdfUrl'].includes(key) && val === null) return false;
           return true;
         })
         .map(key => [key, (payload as any)[key]])
@@ -502,7 +498,7 @@ export const lessonService = {
     const extraPayload = {
       ...extraFields,
       ...(isPaid && !isNaN(courseIdNum) ? { courseId: courseIdNum } : {}),
-      ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {})
+      ...((payload as any).isReading !== undefined ? { isReading: Boolean((payload as any).isReading) } : {})
     };
     if (Object.keys(extraPayload).length) {
       const { data: updatedData } = await api.patch<BackendLesson | { data: BackendLesson }>(`/lessons/${lesson.id}`, extraPayload);
@@ -561,12 +557,11 @@ export const lessonService = {
         .filter(key => {
           const val = (payload as any)[key];
           if (val === undefined || val === '') return false;
-          if (['liveStatus', 'liveMeetingUrl', 'recordingVideoUrl', 'videoUrl', 'pdfUrl'].includes(key) && val === null) return false;
           return true;
         })
         .map(key => [key, (payload as any)[key]])
     );
-    const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: (payload as any).isReading } : {}) };
+    const extraPayload = { ...extraFields, ...((payload as any).isReading !== undefined ? { isReading: Boolean((payload as any).isReading) } : {}) };
     if (Object.keys(extraPayload).length) {
       console.info(`[Lesson ${id}] Updating request sent (JSON fields)`);
       console.info(`[Lesson ${id}] Update payload (JSON fields)`, extraPayload);
