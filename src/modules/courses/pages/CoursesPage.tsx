@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { uploadService, validateImageFile, classifyUploadError, type UploadProgress, type UploadError } from '../../../services/api/upload.api';
 import {
   Plus, BookOpen, X, CheckCircle, AlertCircle, Image as ImageIcon, Link as LinkIcon,
-  Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi, CheckSquare, Square, Copy, Eye
+  Upload, Loader2, Edit3, Trash2, RefreshCw, FileWarning, Search, Filter, BookOpenCheck, Wifi, CheckSquare, Square, Copy, Eye,
+  Landmark, CreditCard
 } from 'lucide-react';
 import { MarkdownRenderer } from '../../quizzes/components/MarkdownRenderer';
 import { getImageUrl } from '../../../utils/helpers';
@@ -34,6 +35,7 @@ interface FormState {
   thumbnailUrl: string;
   thumbnailFile: File | null;
   isPaid: boolean;
+  bankAccounts: string;
   courseType: 'RECORDED' | 'LIVE';
   lessonOrderMode: 'BY_DATE' | 'BY_ORDER';
   priceYerOld: string; discountedPriceYerOld: string; priceYerNew: string; discountedPriceYerNew: string;
@@ -42,7 +44,7 @@ interface FormState {
   scheduleDays: string[];
   scheduleDaysText: string; objectives: string[]; certificateMinScore: string; certificateMinAttendance: string;
 }
-const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thumbnailFile: null, isPaid: false, courseType: 'RECORDED', lessonOrderMode: 'BY_DATE', priceYerOld: '', discountedPriceYerOld: '', priceYerNew: '', discountedPriceYerNew: '', priceSar: '', discountedPriceSar: '', price: '', discountedPrice: '', maxStudents: '', startDate: '', endDate: '', durationWeeks: '', scheduleDays: [], scheduleDaysText: '', objectives: [], certificateMinScore: '70', certificateMinAttendance: '80' };
+const emptyForm: FormState = { title: '', description: '', thumbnailUrl: '', thumbnailFile: null, isPaid: false, bankAccounts: '', courseType: 'RECORDED', lessonOrderMode: 'BY_DATE', priceYerOld: '', discountedPriceYerOld: '', priceYerNew: '', discountedPriceYerNew: '', priceSar: '', discountedPriceSar: '', price: '', discountedPrice: '', maxStudents: '', startDate: '', endDate: '', durationWeeks: '', scheduleDays: [], scheduleDaysText: '', objectives: [], certificateMinScore: '70', certificateMinAttendance: '80' };
 
 const normalizeSearchText = (value: unknown) => String(value ?? '')
   .normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '')
@@ -243,6 +245,7 @@ export function CoursesPage() {
       thumbnailUrl: editableCourse.thumbnail || '',
       thumbnailFile: null,
       isPaid: Boolean(editableCourse.isPaid),
+      bankAccounts: String((editableCourse as any).bankAccounts ?? ''),
       courseType: (editableCourse.courseType as FormState['courseType']) ?? 'RECORDED',
       lessonOrderMode: ((editableCourse as any).lessonOrderMode as FormState['lessonOrderMode']) || 'BY_DATE',
       ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, (editableCourse as any)[k] == null ? '' : String((editableCourse as any)[k])])) as Partial<FormState>,
@@ -255,7 +258,7 @@ export function CoursesPage() {
   };
 
   const closeModal = () => {
-    const isDirty = form.title || form.description || form.thumbnailFile || form.thumbnailUrl || form.objectives.length || form.isPaid;
+    const isDirty = form.title || form.description || form.thumbnailFile || form.thumbnailUrl || form.objectives.length || form.isPaid || form.bankAccounts;
     if (isDirty && saveStatus !== 'success' && !confirm('لديك تغييرات غير محفوظة. هل أنت متأكد من الإلغاء؟')) {
       return;
     }
@@ -295,6 +298,7 @@ export function CoursesPage() {
         description: form.description.trim(),
         thumbnail: finalThumbnailUrl,
         isPaid: form.isPaid,
+        bankAccounts: form.isPaid ? (form.bankAccounts.trim() || undefined) : undefined,
         courseType: form.courseType,
         lessonOrderMode: form.lessonOrderMode,
         ...Object.fromEntries(['price','discountedPrice','priceYerOld','discountedPriceYerOld','priceYerNew','discountedPriceYerNew','priceSar','discountedPriceSar','maxStudents','durationWeeks','certificateMinScore','certificateMinAttendance'].map(k => [k, form[k as keyof FormState] ? Number(form[k as keyof FormState]) : undefined])),
@@ -833,7 +837,72 @@ export function CoursesPage() {
                     <label className="text-sm font-bold">نوع المقرر<select className={inputCls(false)} value={form.courseType} onChange={e=>setForm(p=>({...p,courseType:e.target.value as FormState['courseType']}))}><option value="RECORDED">مسجل</option><option value="LIVE">معسكر مباشر</option></select></label>
                     <label className="text-sm font-bold">طريقة ترتيب الدروس<select className={inputCls(false)} value={form.lessonOrderMode} onChange={e=>setForm(p=>({...p,lessonOrderMode:e.target.value as FormState['lessonOrderMode']}))}><option value="BY_DATE">حسب تاريخ الإنشاء (الافتراضي)</option><option value="BY_ORDER">ترتيب مخصص يدوي (بالأوردر)</option></select></label>
                   </div>
-                  {form.isPaid && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['price','Base price (USD) *'],['discountedPrice','Discounted price (USD)'],['priceSar','Price (SAR)'],['discountedPriceSar','Discounted price (SAR)'],['priceYerOld','Price (YER old)'],['discountedPriceYerOld','Discounted price (YER old)'],['priceYerNew','Price (YER new)'],['discountedPriceYerNew','Discounted price (YER new)']].map(([key,label])=><label key={key} className="text-xs font-bold text-slate-600">{label}{key === 'price' && <span className="mt-1 block font-normal leading-relaxed text-slate-500">This field is required for paid courses. It represents the base price in US dollars ($ USD) and is the primary reference for international students and payments through Karty and bank cards.</span>}<input type="number" min="0" required={key === 'price'} value={form[key as keyof FormState] as string} onChange={e=>{setForm(p=>({...p,[key]:e.target.value})); setErrors(p=>({...p,price:undefined}));}} className={`${inputCls(key === 'price' && !!errors.price)} mt-1`} />{key === 'price' && errors.price && <span className="text-red-600">{errors.price}</span>}</label>)}</div>}
+                  {form.isPaid && (
+                    <div className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50/20 p-4 sm:p-5">
+                      <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-sm border-b border-emerald-100 pb-2.5">
+                        <CreditCard size={18} className="text-emerald-600" />
+                        <span>بيانات التسعير والاشتراك للكورس المدفوع</span>
+                      </div>
+
+                      {/* Pricing grid */}
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {([
+                          ['price', 'السعر الأساسي بالدولار (USD) *'],
+                          ['discountedPrice', 'سعر الخصم بالدولار (USD)'],
+                          ['priceSar', 'السعر بالريال السعودي (SAR)'],
+                          ['discountedPriceSar', 'سعر الخصم بالريال السعودي (SAR)'],
+                          ['priceYerOld', 'السعر بالريال اليمني - طبعة قديمة (YER)'],
+                          ['discountedPriceYerOld', 'سعر الخصم - طبعة قديمة (YER)'],
+                          ['priceYerNew', 'السعر بالريال اليمني - طبعة جديدة (YER)'],
+                          ['discountedPriceYerNew', 'سعر الخصم - طبعة جديدة (YER)'],
+                        ] as const).map(([key, label]) => (
+                          <label key={key} className="text-xs font-bold text-slate-700">
+                            {label}
+                            {key === 'price' && (
+                              <span className="mt-0.5 block font-normal leading-relaxed text-[11px] text-slate-500">
+                                الحقل الأساسي المطلوب للمقررات المدفوعة (المرجع الرئيسي لعمليات الدفع الإلكتروني والبطاقات).
+                              </span>
+                            )}
+                            <input
+                              type="number"
+                              min="0"
+                              required={key === 'price'}
+                              value={form[key as keyof FormState] as string}
+                              onChange={e => {
+                                setForm(p => ({ ...p, [key]: e.target.value }));
+                                setErrors(p => ({ ...p, price: undefined }));
+                              }}
+                              className={`${inputCls(key === 'price' && !!errors.price)} mt-1`}
+                              placeholder="0"
+                            />
+                            {key === 'price' && errors.price && (
+                              <span className="text-red-600 text-xs mt-1 block">{errors.price}</span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Bank Accounts Field */}
+                      <div className="pt-3 border-t border-emerald-100">
+                        <label className="block text-xs font-bold text-slate-700">
+                          <span className="flex items-center gap-1.5 text-slate-900 text-xs font-black mb-1">
+                            <Landmark size={16} className="text-emerald-600" />
+                            <span>أرقام الحسابات البنكية ومعلومات التحويل (bankAccounts)</span>
+                          </span>
+                          <span className="block font-normal text-[11px] text-slate-500 leading-relaxed mb-2">
+                            أدخل أرقام الحسابات البنكية، أرقام المحافظ الإلكترونية (كريمي، ون كاش، فلوسك، جوالي)، واسم المستفيد التي ستظهر للطالب عند اختيار الدفع اليدوي للاشتراك في هذا المقرر.
+                          </span>
+                          <textarea
+                            rows={4}
+                            value={form.bankAccounts}
+                            onChange={e => setForm(p => ({ ...p, bankAccounts: e.target.value }))}
+                            placeholder={`مثال:\nبنك الكريمي: 12345678 - باسم بشار الجنيد\nمحفظة ون كاش: 777123456\nبنك التضامن: 987654321\nشركة النجم / العمقي: باسم ...`}
+                            className={`${inputCls(false)} font-medium text-xs sm:text-sm leading-relaxed custom-scrollbar resize-y min-h-[110px] bg-white`}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {([['maxStudents','الحد الأقصى للطلاب'],['durationWeeks','المدة بالأسابيع'],['certificateMinScore','حد درجة الشهادة %'],['certificateMinAttendance','حد الحضور للشهادة %']] as const).map(([key,label])=><label key={key} className="text-xs font-bold text-slate-600">{label}<input type="number" min="0" value={form[key]} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} placeholder={key==='maxStudents'?'غير محدود':''} className={`${inputCls(false)} mt-1`} /></label>)}
                     <label className="text-xs font-bold text-slate-600">تاريخ البداية<input type="date" value={form.startDate} onChange={e=>setForm(p=>({...p,startDate:e.target.value}))} className={`${inputCls(false)} mt-1`}/></label>

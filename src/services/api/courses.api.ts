@@ -50,6 +50,7 @@ function adaptCourse(bc: BackendCourse): Course {
     examsCount: course.examsCount ?? 0,
     isFull: course.isFull,
     remainingSeats: course.remainingSeats,
+    bankAccounts: (bc as any).bankAccounts ?? null,
     createdAt: bc.createdAt ?? new Date().toISOString(),
   };
 }
@@ -143,6 +144,7 @@ export const courseService = {
       discountedPriceYerNew: rawBody.discountedPriceYerNew,
       priceSar: rawBody.priceSar,
       discountedPriceSar: rawBody.discountedPriceSar,
+      bankAccounts: rawBody.bankAccounts,
       scheduleDaysText: rawBody.scheduleDaysText,
       maxStudents: rawBody.maxStudents,
       startDate: rawBody.startDate,
@@ -155,9 +157,9 @@ export const courseService = {
       lessonOrderMode: rawBody.lessonOrderMode,
     };
 
-    // Remove undefined or null keys
+    // Remove undefined or null keys, and empty strings for non-string fields
     for (const key of Object.keys(body)) {
-      if (body[key] === undefined || body[key] === null || body[key] === '') {
+      if (body[key] === undefined || body[key] === null || (body[key] === '' && key !== 'bankAccounts')) {
         delete body[key];
       }
     }
@@ -192,6 +194,7 @@ export const courseService = {
       discountedPriceYerNew: rawBody.discountedPriceYerNew,
       priceSar: rawBody.priceSar,
       discountedPriceSar: rawBody.discountedPriceSar,
+      bankAccounts: rawBody.bankAccounts,
       scheduleDaysText: rawBody.scheduleDaysText,
       maxStudents: rawBody.maxStudents,
       startDate: rawBody.startDate,
@@ -205,7 +208,7 @@ export const courseService = {
     };
 
     for (const key of Object.keys(body)) {
-      if (body[key] === undefined || body[key] === null || body[key] === '') {
+      if (body[key] === undefined || body[key] === null || (body[key] === '' && key !== 'bankAccounts')) {
         delete body[key];
       }
     }

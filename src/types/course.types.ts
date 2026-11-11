@@ -10,6 +10,7 @@ export interface Course {
   lessonsCount: number;
   enrolledStudentsCount?: number;
   isPaid?: boolean;
+  bankAccounts?: string | null;
   courseType?: 'RECORDED' | 'LIVE';
   lessonOrderMode?: LessonOrderMode;
   maxStudents?: number | null;
@@ -28,6 +29,8 @@ export interface CreateCoursePayload {
   title: string;
   description: string;
   thumbnail?: string;
+  isPaid?: boolean;
+  bankAccounts?: string;
   lessonOrderMode?: LessonOrderMode;
   scheduleDays?: string[];
   scheduleDaysText?: string;
@@ -36,6 +39,8 @@ export interface CreateCoursePayload {
 
 export interface UpdateCoursePayload extends Partial<CreateCoursePayload> {
   id: ID;
+  isPaid?: boolean;
+  bankAccounts?: string;
   lessonOrderMode?: LessonOrderMode;
   scheduleDays?: string[];
   scheduleDaysText?: string;
@@ -45,6 +50,8 @@ export interface CourseFormValues {
   title: string;
   description: string;
   thumbnail?: string;
+  isPaid?: boolean;
+  bankAccounts?: string;
   lessonOrderMode?: LessonOrderMode;
   scheduleDays?: string[];
   scheduleDaysText?: string;
