@@ -222,7 +222,7 @@ export const uploadService = {
         return rawUrl;
       }
 
-      const configuredBaseUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'https://algonaid-api.onrender.com/api/v1'; 
+      const configuredBaseUrl = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'https://api.exchangesmangement.online/api/v1'; 
       const baseUrl = configuredBaseUrl.replace(/\/api\/v1\/?$/, '');
       return `${baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
     } catch (err) {

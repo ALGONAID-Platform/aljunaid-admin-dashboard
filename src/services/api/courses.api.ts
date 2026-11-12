@@ -62,9 +62,14 @@ export const courseService = {
     await api.patch(`/courses/${id}/convert-to-recorded`, prices);
   },
   async getAll(): Promise<Course[]> {
+    // Keep the main course list available if the optional admin paid-course
+    // endpoint is unavailable (for example, due to missing backend support).
     const [freeResponse, paidCourses] = await Promise.all([
       api.get<BackendCoursesListResponse | BackendCourse[]>('/courses'),
-      this.getAdminPaidCourses(),
+      this.getAdminPaidCourses().catch((error) => {
+        console.warn('Unable to load paid courses; continuing with the main course list.', error);
+        return [];
+      }),
     ]);
     const asList = (data: BackendCoursesListResponse | BackendCourse[]) => Array.isArray(data) ? data : (data as BackendCoursesListResponse).data ?? [];
     const merged = [...asList(freeResponse.data), ...paidCourses];
