@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   UploadCloud, CheckCircle2, AlertCircle, X, ShieldCheck,
-  Minimize2, Maximize2, Copy, Check
+  Minimize2, Maximize2, Copy, Check, RotateCcw
 } from 'lucide-react';
 import { useVideoUploadStore } from '../../store';
 import { toast } from 'react-hot-toast';
@@ -17,6 +17,8 @@ export function GlobalVideoUploadBanner() {
     uploadSpeed,
     timeRemaining,
     cancelUpload,
+    retryUpload,
+    canRetry,
     dismiss,
   } = useVideoUploadStore();
 
@@ -160,7 +162,7 @@ export function GlobalVideoUploadBanner() {
               <div className="flex items-center gap-2 p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 text-[11px]">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="leading-tight">
-                  يجب إبقاء الصفحة مفتوحة. إذا انقطع الاتصال عند الانتقال لتطبيق آخر، أعد الصفحة للواجهة وسيحاول الرفع مجدداً تلقائياً.
+                  حماية الخلفية مفعلة: يستمر الرفع عند الانتقال لتطبيق آخر. إذا حدث أي تقطع في الشبكة، سنستأنف تلقائياً فور العودة.
                 </span>
               </div>
             )}
@@ -171,11 +173,25 @@ export function GlobalVideoUploadBanner() {
               </p>
             )}
 
-            {/* Error Message */}
-            {status === 'error' && error && (
-              <p className="text-xs text-red-400 bg-red-950/40 p-2 rounded-xl border border-red-500/20 leading-relaxed">
-                {error}
-              </p>
+            {/* Error Message & Retry */}
+            {status === 'error' && (
+              <div className="space-y-2">
+                {error && (
+                  <p className="text-xs text-red-400 bg-red-950/40 p-2 rounded-xl border border-red-500/20 leading-relaxed">
+                    {error}
+                  </p>
+                )}
+                {canRetry && (
+                  <button
+                    type="button"
+                    onClick={() => void retryUpload()}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-md active:scale-98"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>إعادة محاولة الرفع الآن</span>
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Completed Actions */}

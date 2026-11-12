@@ -14,13 +14,16 @@ interface VideoUploadState {
   status: UploadStatus;
   progress: UploadProgress | null;
   fileInfo: { name: string; size: number } | null;
+  activeFile: File | null;
   courseId: string | number | null;
   videoUrl: string | null;
   error: string | null;
   uploadSpeed: string | null;
   timeRemaining: string | null;
+  canRetry: boolean;
 
   startUpload: (file: File, courseId: string | number) => Promise<string>;
+  retryUpload: () => Promise<string>;
   cancelUpload: () => void;
   dismiss: () => void;
   reset: () => void;
@@ -31,36 +34,98 @@ let lastBytesLoaded = 0;
 let lastProgressTimestamp = 0;
 let smoothedSpeed = 0;
 
+/**
+ * Checks whether an upload failure was due to transient network drops,
+ * mobile app backgrounding, server timeouts, or temporary gateway errors.
+ */
 function isTransientUploadError(error: any): boolean {
-  if (error?.status || error?.response?.status) return false;
+  if (!error) return true;
+
+  // Explicit user abort should never be retried
+  if (
+    error?.name === 'AbortError' ||
+    error?.code === 'ERR_CANCELED' ||
+    error?.message === 'تم إلغاء الرفع.' ||
+    error?.isAborted
+  ) {
+    return false;
+  }
+
+  // Non-retryable client errors (400 Bad Request, 401 Unauthorized, 403 Forbidden, 413 Too Large, 422 Invalid)
+  const status = Number(error?.status || error?.response?.status || 0);
+  if (status >= 400 && status < 500 && status !== 408 && status !== 429 && status !== 499) {
+    return false;
+  }
+
   const message = String(error?.message ?? '').toLowerCase();
-  return Boolean(error?.isNetworkError)
-    || /network|connection|مشكلة في الاتصال|تعذر الاتصال|انقطع الاتصال/.test(message);
+
+  // Network drops, socket interruptions, or gateway/timeout responses are transient
+  if (
+    error?.isNetworkError ||
+    error?.code === 'ECONNABORTED' ||
+    error?.code === 'ERR_NETWORK' ||
+    status === 0 ||
+    status >= 500 ||
+    status === 408 ||
+    status === 429 ||
+    status === 499 ||
+    /network|connection|timeout|offline|failed to fetch|load failed|econnreset|econnrefused|socket|اتصال|خادم|الخادم|الوصول|انقطع|تعذر|فشل/.test(message)
+  ) {
+    return true;
+  }
+
+  // Request issued but no HTTP response received from server
+  if (error?.request && !error?.response) {
+    return true;
+  }
+
+  return false;
 }
 
+/**
+ * Suspends retry until the web page returns to foreground and an active internet connection is present.
+ */
 function waitForUploadResume(signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(new Error('تم إلغاء الرفع.'));
   if (document.visibilityState === 'visible' && navigator.onLine) return Promise.resolve();
 
   return new Promise((resolve, reject) => {
+    let finished = false;
+    let interval: any = null;
+
     const cleanup = () => {
+      finished = true;
+      if (interval) clearInterval(interval);
       document.removeEventListener('visibilitychange', checkReady);
       window.removeEventListener('online', checkReady);
       signal.removeEventListener('abort', onAbort);
     };
+
     const checkReady = () => {
+      if (finished) return;
       if (document.visibilityState === 'visible' && navigator.onLine) {
         cleanup();
         resolve();
       }
     };
+
     const onAbort = () => {
+      if (finished) return;
       cleanup();
       reject(new Error('تم إلغاء الرفع.'));
     };
+
     document.addEventListener('visibilitychange', checkReady);
     window.addEventListener('online', checkReady);
     signal.addEventListener('abort', onAbort, { once: true });
+
+    // Periodic safety check in case visibilitychange / online events are delayed on mobile OS
+    interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        checkReady();
+      }
+    }, 1000);
+
     checkReady();
   });
 }
@@ -88,11 +153,13 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
   status: 'idle',
   progress: null,
   fileInfo: null,
+  activeFile: null,
   courseId: null,
   videoUrl: null,
   error: null,
   uploadSpeed: null,
   timeRemaining: null,
+  canRetry: false,
 
   startUpload: async (file: File, courseId: string | number) => {
     // If an upload is already running, warn the user
@@ -116,11 +183,13 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
       status: 'uploading',
       progress: { percent: 0, loaded: 0, total: file.size },
       fileInfo: { name: file.name, size: file.size },
+      activeFile: file,
       courseId,
       videoUrl: null,
       error: null,
       uploadSpeed: null,
       timeRemaining: null,
+      canRetry: true,
     });
 
     // Start background survival features (silent audio keepalive, wake lock, beforeunload)
@@ -157,7 +226,7 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
 
     try {
       let uploaded;
-      const maxAttempts = 3;
+      const maxAttempts = 10;
       for (let attempt = 1; ; attempt += 1) {
         try {
           uploaded = await mediaApi.uploadVideo(
@@ -168,14 +237,42 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
           );
           break;
         } catch (uploadError: any) {
-          if (attempt >= maxAttempts || !isTransientUploadError(uploadError)) throw uploadError;
-          set({ error: `انقطع الاتصال. أعد الصفحة إلى الواجهة والاتصال بالإنترنت لإعادة المحاولة (${attempt}/${maxAttempts - 1}).` });
+          if (activeAbortController?.signal?.aborted) {
+            throw uploadError;
+          }
+
+          if (attempt >= maxAttempts || !isTransientUploadError(uploadError)) {
+            throw uploadError;
+          }
+
+          const isHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+          if (isHidden) {
+            set({
+              error: 'تم تعليق الرفع مؤقتاً أثناء استخدام تطبيق آخر. أعد الصفحة للواجهة وسنستأنف الرفع تلقائياً.',
+            });
+          } else {
+            set({
+              error: `انقطع الاتصال بالخادم. جارٍ استئناف الرفع تلقائياً (${attempt}/${maxAttempts - 1})...`,
+            });
+          }
+
+          // Wait until the user brings the app back to foreground and has network
           await waitForUploadResume(activeAbortController.signal);
-          await new Promise(resolve => setTimeout(resolve, 1200 * attempt));
+
+          set({
+            error: `جاري إعادة محاولة الرفع (${attempt + 1}/${maxAttempts})...`,
+          });
+
+          await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * attempt, 3500)));
           lastBytesLoaded = 0;
           lastProgressTimestamp = Date.now();
           smoothedSpeed = 0;
-          set({ error: null, progress: { percent: 0, loaded: 0, total: file.size }, uploadSpeed: null, timeRemaining: null });
+          set({
+            error: null,
+            progress: { percent: 0, loaded: 0, total: file.size },
+            uploadSpeed: null,
+            timeRemaining: null,
+          });
         }
       }
 
@@ -192,6 +289,7 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
         error: null,
         uploadSpeed: null,
         timeRemaining: null,
+        canRetry: false,
       });
 
       stopBackgroundUploadKeepalive();
@@ -210,6 +308,7 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
           error: null,
           uploadSpeed: null,
           timeRemaining: null,
+          canRetry: false,
         });
         toast('تم إلغاء رفع الفيديو.');
         throw new Error('تم إلغاء الرفع.');
@@ -223,12 +322,26 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
         error: errorMessage,
         uploadSpeed: null,
         timeRemaining: null,
+        canRetry: true,
       });
       toast.error(`خطأ في رفع الفيديو: ${errorMessage}`);
       throw err;
     } finally {
       activeAbortController = null;
     }
+  },
+
+  retryUpload: async () => {
+    const { activeFile, courseId, isUploading } = get();
+    if (!activeFile || !courseId) {
+      toast.error('لا يوجد ملف محفوظ لإعادة المحاولة.');
+      throw new Error('لا يوجد ملف محفوظ.');
+    }
+    if (isUploading) {
+      toast('عملية الرفع جارية بالفعل.');
+      return '';
+    }
+    return get().startUpload(activeFile, courseId);
   },
 
   cancelUpload: () => {
@@ -241,9 +354,11 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
       isUploading: false,
       status: 'idle',
       progress: null,
+      activeFile: null,
       error: null,
       uploadSpeed: null,
       timeRemaining: null,
+      canRetry: false,
     });
   },
 
@@ -268,11 +383,13 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
       status: 'idle',
       progress: null,
       fileInfo: null,
+      activeFile: null,
       courseId: null,
       videoUrl: null,
       error: null,
       uploadSpeed: null,
       timeRemaining: null,
+      canRetry: false,
     });
   },
 }));

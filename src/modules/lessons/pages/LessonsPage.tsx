@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, ChevronUp, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2, Info, BookOpen
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, ChevronUp, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2, Info, BookOpen, RotateCcw
 } from 'lucide-react';
 import type { Lesson } from '../../../types';
 import { useCoursesStore, useLessonsStore, useModulesStore, useVideoUploadStore } from '../../../store';
@@ -249,6 +249,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     timeRemaining: videoUploadRemaining,
     startUpload: startVideoUpload,
     cancelUpload: cancelVideoUpload,
+    retryUpload: retryVideoUpload,
+    canRetry: canRetryVideoUpload,
   } = useVideoUploadStore();
 
   // Automatically link completed background upload to the active lesson form
@@ -2097,7 +2099,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                           <span className="text-xs font-bold text-slate-700 block">أو ارفع فيديو للمقرر (MP4, MOV, AVI, MKV, WebM · حتى 2 GB)</span>
                           <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1 mt-0.5">
                             <ShieldCheck className="w-3.5 h-3.5 inline text-emerald-600" />
-                            ميزة الحماية في الخلفية مفعلة: يستمر الرفع حتى لو خرجت بالزر الأوسط للشاشة.
+                            ميزة الحماية في الخلفية مفعلة: يستمر الرفع عند التبديل لتطبيقات أخرى أو سكون الشاشة.
                           </span>
                         </div>
                         <button
@@ -2159,6 +2161,11 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                             )}
                           </div>
 
+                          {videoUploadError && (
+                            <p className="text-xs text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 leading-relaxed font-medium">
+                              {videoUploadError}
+                            </p>
+                          )}
                         </div>
                       )}
 
@@ -2176,11 +2183,35 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                         </div>
                       )}
 
-                      {/* Error Status */}
-                      {videoUploadError && (
-                        <p role="alert" className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
-                          {videoUploadError}
-                        </p>
+                      {/* Error Status with Retry */}
+                      {!isVideoUploading && videoUploadError && (
+                        <div role="alert" className="flex items-center justify-between gap-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs">
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <p className="font-bold text-red-800">
+                              {videoUploadStatus === 'error' ? 'تعذر إكمال رفع الفيديو' : 'حالة الاتصال'}
+                            </p>
+                            <p className="text-red-700 leading-relaxed break-words">
+                              {videoUploadError}
+                            </p>
+                          </div>
+                          {canRetryVideoUpload && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const url = await retryVideoUpload();
+                                  if (url) {
+                                    setForm(current => ({ ...current, videoUrl: url }));
+                                  }
+                                } catch {}
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 active:scale-95 rounded-lg shadow-sm shrink-0 transition-all"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>إعادة المحاولة</span>
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </Field>
