@@ -9,7 +9,6 @@ import { ROUTES } from '../../routes/routes.config';
 import { AIAssistantCopilot } from '../ui/AIAssistantCopilot';
 import { SaveStatusIndicator } from '../ui/SaveStatusIndicator';
 import { RouteTransitionLoader } from '../feedback/RouteTransitionLoader';
-import { GlobalVideoUploadBanner } from '../ui/GlobalVideoUploadBanner';
 import logo from '../../assets/logo.png';
 
 const NAV_ITEMS = [
@@ -223,8 +222,6 @@ export function MainDashboardLayout({ children }: MainDashboardLayoutProps) {
           </div>
           {/* AI Copilot integrated globally */}
           <AIAssistantCopilot />
-          {/* Global Background Video Upload Banner */}
-          <GlobalVideoUploadBanner />
         </main>
 
         {/* Mobile Bottom Thumb Navigation Bar (< 768px) */}

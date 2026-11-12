@@ -248,6 +248,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     uploadSpeed: videoUploadSpeed,
     timeRemaining: videoUploadRemaining,
     startUpload: startVideoUpload,
+    cancelUpload: cancelVideoUpload,
   } = useVideoUploadStore();
 
   // Automatically link completed background upload to the active lesson form
@@ -533,6 +534,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
     if (!editingLessonId) {
       sessionStorage.removeItem('create_lesson_form_state');
     }
+    cancelVideoUpload();
     setShowModal(false);
     resetModal();
   };
@@ -2157,10 +2159,6 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
                             )}
                           </div>
 
-                          <p className="text-[11px] text-emerald-800 bg-emerald-50 p-1.5 rounded-lg font-medium flex items-center gap-1.5">
-                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                            الرفع نشط في الخلفية: يمكنك تصغير المتصفح أو التنقل في النظام بأمان.
-                          </p>
                         </div>
                       )}
 
