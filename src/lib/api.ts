@@ -15,7 +15,7 @@ import { toast } from "react-hot-toast";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const API_BASE_URL = import.meta.env.VITE_API_URL as string | undefined
-  ?? 'https://api.exchangesmangement.online/api/v1';
+  ?? 'https://algonaid-api.onrender.com/api/v1';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';

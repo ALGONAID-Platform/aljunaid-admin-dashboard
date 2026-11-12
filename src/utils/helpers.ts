@@ -91,7 +91,7 @@ export function getImageUrl(path?: string | null): string {
 
   const configuredBaseUrl = import.meta.env.VITE_IMAGE_BASE_URL?.trim()
     || import.meta.env.VITE_API_URL?.trim()
-    || 'https://api.exchangesmangement.online/api/v1';
+    || 'https://algonaid-api.onrender.com/api/v1';
 
   try {
     const imageBase = new URL(configuredBaseUrl);
