@@ -69,7 +69,7 @@ export function GlobalVideoUploadBanner() {
 
             <span className="text-xs font-bold text-slate-100 truncate">
               {status === 'uploading'
-                ? 'جارٍ رفع الفيديو في الخلفية'
+                ? 'جارٍ رفع الفيديو'
                 : status === 'completed'
                 ? 'اكتمل رفع الفيديو بنجاح'
                 : 'تعذر رفع الفيديو'}
@@ -160,9 +160,15 @@ export function GlobalVideoUploadBanner() {
               <div className="flex items-center gap-2 p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 text-[11px]">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="leading-tight">
-                  الرفع مستمر في الخلفية حتى عند الخروج بالزر الأوسط أو إيقاف الشاشة مؤقتاً.
+                  يجب إبقاء الصفحة مفتوحة. إذا انقطع الاتصال عند الانتقال لتطبيق آخر، أعد الصفحة للواجهة وسيحاول الرفع مجدداً تلقائياً.
                 </span>
               </div>
+            )}
+
+            {status === 'uploading' && error && (
+              <p className="text-xs text-amber-300 bg-amber-950/40 p-2 rounded-xl border border-amber-500/20 leading-relaxed">
+                {error}
+              </p>
             )}
 
             {/* Error Message */}

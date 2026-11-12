@@ -31,6 +31,40 @@ let lastBytesLoaded = 0;
 let lastProgressTimestamp = 0;
 let smoothedSpeed = 0;
 
+function isTransientUploadError(error: any): boolean {
+  if (error?.status || error?.response?.status) return false;
+  const message = String(error?.message ?? '').toLowerCase();
+  return Boolean(error?.isNetworkError)
+    || /network|connection|مشكلة في الاتصال|تعذر الاتصال|انقطع الاتصال/.test(message);
+}
+
+function waitForUploadResume(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(new Error('تم إلغاء الرفع.'));
+  if (document.visibilityState === 'visible' && navigator.onLine) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      document.removeEventListener('visibilitychange', checkReady);
+      window.removeEventListener('online', checkReady);
+      signal.removeEventListener('abort', onAbort);
+    };
+    const checkReady = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        cleanup();
+        resolve();
+      }
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new Error('تم إلغاء الرفع.'));
+    };
+    document.addEventListener('visibilitychange', checkReady);
+    window.addEventListener('online', checkReady);
+    signal.addEventListener('abort', onAbort, { once: true });
+    checkReady();
+  });
+}
+
 function formatSpeed(bytesPerSec: number): string {
   if (bytesPerSec <= 0 || !isFinite(bytesPerSec)) return '';
   if (bytesPerSec >= 1024 * 1024) {
@@ -122,12 +156,28 @@ export const useVideoUploadStore = create<VideoUploadState>((set, get) => ({
     };
 
     try {
-      const uploaded = await mediaApi.uploadVideo(
-        file,
-        courseId,
-        onProgress,
-        activeAbortController.signal
-      );
+      let uploaded;
+      const maxAttempts = 3;
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          uploaded = await mediaApi.uploadVideo(
+            file,
+            courseId,
+            onProgress,
+            activeAbortController.signal
+          );
+          break;
+        } catch (uploadError: any) {
+          if (attempt >= maxAttempts || !isTransientUploadError(uploadError)) throw uploadError;
+          set({ error: `انقطع الاتصال. أعد الصفحة إلى الواجهة والاتصال بالإنترنت لإعادة المحاولة (${attempt}/${maxAttempts - 1}).` });
+          await waitForUploadResume(activeAbortController.signal);
+          await new Promise(resolve => setTimeout(resolve, 1200 * attempt));
+          lastBytesLoaded = 0;
+          lastProgressTimestamp = Date.now();
+          smoothedSpeed = 0;
+          set({ error: null, progress: { percent: 0, loaded: 0, total: file.size }, uploadSpeed: null, timeRemaining: null });
+        }
+      }
 
       const finalVideoUrl = uploaded.videoUrl ?? uploaded.url;
       if (!finalVideoUrl) {
