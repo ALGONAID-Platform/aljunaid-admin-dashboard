@@ -90,11 +90,15 @@ export function CourseGradesPage({ courseId }: { courseId: string }) {
   };
 
   const openStudent = async (studentId: string) => {
-    setSelected(studentId); setTab('students'); setStudentLoading(true); setStudentRecord(null); setSelectedLessonId('');
+    setSelected(studentId); setTab('students'); localStorage.setItem(`course-grades-selected-student:${courseId}`, studentId); setStudentLoading(true); setStudentRecord(null); setSelectedLessonId('');
     try { const { data } = await api.get(`/grades/courses/${courseId}/students/${studentId}`); const record = unwrap(data); setStudentRecord(record); setSelectedLessonId(String(record.lessons?.[0]?.lessonId ?? '')); }
     catch { /* Keep the page open if student details cannot load. */ }
     finally { setStudentLoading(false); }
   };
+  useEffect(() => {
+    const rememberedStudent = localStorage.getItem(`course-grades-selected-student:${courseId}`);
+    if (rememberedStudent) void openStudent(rememberedStudent);
+  }, [courseId]);
   const saveStudentGrade = async (assessment: Assessment) => {
     if (!selected || assessment.kind !== 'assignment') return;
     const edit = studentEdits[assessment.id]; if (!edit || edit.score === '') { toast.error('أدخل درجة صحيحة أولاً'); return; }
