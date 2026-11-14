@@ -301,6 +301,37 @@ export const lessonService = {
     }
   },
   /**
+   * Bulk recurring weekly schedule for lessons in a course
+   */
+  async scheduleRecurring(
+    courseId: string | number,
+    payload: {
+      startDate: string;
+      daysOfWeek: (number | string)[];
+      time: string;
+      durationMinutes?: number;
+      lessonIds?: (number | string)[];
+      updateDayNumber?: boolean;
+      intervalWeeks?: number;
+      timezoneOffset?: number;
+    }
+  ): Promise<any> {
+    const numericCourseId = Number(courseId);
+    const body = {
+      courseId: numericCourseId,
+      ...payload,
+      lessonIds: payload.lessonIds?.map(Number),
+      timezoneOffset: payload.timezoneOffset ?? new Date().getTimezoneOffset(),
+    };
+    try {
+      const { data } = await api.post(`/lessons/course/${numericCourseId}/schedule-recurring`, body);
+      return data;
+    } catch {
+      const { data } = await api.post('/lessons/schedule-recurring', body);
+      return data;
+    }
+  },
+  /**
    * Lightweight lesson names list for dropdowns — returns only id + title.
    * Calls the dedicated GET /lessons/names?courseId=X backend endpoint.
    * Falls back to /lessons/search with excludeDescription=true if unavailable.

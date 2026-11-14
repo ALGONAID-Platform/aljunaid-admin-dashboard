@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, ChevronUp, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2, Info, BookOpen, RotateCcw
+  Plus, BookMarked, X, Loader2, CheckCircle, AlertCircle, Trash2, Search, Filter, PlayCircle, Clock, Edit3, AlertTriangle, Eye, CheckSquare, Square, Copy, GripVertical, FileWarning, Timer, ChevronDown, ChevronUp, FileText, FileType2, Link, Layers, Archive, ShieldCheck, ShieldAlert, Lock, Unlock, Sliders, Radio, Calendar, CheckCircle2, Info, BookOpen, RotateCcw, CalendarClock
 } from 'lucide-react';
 import type { Lesson } from '../../../types';
 import { useCoursesStore, useLessonsStore, useModulesStore, useVideoUploadStore } from '../../../store';
@@ -20,6 +20,7 @@ import { GlobalSearch } from '../../../components/ui/GlobalSearch';
 import { AdvancedFilters } from '../../../components/ui/AdvancedFilters';
 import { SavedViews } from '../../../components/ui/SavedViews';
 import { CascadeDeleteModal } from '../../../components/ui/CascadeDeleteModal';
+import { RecurringScheduleModal } from '../../../components/ui/RecurringScheduleModal';
 import { PageGuide } from '../../../components/ui/PageGuide';
 import type { BackendModule } from '../../../types/api';
 import { lessonService } from '../../../services/api/lessons.api';
@@ -201,6 +202,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
   const [selectedLessons, setSelectedLessons] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<any>(null);
+  const [showRecurringModal, setShowRecurringModal] = useState(false);
   const autoPreviewOpened = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -905,6 +907,15 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <button
+            type="button"
+            onClick={() => setShowRecurringModal(true)}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 transition-all font-bold text-sm shadow-xs hover:-translate-y-0.5 active:translate-y-0"
+            title="جدولة أسبوعية منتظمة للدروس بتوزيع التواريخ على أيام محددة تلقائياً"
+          >
+            <CalendarClock className="w-4 h-4 text-indigo-600" />
+            الجدولة الأسبوعية التلقائية
+          </button>
           <button
             onClick={openModal}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
@@ -2325,6 +2336,12 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         targetType={deleteTarget?.type || 'lesson'}
         targetId={deleteTarget?.id || ''}
         onClose={() => setDeleteTarget(null)}
+      />
+      <RecurringScheduleModal
+        isOpen={showRecurringModal}
+        onClose={() => setShowRecurringModal(false)}
+        courseId={scopedCourseId || (courseFilter !== 'all' ? courseFilter : undefined)}
+        courseTitle={currentCourse?.title}
       />
     </div>
   );

@@ -25,6 +25,16 @@ interface LessonsState {
   deleteLesson: (id: string) => Promise<void>;
   togglePublish: (id: string) => Promise<void>;
   reorderLessons: (courseId: string, orderedLessonIds: string[]) => Promise<void>;
+  scheduleRecurring: (courseId: string, payload: {
+    startDate: string;
+    daysOfWeek: (number | string)[];
+    time: string;
+    durationMinutes?: number;
+    lessonIds?: (number | string)[];
+    updateDayNumber?: boolean;
+    intervalWeeks?: number;
+    timezoneOffset?: number;
+  }) => Promise<any>;
   clearError: () => void;
   /** Clear lessons array immediately (e.g. when switching course scope) */
   clearLessons: () => void;
@@ -171,6 +181,21 @@ export const useLessonsStore = create<LessonsState>()((set, get) => ({
       lessonsMutationVersion += 1;
     } catch (err) {
       set({ lessons: prevLessons, error: resolveErrorMessage(err) });
+      throw err;
+    }
+  },
+
+  scheduleRecurring: async (courseId, payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await lessonService.scheduleRecurring(courseId, payload);
+      lessonsMutationVersion += 1;
+      // Refresh lessons list
+      await get().fetchLessons(courseId);
+      set({ isLoading: false });
+      return res;
+    } catch (err) {
+      set({ error: resolveErrorMessage(err), isLoading: false });
       throw err;
     }
   },
