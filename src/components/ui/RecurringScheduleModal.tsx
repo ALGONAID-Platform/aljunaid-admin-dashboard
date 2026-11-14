@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   CalendarClock, X, Check, Loader2, Sparkles, AlertCircle,
   Calendar, Clock, CheckCircle2, ChevronRight, Layers, ArrowLeft
 } from 'lucide-react';
-import { useLessonsStore, useCoursesStore } from '../../store';
+import { useLessonsStore, useCoursesStore, useModulesStore } from '../../store';
+import { lessonService } from '../../services/api/lessons.api';
 import { toast } from 'react-hot-toast';
 import type { Lesson } from '../../types';
 
@@ -12,6 +13,7 @@ interface RecurringScheduleModalProps {
   onClose: () => void;
   courseId?: string;
   courseTitle?: string;
+  fallbackLessons?: Lesson[];
   onSuccess?: () => void;
 }
 
@@ -37,12 +39,17 @@ export function RecurringScheduleModal({
   onClose,
   courseId: initialCourseId,
   courseTitle: initialCourseTitle,
+  fallbackLessons,
   onSuccess,
 }: RecurringScheduleModalProps) {
-  const { courses } = useCoursesStore();
-  const { lessons, scheduleRecurring, fetchLessonsPage, fetchLessons } = useLessonsStore();
+  const { courses, fetchCourses } = useCoursesStore();
+  const { lessons: storeLessons, scheduleRecurring, fetchLessonsPage, fetchLessons } = useLessonsStore();
+  const { modules: allModules, fetchModules } = useModulesStore();
 
   const [selectedCourseId, setSelectedCourseId] = useState<string>(initialCourseId || '');
+  const [courseLessons, setCourseLessons] = useState<Lesson[]>([]);
+  const [isFetchingLessons, setIsFetchingLessons] = useState(false);
+
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -55,16 +62,94 @@ export function RecurringScheduleModal({
   const [isLoading, setIsLoading] = useState(false);
   const [showAllPreview, setShowAllPreview] = useState(false);
 
+  // Sync course selection
+  useEffect(() => {
+    if (initialCourseId) {
+      setSelectedCourseId(initialCourseId);
+    } else if (courses.length > 0 && !selectedCourseId) {
+      setSelectedCourseId(String(courses[0].id));
+    }
+  }, [initialCourseId, courses, selectedCourseId]);
+
+  // Make sure courses and modules are loaded
+  useEffect(() => {
+    if (courses.length === 0) {
+      void fetchCourses();
+    }
+    if (allModules.length === 0) {
+      void fetchModules();
+    }
+  }, [courses.length, allModules.length, fetchCourses, fetchModules]);
+
   // Effective course
   const effectiveCourseId = initialCourseId || selectedCourseId || (courses[0]?.id ? String(courses[0].id) : '');
   const currentCourse = courses.find((c) => String(c.id) === String(effectiveCourseId));
 
+  // Fetch all lessons for the selected course directly
+  useEffect(() => {
+    if (!isOpen || !effectiveCourseId) {
+      setCourseLessons([]);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsFetchingLessons(true);
+
+    const load = async () => {
+      try {
+        // 1. Fetch full course lessons directly via getCoursePage with high limit
+        const res = await lessonService.getCoursePage(effectiveCourseId, 1, 500);
+        if (!isCancelled && res.items && res.items.length > 0) {
+          setCourseLessons(res.items);
+          setIsFetchingLessons(false);
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed getCoursePage in RecurringScheduleModal', e);
+      }
+
+      try {
+        // 2. Fallback: getByCourseId
+        const items = await lessonService.getByCourseId(effectiveCourseId);
+        if (!isCancelled && items && items.length > 0) {
+          setCourseLessons(items);
+          setIsFetchingLessons(false);
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed getByCourseId in RecurringScheduleModal', e);
+      }
+
+      // 3. Fallback: check fallbackLessons prop if supplied and matching
+      if (!isCancelled && fallbackLessons && fallbackLessons.length > 0) {
+        setCourseLessons(fallbackLessons);
+        setIsFetchingLessons(false);
+        return;
+      }
+
+      // 4. Fallback: check lessons from store using module resolution
+      if (!isCancelled) {
+        const matched = storeLessons.filter((l) => {
+          if (String(l.courseId) === String(effectiveCourseId)) return true;
+          const mod = allModules.find((m) => String(m.id) === String(l.courseId));
+          return String(mod?.courseId) === String(effectiveCourseId);
+        });
+        setCourseLessons(matched);
+        setIsFetchingLessons(false);
+      }
+    };
+
+    void load();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, effectiveCourseId, fallbackLessons, storeLessons, allModules]);
+
   // Relevant lessons sorted by order
   const targetLessons = useMemo(() => {
-    return lessons
-      .filter((l) => !effectiveCourseId || String(l.courseId) === String(effectiveCourseId))
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
-  }, [lessons, effectiveCourseId]);
+    return [...courseLessons].sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [courseLessons]);
 
   // Toggle single day
   const toggleDay = (dayId: number) => {
@@ -196,6 +281,7 @@ export function RecurringScheduleModal({
         durationMinutes: durationMinutes ? Number(durationMinutes) : undefined,
         updateDayNumber,
         intervalWeeks,
+        lessonIds: targetLessons.map((l) => Number(l.id)),
         timezoneOffset: new Date().getTimezoneOffset(),
       };
 
@@ -262,10 +348,10 @@ export function RecurringScheduleModal({
 
         {/* Content */}
         <div className="p-4 sm:p-6 space-y-5 max-h-[75vh] overflow-y-auto custom-scrollbar">
-          {/* Course Selector (if not scoped) */}
-          {!initialCourseId && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 block">المقرر المستهدف</label>
+          {/* Course Selector */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 block">المقرر المستهدف للجدولة</label>
+            {courses.length > 0 ? (
               <select
                 value={effectiveCourseId}
                 onChange={(e) => setSelectedCourseId(e.target.value)}
@@ -277,18 +363,35 @@ export function RecurringScheduleModal({
                   </option>
                 ))}
               </select>
-            </div>
-          )}
+            ) : (
+              <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
+                {currentCourse?.title || initialCourseTitle || 'المقرر المحدد'}
+              </div>
+            )}
+          </div>
 
           {/* Quick Info Badge */}
-          <div className="p-3 rounded-2xl bg-indigo-50/80 border border-indigo-100 flex items-center justify-between text-xs text-indigo-900">
+          <div className="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-900">
             <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-indigo-600" />
-              <span>المقرر: <strong className="font-black">{currentCourse?.title || initialCourseTitle || 'المقرر المحدد'}</strong></span>
+              <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>
+                المقرر: <strong className="font-black text-indigo-950">{currentCourse?.title || initialCourseTitle || 'المقرر المحدد'}</strong>
+              </span>
             </div>
-            <span className="font-bold bg-white px-2.5 py-1 rounded-lg border border-indigo-200 text-indigo-700 shadow-2xs">
-              {targetLessons.length} درس متاح للجدولة
-            </span>
+            {isFetchingLessons ? (
+              <span className="flex items-center gap-1.5 font-bold bg-white px-3 py-1 rounded-xl border border-indigo-200 text-indigo-700 shadow-2xs">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                جارٍ جلب الدروس...
+              </span>
+            ) : targetLessons.length > 0 ? (
+              <span className="font-bold bg-emerald-100/90 px-3 py-1 rounded-xl border border-emerald-300 text-emerald-800 shadow-2xs">
+                {targetLessons.length} درس متاح للجدولة ✅
+              </span>
+            ) : (
+              <span className="font-bold bg-amber-100/90 px-3 py-1 rounded-xl border border-amber-300 text-amber-800 shadow-2xs">
+                0 درس متاح في هذا المقرر ⚠️
+              </span>
+            )}
           </div>
 
           {/* Start Date & Time */}
@@ -428,9 +531,15 @@ export function RecurringScheduleModal({
               )}
             </div>
 
-            {previewSchedule.length === 0 ? (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-400">
-                لا توجد دروس أو أيام مختارة لإنشاء المعاينة.
+            {isFetchingLessons ? (
+              <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center gap-2 text-center text-xs text-slate-500">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                <span className="font-semibold">جارٍ فحص وتحميل دروس هذا المقرر وتوليد الجدول الزمني...</span>
+              </div>
+            ) : previewSchedule.length === 0 ? (
+              <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500 space-y-1">
+                <p className="font-bold text-slate-700">لا توجد دروس مضافة لهذا المقرر حتى الآن أو لم يتم اختيار أيام تدريس.</p>
+                <p className="text-[11px] text-slate-400">أضف بعض الدروس للمقرر أولاً لتتمكن من جدولتها أسبوعياً بشكل تلقائي.</p>
               </div>
             ) : (
               <div className="space-y-1.5 bg-slate-50/80 p-2.5 rounded-2xl border border-slate-200/80 max-h-56 overflow-y-auto custom-scrollbar">

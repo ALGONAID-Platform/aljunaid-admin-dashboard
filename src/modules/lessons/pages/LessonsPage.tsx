@@ -2340,8 +2340,9 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       <RecurringScheduleModal
         isOpen={showRecurringModal}
         onClose={() => setShowRecurringModal(false)}
-        courseId={scopedCourseId || (courseFilter !== 'all' ? courseFilter : undefined)}
+        courseId={scopedCourseId || (courseFilter !== 'all' ? courseFilter : (currentCourse?.id ? String(currentCourse.id) : undefined))}
         courseTitle={currentCourse?.title}
+        fallbackLessons={courseLessons}
       />
     </div>
   );
