@@ -899,10 +899,10 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-l from-slate-800 to-slate-600 mb-1">
-            إدارة الدروس والمحتوى
+            إدارة الدروس للمقرر
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium">
-            تصفح، أضف، ونظّم {courseLessons.length} درس مسجّل{scopedCourseId ? ' في هذا المقرر' : '. قم ببناء الهيكل التعليمي لمقرراتك'}.
+          <p className="text-xs sm:text-sm text-slate-500 font-semibold">
+            تنظيم {courseLessons.length} دروس{currentCourse ? ` في مقرر: ${currentCourse.title}` : ''}
           </p>
         </div>
 
@@ -927,83 +927,8 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
         </div>
       </div>
 
-      {/* Course Ordering Mode Bar */}
-      {currentCourse && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/70 via-white to-slate-50/60 p-4 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
-              <Sliders className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500">نظام ترتيب وعرض الدروس في مقرر:</span>
-                <span className="text-xs font-black text-slate-800">{currentCourse.title}</span>
-              </div>
-              <div className="text-sm font-extrabold text-emerald-900 mt-0.5">
-                {currentCourse.lessonOrderMode === 'BY_ORDER'
-                  ? 'ترتيب مخصص يدوي (يتم العرض للطلاب في التطبيق حسب الأوردر وتسلسل السحب)'
-                  : 'حسب تاريخ الإنشاء الافتراضي (يتم العرض للطلاب في التطبيق من الأقدم للأحدث)'}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
-            <button
-              type="button"
-              disabled={isUpdatingOrderMode}
-              onClick={() => void handleChangeOrderMode('BY_DATE')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                currentCourse.lessonOrderMode !== 'BY_ORDER'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <Calendar className="h-3.5 w-3.5" />
-              حسب تاريخ الإنشاء (الافتراضي)
-            </button>
-
-            <button
-              type="button"
-              disabled={isUpdatingOrderMode}
-              onClick={() => void handleChangeOrderMode('BY_ORDER')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                currentCourse.lessonOrderMode === 'BY_ORDER'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <CheckSquare className="h-3.5 w-3.5" />
-              ترتيب مخصص يدوي (بالأوردر)
-            </button>
-          </div>
-        </div>
-      )}
-
-      <PageGuide
-        title="دليل إدارة الدروس"
-        description="خطوات إدارة الدروس والوحدات التعليمية الخاصة بكل مقرر"
-        steps={[
-          {
-            title: "إدارة الوحدات التعليمية",
-            description: "استخدم زر 'إدارة الوحدات' لإنشاء وترتيب فصول/وحدات المقرر قبل إضافة الدروس إليها."
-          },
-          {
-            title: "إضافة درس جديد",
-            description: "انقر على 'إنشاء درس جديد' لتحديد نوع المحتوى (فيديو، مستند، نص) وربطه بمقرر ووحدة معينة."
-          },
-          {
-            title: "تصفية متقدمة",
-            description: "استخدم شريط الفلاتر للوصول السريع إلى الدروس المنشورة، المسودات، أو الدروس بدون محتوى."
-          }
-        ]}
-        tips={[
-          "لا تنس تحديد حالة الدرس كـ 'منشور' عندما يكون جاهزاً ليظهر للطلاب.",
-          "يمكنك النقر على زر 'توليد بالذكاء الاصطناعي' أثناء كتابة الدرس للحصول على أفكار ونصوص سريعة."
-        ]}
-      />
-
       {/* Sticky Advanced Filters */}
-      <StickyToolbar position="top" className="!flex-col !items-stretch">
+      <StickyToolbar position="top" className="!flex-col !items-stretch mb-3">
         <div className="flex w-full min-w-0 flex-col gap-3">
           <div className="relative group w-full min-w-0">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
@@ -1012,7 +937,7 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث باسم الدرس أو وصفه أو المقرر..."
+              placeholder="البحث في الدروس المسجلة في هذا المقرر..."
               className="min-h-12 w-full min-w-0 pl-4 pr-12 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
             />
           </div>
@@ -1039,20 +964,81 @@ export function LessonsPage({ scopedCourseId, scopedLessonId }: { scopedCourseId
           activeView={activeView}
           onChange={setActiveView}
           views={[
-            { id: 'all', label: 'الكل', icon: Layers },
-            { id: 'published', label: 'منشور', icon: CheckCircle },
-            { id: 'drafts', label: 'مسودات', icon: Clock },
-            { id: 'incomplete', label: 'غير مكتمل', icon: AlertTriangle }
+            { id: 'all', label: `الكل (${stats.total})`, icon: Layers },
+            { id: 'published', label: `منشور (${stats.published})`, icon: CheckCircle },
+            { id: 'drafts', label: `مسودات (${stats.drafts})`, icon: Clock },
+            { id: 'incomplete', label: `غير مكتمل (${stats.missingContent})`, icon: AlertTriangle }
           ]}
         />
       </StickyToolbar>
 
-      {/* Performance Monitoring Widgets */}
-      <div className="grid grid-cols-1 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
-          <div className="text-slate-500 text-xs font-bold flex items-center gap-2 mb-1"><Layers className="w-4 h-4 text-indigo-500" /> إجمالي الدروس</div>
-          <div className="text-2xl font-black text-slate-800">{stats.total}</div>
+      {/* Course Ordering Mode Bar */}
+      {currentCourse && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <Sliders className="h-4 w-4 text-emerald-600" />
+            <span className="text-xs font-bold text-slate-700">ترتيب وعرض الدروس:</span>
+            <span className="text-xs font-bold text-slate-500">
+              {currentCourse.lessonOrderMode === 'BY_ORDER' ? 'مخصص يدوي (حسب الترتيب)' : 'حسب تاريخ الإنشاء'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1 text-xs">
+            <button
+              type="button"
+              disabled={isUpdatingOrderMode}
+              onClick={() => void handleChangeOrderMode('BY_DATE')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 font-bold transition-all ${
+                currentCourse.lessonOrderMode !== 'BY_ORDER'
+                  ? 'bg-white text-emerald-700 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              تاريخ الإنشاء
+            </button>
+
+            <button
+              type="button"
+              disabled={isUpdatingOrderMode}
+              onClick={() => void handleChangeOrderMode('BY_ORDER')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 font-bold transition-all ${
+                currentCourse.lessonOrderMode === 'BY_ORDER'
+                  ? 'bg-white text-emerald-700 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              ترتيب مخصص
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* Guide for Lesson Management */}
+      <div className="mb-4">
+        <PageGuide
+          title="دليل إدارة الدروس"
+          description="خطوات إدارة وتنظيم دروس المقرر"
+          steps={[
+            {
+              title: "إدارة الوحدات والدروس",
+              description: "إنشاء الفصول والوحدات وترتيب الدروس بداخلها."
+            },
+            {
+              title: "إضافة المحتوى والجدولة",
+              description: "رفع الفيديو أو ملفات PDF أو ضبط الجدولة الأسبوعية المباشرة."
+            },
+            {
+              title: "حالة النشر",
+              description: "تحديد حالة الدرس كمنشور ليظهر مباشرة للطلاب في التطبيق."
+            }
+          ]}
+          tips={[
+            "تأكد من نشر الدرس بعد إعداده ليتمكن الطلاب من الوصول إليه.",
+            "استخدم الجدولة الأسبوعية التلقائية لتوزيع المواعيد بنقرة واحدة."
+          ]}
+        />
       </div>
 
       {error && courseLessons.length === 0 && lessons.length === 0 ? (
