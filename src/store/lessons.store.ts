@@ -32,6 +32,7 @@ interface LessonsState {
     durationMinutes?: number;
     lessonIds?: (number | string)[];
     updateDayNumber?: boolean;
+    startDayNumber?: number;
     intervalWeeks?: number;
     timezoneOffset?: number;
   }) => Promise<any>;

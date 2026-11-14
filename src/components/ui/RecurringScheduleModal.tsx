@@ -50,6 +50,12 @@ export function RecurringScheduleModal({
   const [courseLessons, setCourseLessons] = useState<Lesson[]>([]);
   const [isFetchingLessons, setIsFetchingLessons] = useState(false);
 
+  // Range selection state
+  const [rangeMode, setRangeMode] = useState<'all' | 'custom'>('custom');
+  const [startLessonId, setStartLessonId] = useState<string>('');
+  const [endLessonId, setEndLessonId] = useState<string>('');
+  const [startDayNumber, setStartDayNumber] = useState<number>(1);
+
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -146,10 +152,61 @@ export function RecurringScheduleModal({
     };
   }, [isOpen, effectiveCourseId, fallbackLessons, storeLessons, allModules]);
 
-  // Relevant lessons sorted by order
-  const targetLessons = useMemo(() => {
+  // Full sorted lessons in the course
+  const sortedAllLessons = useMemo(() => {
     return [...courseLessons].sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [courseLessons]);
+
+  // Default start and end lesson IDs when lessons load
+  useEffect(() => {
+    if (sortedAllLessons.length > 0) {
+      const firstId = String(sortedAllLessons[0].id);
+      const lastId = String(sortedAllLessons[sortedAllLessons.length - 1].id);
+      setStartLessonId((prev) => (sortedAllLessons.some((l) => String(l.id) === prev) ? prev : firstId));
+      setEndLessonId((prev) => (sortedAllLessons.some((l) => String(l.id) === prev) ? prev : lastId));
+    } else {
+      setStartLessonId('');
+      setEndLessonId('');
+    }
+  }, [sortedAllLessons]);
+
+  // Sliced target lessons based on range selection
+  const { targetLessons, startIndex, endIndex } = useMemo(() => {
+    if (sortedAllLessons.length === 0) {
+      return { targetLessons: [], startIndex: 0, endIndex: 0 };
+    }
+    if (rangeMode === 'all') {
+      return {
+        targetLessons: sortedAllLessons,
+        startIndex: 0,
+        endIndex: sortedAllLessons.length - 1,
+      };
+    }
+
+    let sIdx = sortedAllLessons.findIndex((l) => String(l.id) === String(startLessonId));
+    let eIdx = sortedAllLessons.findIndex((l) => String(l.id) === String(endLessonId));
+
+    if (sIdx === -1) sIdx = 0;
+    if (eIdx === -1) eIdx = sortedAllLessons.length - 1;
+
+    if (sIdx > eIdx) {
+      const tmp = sIdx;
+      sIdx = eIdx;
+      eIdx = tmp;
+    }
+
+    const sliced = sortedAllLessons.slice(sIdx, eIdx + 1);
+    return { targetLessons: sliced, startIndex: sIdx, endIndex: eIdx };
+  }, [sortedAllLessons, rangeMode, startLessonId, endLessonId]);
+
+  // Auto-sync startDayNumber with startIndex
+  useEffect(() => {
+    if (rangeMode === 'custom') {
+      setStartDayNumber(startIndex + 1);
+    } else {
+      setStartDayNumber(1);
+    }
+  }, [startIndex, rangeMode]);
 
   // Toggle single day
   const toggleDay = (dayId: number) => {
@@ -232,7 +289,7 @@ export function RecurringScheduleModal({
       result.push({
         lesson,
         date: scheduledDate,
-        dayNumber: i + 1,
+        dayNumber: startDayNumber + i,
         dayName: arabicDayNames[scheduledDate.getDay()],
         formattedDate: scheduledDate.toLocaleDateString('ar-EG', {
           year: 'numeric',
@@ -248,7 +305,7 @@ export function RecurringScheduleModal({
     }
 
     return result;
-  }, [startDate, selectedDays, time, targetLessons, intervalWeeks]);
+  }, [startDate, selectedDays, time, targetLessons, intervalWeeks, startDayNumber]);
 
   const handleApply = async () => {
     if (!effectiveCourseId) {
@@ -268,7 +325,7 @@ export function RecurringScheduleModal({
       return;
     }
     if (targetLessons.length === 0) {
-      toast.error('لا توجد دروس في هذا المقرر لجدولتها.');
+      toast.error('لا توجد دروس في النطاق المحدد لجدولتها.');
       return;
     }
 
@@ -280,6 +337,7 @@ export function RecurringScheduleModal({
         time,
         durationMinutes: durationMinutes ? Number(durationMinutes) : undefined,
         updateDayNumber,
+        startDayNumber: updateDayNumber ? Number(startDayNumber) : undefined,
         intervalWeeks,
         lessonIds: targetLessons.map((l) => Number(l.id)),
         timezoneOffset: new Date().getTimezoneOffset(),
@@ -383,9 +441,9 @@ export function RecurringScheduleModal({
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
                 جارٍ جلب الدروس...
               </span>
-            ) : targetLessons.length > 0 ? (
+            ) : sortedAllLessons.length > 0 ? (
               <span className="font-bold bg-emerald-100/90 px-3 py-1 rounded-xl border border-emerald-300 text-emerald-800 shadow-2xs">
-                {targetLessons.length} درس متاح للجدولة ✅
+                {sortedAllLessons.length} درس متاح في المقرر ✅
               </span>
             ) : (
               <span className="font-bold bg-amber-100/90 px-3 py-1 rounded-xl border border-amber-300 text-amber-800 shadow-2xs">
@@ -393,6 +451,100 @@ export function RecurringScheduleModal({
               </span>
             )}
           </div>
+
+          {/* Lessons Range Selection (من الدرس ... إلى الدرس ...) */}
+          {sortedAllLessons.length > 0 && (
+            <div className="p-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/60 via-slate-50 to-white space-y-3 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  تحديد نطاق الدروس المراد جدولتها
+                </label>
+
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setRangeMode('custom')}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                      rangeMode === 'custom'
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    نطاق مخصص (من - إلى)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRangeMode('all')}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                      rangeMode === 'all'
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    جميع الدروس ({sortedAllLessons.length})
+                  </button>
+                </div>
+              </div>
+
+              {rangeMode === 'custom' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* Start Lesson */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                      <span>البداية من الدرس:</span>
+                      <span className="text-indigo-600 font-black">({startIndex + 1})</span>
+                    </label>
+                    <select
+                      value={startLessonId}
+                      onChange={(e) => setStartLessonId(e.target.value)}
+                      disabled={sortedAllLessons.length === 0}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {sortedAllLessons.map((l, idx) => (
+                        <option key={l.id} value={l.id}>
+                          {idx + 1}. {l.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* End Lesson */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                      <span>النهاية عند الدرس:</span>
+                      <span className="text-indigo-600 font-black">({endIndex + 1})</span>
+                    </label>
+                    <select
+                      value={endLessonId}
+                      onChange={(e) => setEndLessonId(e.target.value)}
+                      disabled={sortedAllLessons.length === 0}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {sortedAllLessons.map((l, idx) => (
+                        <option key={l.id} value={l.id}>
+                          {idx + 1}. {l.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Range Summary Info */}
+              <div className="text-[11px] font-bold text-indigo-800 bg-white/90 px-3 py-2 rounded-xl border border-indigo-100 flex flex-wrap items-center justify-between gap-1 shadow-2xs">
+                <span>
+                  المحدد للجدولة: <strong className="text-indigo-950 font-black">{targetLessons.length}</strong> درس
+                  {rangeMode === 'custom' ? ` (من الدرس ${startIndex + 1} إلى ${endIndex + 1})` : ''}
+                </span>
+                <span className="text-slate-500 font-normal">
+                  {sortedAllLessons.length - targetLessons.length > 0
+                    ? `باقي الدروس (${sortedAllLessons.length - targetLessons.length}) لن تتأثر مواعيدها`
+                    : 'كامل دروس المقرر مشمولة'}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Start Date & Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -498,7 +650,7 @@ export function RecurringScheduleModal({
               />
             </div>
 
-            <div className="flex items-center pt-6">
+            <div className="space-y-2 pt-1 sm:pt-4">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -510,6 +662,20 @@ export function RecurringScheduleModal({
                   تحديث رقم اليوم (اليوم 1، 2، 3...) تسلسلياً
                 </span>
               </label>
+
+              {updateDayNumber && (
+                <div className="flex items-center gap-2 pr-6">
+                  <span className="text-[11px] font-bold text-slate-600">بدء ترقيم الأيام من:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={startDayNumber}
+                    onChange={(e) => setStartDayNumber(Math.max(1, Number(e.target.value)))}
+                    className="w-16 px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs font-bold text-center text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                  />
+                  <span className="text-[10px] text-slate-400 font-medium">(اليوم {startDayNumber} فصاعداً)</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -599,7 +765,7 @@ export function RecurringScheduleModal({
             ) : (
               <>
                 <CalendarClock className="w-4 h-4" />
-                <span>تطبيق الجدولة على كل الدروس ({targetLessons.length})</span>
+                <span>تطبيق الجدولة على الدروس المحددة ({targetLessons.length})</span>
               </>
             )}
           </button>
