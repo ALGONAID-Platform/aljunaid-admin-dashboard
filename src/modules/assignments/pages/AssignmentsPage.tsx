@@ -3,7 +3,8 @@ import type { FormEvent } from 'react';
 import {
   ExternalLink, RefreshCw, ClipboardCheck, Save, Plus, X,
   Paperclip, Trash2, BookOpen, ChevronDown, CheckCircle2,
-  Clock, AlertCircle, FileText, Check
+  Clock, AlertCircle, FileText, Check, Send, MessageSquare,
+  Sparkles, CheckSquare, Square
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '../../../lib/api';
@@ -182,6 +183,22 @@ export function AssignmentsPage({
   const [modalLessons, setModalLessons] = useState<Array<{ id: string; title: string }>>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  // Bulk Grading & Mass Reply State
+  const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<Set<number>>(new Set());
+  const [dirtySubmissionIds, setDirtySubmissionIds] = useState<Set<number>>(new Set());
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkTargetAssignment, setBulkTargetAssignment] = useState<{ assignment: Assignment; submissions: Submission[] } | null>(null);
+  const [bulkForm, setBulkForm] = useState({
+    feedback: '',
+    scoreMode: 'FULL' as 'FULL' | 'CUSTOM' | 'KEEP',
+    customScore: '100',
+    status: 'GRADED',
+    feedbackImageUrl: '',
+    targetScope: 'ALL' as 'ALL' | 'PENDING' | 'SELECTED',
+  });
+  const [savingBulk, setSavingBulk] = useState(false);
+  const [savingDirty, setSavingDirty] = useState(false);
 
   // Lesson Accordion & Filter State
   const [expandedLessonIds, setExpandedLessonIds] = useState<Set<string>>(() =>
@@ -442,11 +459,214 @@ export function AssignmentsPage({
         status: form.status,
       });
       toast.success('تم حفظ التقييم بنجاح.');
+      setDirtySubmissionIds(prev => {
+        const next = new Set(prev);
+        next.delete(submission.id);
+        return next;
+      });
       await load();
     } catch (e) {
       toast.error(errorOf(e));
     } finally {
       setSaving(null);
+    }
+  };
+
+  const patchGrade = (id: number, patch: Partial<{ score: string; feedback: string; feedbackImageUrl: string; status: string }>) => {
+    setGrades(current => ({ ...current, [id]: { ...current[id], ...patch } }));
+    setDirtySubmissionIds(prev => new Set(prev).add(id));
+  };
+
+  const toggleSelectSubmission = (id: number) => {
+    setSelectedSubmissionIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllInAssignment = (subs: Submission[], checked: boolean) => {
+    setSelectedSubmissionIds(prev => {
+      const next = new Set(prev);
+      for (const s of subs) {
+        if (checked) next.add(s.id);
+        else next.delete(s.id);
+      }
+      return next;
+    });
+  };
+
+  const openBulkReplyModal = (
+    target: { assignment: Assignment; submissions: Submission[] },
+    targetScope: 'ALL' | 'PENDING' | 'SELECTED' = 'ALL'
+  ) => {
+    setBulkTargetAssignment(target);
+    const hasPending = target.submissions.some(s => s.status === 'SUBMITTED');
+    const selectedCount = target.submissions.filter(s => selectedSubmissionIds.has(s.id)).length;
+    const resolvedScope = targetScope === 'SELECTED' && selectedCount > 0
+      ? 'SELECTED'
+      : (hasPending ? 'PENDING' : 'ALL');
+
+    setBulkForm({
+      feedback: '',
+      scoreMode: 'FULL',
+      customScore: String(target.assignment.maxScore),
+      status: 'GRADED',
+      feedbackImageUrl: '',
+      targetScope: resolvedScope,
+    });
+    setBulkModalOpen(true);
+  };
+
+  const executeBulkGrade = async (payload: {
+    submissionIds?: number[];
+    items?: Array<{ submissionId: number; score?: number; feedback?: string; feedbackImageUrl?: string; status?: string }>;
+    commonScore?: number;
+    commonFeedback?: string;
+    commonFeedbackImageUrl?: string;
+    commonStatus?: string;
+  }) => {
+    try {
+      const res = await api.post('/assignments/submissions/bulk-grade', payload);
+      return res.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        // Fallback: batch individual submissions in parallel chunks
+        const ids = payload.submissionIds || (payload.items?.map(it => it.submissionId) ?? []);
+        const itemMap = new Map((payload.items || []).map(it => [it.submissionId, it]));
+        const BATCH = 5;
+        for (let i = 0; i < ids.length; i += BATCH) {
+          const chunk = ids.slice(i, i + BATCH);
+          await Promise.all(chunk.map(id => {
+            const it = itemMap.get(id);
+            const score = it?.score !== undefined ? it.score : payload.commonScore;
+            const feedback = it?.feedback !== undefined ? it.feedback : payload.commonFeedback;
+            const feedbackImageUrl = it?.feedbackImageUrl !== undefined ? it.feedbackImageUrl : payload.commonFeedbackImageUrl;
+            const status = it?.status !== undefined ? it.status : (payload.commonStatus || 'GRADED');
+            return api.post(`/assignments/submissions/${id}/grade`, {
+              score,
+              feedback,
+              feedbackImageUrl,
+              status,
+            });
+          }));
+        }
+        return { success: true, count: ids.length };
+      }
+      throw err;
+    }
+  };
+
+  const handleSendBulkReply = async () => {
+    if (!bulkTargetAssignment) return;
+    const { assignment, submissions } = bulkTargetAssignment;
+
+    let targets: Submission[] = [];
+    if (bulkForm.targetScope === 'SELECTED') {
+      targets = submissions.filter(s => selectedSubmissionIds.has(s.id));
+      if (targets.length === 0) {
+        toast.error('لم يتم تحديد أي طالب من القائمة.');
+        return;
+      }
+    } else if (bulkForm.targetScope === 'PENDING') {
+      targets = submissions.filter(s => s.status === 'SUBMITTED');
+      if (targets.length === 0) {
+        toast.error('لا توجد تسليمات بانتظار التصحيح في هذا التكليف.');
+        return;
+      }
+    } else {
+      targets = submissions;
+      if (targets.length === 0) {
+        toast.error('لا توجد تسليمات لهذا التكليف بعد.');
+        return;
+      }
+    }
+
+    let commonScore: number | undefined;
+    if (bulkForm.scoreMode === 'FULL') {
+      commonScore = assignment.maxScore;
+    } else if (bulkForm.scoreMode === 'CUSTOM') {
+      const parsed = Number(bulkForm.customScore);
+      if (!Number.isInteger(parsed) || parsed < 0 || parsed > assignment.maxScore) {
+        toast.error(`يرجى إدخال درجة صحيحة بين 0 و ${assignment.maxScore}.`);
+        return;
+      }
+      commonScore = parsed;
+    }
+
+    if (!bulkForm.feedback.trim() && commonScore === undefined) {
+      toast.error('يرجى كتابة نص الرد أو تحديد الدرجة الممنوحة.');
+      return;
+    }
+
+    setSavingBulk(true);
+    try {
+      const submissionIds = targets.map(t => t.id);
+      await executeBulkGrade({
+        submissionIds,
+        commonScore,
+        commonFeedback: bulkForm.feedback.trim() || undefined,
+        commonFeedbackImageUrl: bulkForm.feedbackImageUrl.trim() || undefined,
+        commonStatus: bulkForm.status,
+      });
+
+      toast.success(`تم إرسال الرد والتقييم بنجاح إلى ${targets.length} طالب! 🎉`);
+      setSelectedSubmissionIds(prev => {
+        const next = new Set(prev);
+        for (const id of submissionIds) next.delete(id);
+        return next;
+      });
+      setDirtySubmissionIds(prev => {
+        const next = new Set(prev);
+        for (const id of submissionIds) next.delete(id);
+        return next;
+      });
+
+      setBulkModalOpen(false);
+      setBulkTargetAssignment(null);
+      await load();
+    } catch (e: any) {
+      toast.error(errorOf(e));
+    } finally {
+      setSavingBulk(false);
+    }
+  };
+
+  const saveAllDirtySubmissions = async () => {
+    if (dirtySubmissionIds.size === 0) return;
+    setSavingDirty(true);
+    try {
+      const dirtyIds = Array.from(dirtySubmissionIds);
+      const itemsToSave: Array<{ submissionId: number; score: number; feedback?: string; feedbackImageUrl?: string; status: string }> = [];
+
+      for (const subId of dirtyIds) {
+        const form = grades[subId];
+        const parentRow = rows.find(r => r.submissions.some(s => s.id === subId));
+        const maxScore = parentRow?.assignment.maxScore ?? 100;
+        const score = Number(form?.score);
+        if (!Number.isInteger(score) || score < 0 || score > maxScore) {
+          toast.error(`تحقق من صحة الدرجة المدخلة للتسليم #${subId} (بين 0 و ${maxScore}).`);
+          setSavingDirty(false);
+          return;
+        }
+        itemsToSave.push({
+          submissionId: subId,
+          score,
+          feedback: form?.feedback || undefined,
+          feedbackImageUrl: form?.feedbackImageUrl || undefined,
+          status: form?.status || 'GRADED',
+        });
+      }
+
+      await executeBulkGrade({ items: itemsToSave });
+      toast.success(`تم حفظ وإرسال تقييمات ${itemsToSave.length} طالب بنجاح!`);
+      setDirtySubmissionIds(new Set());
+      await load();
+    } catch (e: any) {
+      toast.error(errorOf(e));
+    } finally {
+      setSavingDirty(false);
     }
   };
 
@@ -482,8 +702,6 @@ export function AssignmentsPage({
     }
   };
 
-  const patchGrade = (id: number, patch: Partial<{ score: string; feedback: string; feedbackImageUrl: string; status: string }>) =>
-    setGrades(current => ({ ...current, [id]: { ...current[id], ...patch } }));
 
   const deleteAssignment = async (assignmentId: number) => {
     setDeletingId(assignmentId);
@@ -604,6 +822,53 @@ export function AssignmentsPage({
         <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900 flex items-center gap-3">
           <AlertCircle size={18} className="shrink-0 text-amber-600" />
           <span>{loadWarning}</span>
+        </div>
+      )}
+
+      {/* Dirty Submissions Alert Bar */}
+      {dirtySubmissionIds.size > 0 && (
+        <div className="rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Sparkles size={20} className="animate-pulse" />
+            </div>
+            <div>
+              <h4 className="font-black text-emerald-950 text-sm sm:text-base">
+                لديك ({dirtySubmissionIds.size}) تقييمات فردية معدلة لم يتم حفظها بعد
+              </h4>
+              <p className="text-xs text-emerald-700 font-medium">
+                يمكنك كتابة التقييم والرد لكل طالب على حدة، ثم حفظ كافة التعديلات الفردية وإرسالها لجميع هؤلاء الطلاب بنقرة واحدة.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={savingDirty}
+              className="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              تراجع عن التعديلات
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveAllDirtySubmissions()}
+              disabled={savingDirty}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition-all active:scale-95"
+            >
+              {savingDirty ? (
+                <>
+                  <RefreshCw size={15} className="animate-spin" />
+                  <span>جارٍ حفظ كافة التعديلات...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={15} />
+                  <span>إرسال وحفظ كافة التعديلات الفردية الآن ({dirtySubmissionIds.size})</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
@@ -865,7 +1130,18 @@ export function AssignmentsPage({
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {assignment.type !== 'QUIZ' && submissions.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => openBulkReplyModal({ assignment, submissions }, 'ALL')}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-all active:scale-95"
+                                  title="كتابة رد أو حل نموذجي وإرساله لجميع الطلاب بنقرة واحدة"
+                                >
+                                  <MessageSquare size={14} />
+                                  <span>رد جماعي للطلاب ({submissions.length})</span>
+                                </button>
+                              )}
                               <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100">
                                 الدرجة القصوى: {assignment.maxScore}
                               </span>
@@ -924,37 +1200,93 @@ export function AssignmentsPage({
                               <p className="text-[11px] text-slate-400">ستظهر تسليمات الطلاب هنا فور إرسالها من التطبيق أو الموقع.</p>
                             </div>
                           ) : (
-                            <div className="divide-y divide-slate-100">
-                              {submissions.map(sub => {
-                                const student = sub.student?.user ?? sub.student;
-                                const form = grades[sub.id] ?? {
-                                  score: String(sub.score ?? ''),
-                                  feedback: sub.feedback ?? '',
-                                  feedbackImageUrl: sub.feedbackImageUrl ?? '',
-                                  status: sub.status === 'RESUBMISSION_REQUESTED' ? 'RESUBMISSION_REQUESTED' : 'GRADED',
-                                };
-                                const badge = getStatusBadge(sub.status);
+                            <div>
+                              {/* Submissions Quick Selection Bar */}
+                              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/90 border-b border-slate-100 px-4 py-2.5">
+                                <div className="flex items-center gap-3">
+                                  <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={submissions.length > 0 && submissions.every(s => selectedSubmissionIds.has(s.id))}
+                                      onChange={(e) => toggleSelectAllInAssignment(submissions, e.target.checked)}
+                                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                                    />
+                                    <span>تحديد جميع التسليمات ({submissions.length})</span>
+                                  </label>
+                                  {submissions.filter(s => selectedSubmissionIds.has(s.id)).length > 0 && (
+                                    <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200">
+                                      تم تحديد {submissions.filter(s => selectedSubmissionIds.has(s.id)).length} طالب
+                                    </span>
+                                  )}
+                                </div>
 
-                                return (
-                                  <div
-                                    key={sub.id}
-                                    className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1.2fr_1fr] bg-white hover:bg-slate-50/30 transition-colors"
-                                  >
-                                    {/* Left: Student Submission Details */}
-                                    <div className="space-y-3">
-                                      <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2.5">
-                                          {student?.avatar ? (
-                                            <img
-                                              src={student.avatar}
-                                              alt={student.name}
-                                              className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                                <div className="flex items-center gap-2">
+                                  {submissions.filter(s => selectedSubmissionIds.has(s.id)).length > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openBulkReplyModal({ assignment, submissions }, 'SELECTED')}
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
+                                    >
+                                      <Send size={13} />
+                                      <span>رد وإرسال للمحددين ({submissions.filter(s => selectedSubmissionIds.has(s.id)).length})</span>
+                                    </button>
+                                  ) : null}
+
+                                  {submissions.some(s => s.status === 'SUBMITTED') && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openBulkReplyModal({ assignment, submissions }, 'PENDING')}
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1.5 text-xs font-bold hover:bg-amber-200 transition-colors"
+                                    >
+                                      <Clock size={13} />
+                                      <span>رد موحد على المعلقين ({submissions.filter(s => s.status === 'SUBMITTED').length})</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="divide-y divide-slate-100">
+                                {submissions.map(sub => {
+                                  const student = sub.student?.user ?? sub.student;
+                                  const form = grades[sub.id] ?? {
+                                    score: String(sub.score ?? ''),
+                                    feedback: sub.feedback ?? '',
+                                    feedbackImageUrl: sub.feedbackImageUrl ?? '',
+                                    status: sub.status === 'RESUBMISSION_REQUESTED' ? 'RESUBMISSION_REQUESTED' : 'GRADED',
+                                  };
+                                  const badge = getStatusBadge(sub.status);
+                                  const isSelected = selectedSubmissionIds.has(sub.id);
+                                  const isDirty = dirtySubmissionIds.has(sub.id);
+
+                                  return (
+                                    <div
+                                      key={sub.id}
+                                      className={`grid gap-4 p-4 sm:p-5 lg:grid-cols-[1.2fr_1fr] transition-colors ${
+                                        isSelected ? 'bg-indigo-50/30' : 'bg-white hover:bg-slate-50/30'
+                                      }`}
+                                    >
+                                      {/* Left: Student Submission Details */}
+                                      <div className="space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2.5">
+                                            <input
+                                              type="checkbox"
+                                              checked={isSelected}
+                                              onChange={() => toggleSelectSubmission(sub.id)}
+                                              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                                              title="تحديد الطالب للرد الجماعي"
                                             />
-                                          ) : (
-                                            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs border border-emerald-200">
-                                              {student?.name ? student.name.charAt(0) : 'ط'}
-                                            </div>
-                                          )}
+                                            {student?.avatar ? (
+                                              <img
+                                                src={student.avatar}
+                                                alt={student.name}
+                                                className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                                              />
+                                            ) : (
+                                              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs border border-emerald-200">
+                                                {student?.name ? student.name.charAt(0) : 'ط'}
+                                              </div>
+                                            )}
                                           <div>
                                             <strong className="text-sm font-black text-slate-900 block">
                                               {student?.name ?? 'طالب'}
@@ -1084,7 +1416,11 @@ export function AssignmentsPage({
                                         <button
                                           disabled={saving === sub.id}
                                           onClick={() => void gradeSubmission(sub, assignment)}
-                                          className="sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                                          className={`sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs transition-all active:scale-95 disabled:opacity-50 ${
+                                            isDirty
+                                              ? 'bg-amber-600 hover:bg-amber-700 ring-2 ring-amber-400/40'
+                                              : 'bg-emerald-600 hover:bg-emerald-700'
+                                          }`}
                                         >
                                           {saving === sub.id ? (
                                             <>
@@ -1094,7 +1430,7 @@ export function AssignmentsPage({
                                           ) : (
                                             <>
                                               <Save size={14} />
-                                              <span>حفظ التقييم</span>
+                                              <span>{isDirty ? 'حفظ التقييم لهذا الطالب (معدّل)' : 'حفظ التقييم لهذا الطالب'}</span>
                                             </>
                                           )}
                                         </button>
@@ -1103,6 +1439,7 @@ export function AssignmentsPage({
                                   </div>
                                 );
                               })}
+                            </div>
                             </div>
                           )}
                         </article>
@@ -1291,6 +1628,329 @@ export function AssignmentsPage({
               >
                 إلغاء
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Action Bar for Unsaved Individual Edits */}
+      {dirtySubmissionIds.size > 0 && (
+        <div className="sticky bottom-4 z-40 mx-auto max-w-4xl rounded-2xl border-2 border-emerald-500 bg-emerald-950/95 backdrop-blur-md p-4 text-white shadow-2xl animate-in slide-in-from-bottom-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600/50 flex items-center justify-center shrink-0">
+              <Sparkles size={20} className="text-emerald-300 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="font-extrabold text-sm sm:text-base text-white">
+                لديك ({dirtySubmissionIds.size}) تقييمات فردية معدلة لم تُرسل بعد
+              </h4>
+              <p className="text-xs text-emerald-200">
+                تم تعديل درجات أو ملاحظات للطلاب فرادى، اضغط لحفظ وإرسال كافة التعديلات الفردية معاً بنقرة واحدة.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={savingDirty}
+              className="rounded-xl border border-white/20 px-3 py-2 text-xs font-bold text-white hover:bg-white/10 transition-colors"
+            >
+              تراجع عن التعديلات
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveAllDirtySubmissions()}
+              disabled={savingDirty}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-xs sm:text-sm font-black text-slate-950 hover:bg-emerald-400 transition-colors shadow-lg disabled:opacity-50"
+            >
+              {savingDirty ? (
+                <>
+                  <RefreshCw size={15} className="animate-spin" />
+                  <span>جارٍ حفظ كافة التقييمات...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={15} />
+                  <span>إرسال وحفظ كافة التعديلات الفردية الآن ({dirtySubmissionIds.size})</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Reply & Grading Modal */}
+      {bulkModalOpen && bulkTargetAssignment && (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/60 p-4 animate-in fade-in duration-200 overflow-y-auto"
+          onMouseDown={e => {
+            if (e.target === e.currentTarget && !savingBulk) {
+              setBulkModalOpen(false);
+              setBulkTargetAssignment(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-2xl space-y-5 rounded-3xl bg-white p-6 sm:p-7 shadow-2xl my-8"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-reply-title"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                  <MessageSquare size={22} />
+                </div>
+                <div>
+                  <h3 id="bulk-reply-title" className="text-lg font-black text-slate-900">
+                    رد جماعي وتقييم لجميع الطلاب بنقرة واحدة
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    التكليف: <span className="font-bold text-slate-800">{bulkTargetAssignment.assignment.title}</span> (الدرجة القصوى: {bulkTargetAssignment.assignment.maxScore})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkModalOpen(false);
+                  setBulkTargetAssignment(null);
+                }}
+                disabled={savingBulk}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Target Scope Selection */}
+            <div className="space-y-2 rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
+              <label className="text-xs font-bold text-slate-700 block">
+                تحديد الطلاب المستهدفين بهذا الرد:
+              </label>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {bulkTargetAssignment.submissions.filter(s => selectedSubmissionIds.has(s.id)).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setBulkForm(p => ({ ...p, targetScope: 'SELECTED' }))}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center justify-between ${
+                      bulkForm.targetScope === 'SELECTED'
+                        ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>الطلاب المحددين فقط</span>
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">
+                      {bulkTargetAssignment.submissions.filter(s => selectedSubmissionIds.has(s.id)).length}
+                    </span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setBulkForm(p => ({ ...p, targetScope: 'PENDING' }))}
+                  className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center justify-between ${
+                    bulkForm.targetScope === 'PENDING'
+                      ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>بانتظار التصحيح فقط</span>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                    {bulkTargetAssignment.submissions.filter(s => s.status === 'SUBMITTED').length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBulkForm(p => ({ ...p, targetScope: 'ALL' }))}
+                  className={`p-2.5 rounded-xl border text-xs font-bold text-right transition-all flex items-center justify-between ${
+                    bulkForm.targetScope === 'ALL'
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-xs'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>جميع التسليمات (الكل)</span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                    {bulkTargetAssignment.submissions.length}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Model Answer / Common Feedback */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>الإجابة النموذجية أو الرد المشترك لجميع الطلاب:</span>
+                <span className="text-[11px] font-normal text-slate-400">سيصل كإشعار وملاحظة تصحيح لكل طالب</span>
+              </label>
+
+              {/* Template quick tags */}
+              <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                <span className="text-[11px] font-bold text-slate-400">عبارات جاهزة:</span>
+                {[
+                  'أحسنت! إجابة ممتازة ومكتملة 🌟',
+                  'تمت مراجعة الحل واعتماده بنجاح ✅',
+                  'حل جيد، ولكن انتبه للملاحظات والتفاصيل 📝',
+                  'هذا هو الحل النموذجي للتكليف، يرجى مراجعته ومطابقته بحلك 💡',
+                ].map(tmpl => (
+                  <button
+                    key={tmpl}
+                    type="button"
+                    onClick={() => setBulkForm(p => ({ ...p, feedback: p.feedback ? `${p.feedback}\n${tmpl}` : tmpl }))}
+                    className="rounded-lg bg-slate-100 hover:bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700 transition-colors"
+                  >
+                    + {tmpl.split(' ')[0]} {tmpl.split(' ')[1]}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                rows={4}
+                value={bulkForm.feedback}
+                onChange={e => setBulkForm(p => ({ ...p, feedback: e.target.value }))}
+                placeholder="اكتب هنا الرد الموحد أو الحل النموذجي وملاحظاتك للطلاب..."
+                className="w-full rounded-2xl border border-slate-300 p-3.5 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 custom-scrollbar leading-relaxed"
+              />
+            </div>
+
+            {/* Score & Evaluation Options */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {/* Score Mode */}
+              <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5">
+                <label className="text-xs font-bold text-slate-800 block">
+                  الدرجة الممنوحة للطلاب:
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="scoreMode"
+                      checked={bulkForm.scoreMode === 'FULL'}
+                      onChange={() => setBulkForm(p => ({ ...p, scoreMode: 'FULL' }))}
+                      className="text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>منح الدرجة الكاملة ({bulkTargetAssignment.assignment.maxScore} من {bulkTargetAssignment.assignment.maxScore})</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="scoreMode"
+                      checked={bulkForm.scoreMode === 'CUSTOM'}
+                      onChange={() => setBulkForm(p => ({ ...p, scoreMode: 'CUSTOM' }))}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>تحديد درجة موحدة للجميع</span>
+                  </label>
+
+                  {bulkForm.scoreMode === 'CUSTOM' && (
+                    <div className="pt-1 pr-5">
+                      <input
+                        type="number"
+                        min={0}
+                        max={bulkTargetAssignment.assignment.maxScore}
+                        value={bulkForm.customScore}
+                        onChange={e => setBulkForm(p => ({ ...p, customScore: e.target.value }))}
+                        className="w-32 rounded-xl border border-slate-300 bg-white p-2 text-xs font-bold text-slate-800"
+                        placeholder="الدرجة"
+                      />
+                      <span className="text-xs text-slate-500 mr-2 font-medium">من {bulkTargetAssignment.assignment.maxScore}</span>
+                    </div>
+                  )}
+
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="scoreMode"
+                      checked={bulkForm.scoreMode === 'KEEP'}
+                      onChange={() => setBulkForm(p => ({ ...p, scoreMode: 'KEEP' }))}
+                      className="text-slate-600 focus:ring-slate-500"
+                    />
+                    <span>الإبقاء على درجات الطلاب المسجلة مسبقاً وتطبيق الرد فقط</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Status & Optional Image */}
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    حالة التسليمات بعد الإرسال:
+                  </label>
+                  <select
+                    value={bulkForm.status}
+                    onChange={e => setBulkForm(p => ({ ...p, status: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-bold text-slate-800 cursor-pointer"
+                  >
+                    <option value="GRADED">تم التقييم (اعتماد رسمي)</option>
+                    <option value="RESUBMISSION_REQUESTED">طلب إعادة التسليم</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    رابط صورة التوضيح أو الحل النموذجي (اختياري):
+                  </label>
+                  <input
+                    type="url"
+                    value={bulkForm.feedbackImageUrl}
+                    onChange={e => setBulkForm(p => ({ ...p, feedbackImageUrl: e.target.value }))}
+                    placeholder="https://..."
+                    dir="ltr"
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Submit & Cancel Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              <div className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                {(() => {
+                  const targetCount = bulkForm.targetScope === 'SELECTED'
+                    ? bulkTargetAssignment.submissions.filter(s => selectedSubmissionIds.has(s.id)).length
+                    : bulkForm.targetScope === 'PENDING'
+                      ? bulkTargetAssignment.submissions.filter(s => s.status === 'SUBMITTED').length
+                      : bulkTargetAssignment.submissions.length;
+                  return `سيتم إرسال الرد والإشعار إلى ${targetCount} طالب`;
+                })()}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkModalOpen(false);
+                    setBulkTargetAssignment(null);
+                  }}
+                  disabled={savingBulk}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSendBulkReply()}
+                  disabled={savingBulk}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {savingBulk ? (
+                    <>
+                      <RefreshCw size={15} className="animate-spin" />
+                      <span>جارٍ إرسال الرد للجميع...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={15} />
+                      <span>إرسال الرد والتقييم للجميع الآن (مرة واحدة)</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
